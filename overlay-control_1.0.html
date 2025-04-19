@@ -468,7 +468,7 @@
                 square.classList.add(`level-${monsterLevel}`);
                 
                 const img = document.createElement('img');
-                img.src = 'monsters/unknown.jpg';
+                img.src = 'monsters/unknown.webp';
                 img.alt = '???';
                 square.appendChild(img);
                 
@@ -560,7 +560,7 @@
                             img.src = `monsters/${fileName}.webp`;
                             img.alt = this.value;
                         } else {
-                            img.src = 'monsters/unknown.jpg'; // Используем unknown как placeholder
+                            img.src = 'monsters/unknown.webp'; // Используем unknown как placeholder
                             img.alt = '???';
                         }
                     });
