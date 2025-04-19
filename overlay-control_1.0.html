@@ -623,11 +623,24 @@
                             let fileName = this.value.toLowerCase();
                             let count;
                             
-                            // Определяем количество для базовых монстров
-                            if (this.value === 'Gnomes') {
+                            // Определяем количество для монстров
+                            if (this.value === 'Gnomes' && parseInt(this.dataset.level) !== 3) {
                                 count = 4;
-                            } else if (this.value === 'Bangers') {
+                            } else if (this.value === 'Bangers' && parseInt(this.dataset.level) === 2) {
                                 count = 3;
+                            } else if (parseInt(this.dataset.level) === 3) {
+                                // Для заменяющих монстров 3-го уровня
+                                if (['Animals', 'Upscreams', 'Bowties', 'Rugrat', 'Mentalists', 'Peepers', 'Chefs'].includes(this.value)) {
+                                    count = 3;
+                                } else if (['Hidden'].includes(this.value)) {
+                                    count = 2;
+                                } else if (['Apex Predators', 'Spewers', 'Shadow Children'].includes(this.value)) {
+                                    count = 4;
+                                } else if (['Bangers'].includes(this.value)) {
+                                    count = 6;
+                                } else if (['Gnomes'].includes(this.value)) {
+                                    count = 10;
+                                }
                             }
                             
                             switch(fileName) {
