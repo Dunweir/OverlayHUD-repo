@@ -132,7 +132,7 @@
         /* Стили для панели управления */
         .control-panel {
             padding: 20px;
-            width: 300px;
+            width: 600px;
             background: #2c3e50;
             box-sizing: border-box;
             color: white;
@@ -143,6 +143,13 @@
             top: 0;
             border-radius: 0 0 0 10px;
             font-family: 'Roboto', sans-serif;
+            display: flex;
+            gap: 20px;
+        }
+
+        .control-panel-left,
+        .control-panel-right {
+            flex: 1;
         }
         
         .control-panel h2 {
@@ -363,43 +370,48 @@
 
     <!-- Панель управления -->
     <div class="control-panel">
-        <h2>Управление оверлеем</h2>
-        <div class="timer-controls">
-            <button id="startBtn">Старт</button>
-            <button id="stopBtn">Стоп</button>
-            <button id="resetBtn">Сброс</button>
-        </div>
-        
-        <div class="level-control">
-            <label for="levelInput">Уровень:</label>
-            <input type="number" id="levelInput" min="1" value="1">
-            <div id="errorMsg" class="error"></div>
-            <button id="setLevelBtn">Установить уровень</button>
-        </div>
-
-        <div class="monster-selects" id="monsterSelects">
-            <!-- Здесь будут выпадающие списки для выбора монстров -->
-        </div>
-        
-        <div class="style-buttons">
-            <h3>Стили оверлея:</h3>
-            <button id="style1Btn">Стиль 1 (белый текст)</button>
-            <button id="style2Btn">Стиль 2 (чёрный текст)</button>
+        <div class="control-panel-left">
+            <h2>Управление оверлеем</h2>
+            <div class="timer-controls">
+                <button id="startBtn">Старт</button>
+                <button id="stopBtn">Стоп</button>
+                <button id="resetBtn">Сброс</button>
+            </div>
             
-            <div class="size-control">
-                <span>Размер квадратиков:</span>
-                <div class="slider-row">
-                    <input type="range" id="sizeSlider" min="30" max="60" value="50" step="2">
-                    <span id="sizeValue">50px</span>
+            <div class="level-control">
+                <label for="levelInput">Уровень:</label>
+                <input type="number" id="levelInput" min="1" value="1">
+                <div id="errorMsg" class="error"></div>
+                <button id="setLevelBtn">Установить уровень</button>
+            </div>
+            
+            <div class="style-buttons">
+                <h3>Стили оверлея:</h3>
+                <button id="style1Btn">Стиль 1 (белый текст)</button>
+                <button id="style2Btn">Стиль 2 (чёрный текст)</button>
+                
+                <div class="size-control">
+                    <span>Размер квадратиков:</span>
+                    <div class="slider-row">
+                        <input type="range" id="sizeSlider" min="30" max="60" value="50" step="2">
+                        <span id="sizeValue">50px</span>
+                    </div>
+                </div>
+
+                <div class="bg-toggle">
+                    <span>Подложка:</span>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="bgToggle" checked>
+                        <span class="slider"></span>
+                    </label>
                 </div>
             </div>
+        </div>
 
-            <div class="bg-toggle">
-                <span>Подложка:</span>
-                <label class="toggle-switch">
-                    <input type="checkbox" id="bgToggle" checked>
-                    <span class="slider"></span>
-                </label>
+        <div class="control-panel-right">
+            <h2>Выбор монстров</h2>
+            <div class="monster-selects" id="monsterSelects">
+                <!-- Здесь будут выпадающие списки для выбора монстров -->
             </div>
         </div>
     </div>
