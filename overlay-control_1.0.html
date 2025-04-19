@@ -624,11 +624,12 @@
                             let count;
                             
                             // Определяем количество для монстров
-                            if (this.value === 'Gnomes' && parseInt(this.dataset.level) !== 3) {
+                            const level = parseInt(this.dataset.level);
+                            if (this.value === 'Gnomes' && level !== 3) {
                                 count = 4;
-                            } else if (this.value === 'Bangers' && parseInt(this.dataset.level) === 2) {
+                            } else if ((this.value === 'Bangers' || this.value === 'Banger') && level === 2) {
                                 count = 3;
-                            } else if (parseInt(this.dataset.level) === 3) {
+                            } else if (level === 3) {
                                 // Для заменяющих монстров 3-го уровня
                                 if (['Animals', 'Upscreams', 'Bowties', 'Rugrat', 'Mentalists', 'Peepers', 'Chefs'].includes(this.value)) {
                                     count = 3;
