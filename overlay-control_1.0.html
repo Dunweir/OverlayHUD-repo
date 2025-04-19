@@ -243,12 +243,20 @@
         .size-control {
             margin: 15px 0;
             display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .size-control .slider-row {
+            display: flex;
             align-items: center;
             gap: 10px;
         }
 
         .size-control input[type="range"] {
-            flex-grow: 1;
+            flex: 1;
+            min-width: 100px;
+            max-width: 200px;
             height: 6px;
             background: #3498db;
             border-radius: 3px;
@@ -266,7 +274,7 @@
         }
 
         .size-control #sizeValue {
-            min-width: 50px;
+            min-width: 45px;
             text-align: right;
         }
 
@@ -366,8 +374,10 @@
             
             <div class="size-control">
                 <span>Размер квадратиков:</span>
-                <input type="range" id="sizeSlider" min="30" max="60" value="40" step="2">
-                <span id="sizeValue">40px</span>
+                <div class="slider-row">
+                    <input type="range" id="sizeSlider" min="30" max="60" value="40" step="2">
+                    <span id="sizeValue">40px</span>
+                </div>
             </div>
 
             <div class="bg-toggle">
