@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Stream Overlay Controller</title>
+    <style>
+        @font-face {
+            font-family: 'CC Ultimatum';
+            src: url('cc-ultimatum-bold.otf') format('opentype');
+        }
+        
+        body {
+            font-family: 'CC Ultimatum', sans-serif;
+            display: flex;
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            height: 100vh;
+        }
+        
+        /* Стили для оверлея */
+        .overlay {
+            position: relative;
+            background-color: transparent;
+            flex-grow: 1;
+        }
+        
+        .overlay-container {
+            position: absolute;
+            left: 20px;
+            bottom: 20px;
+            padding: 15px 25px;
+            border-radius: 10px;
+            min-width: 230px;
+            width: max-content;
+        }
+        
+        /* Стиль 1 (по умолчанию) - белый текст */
+        .style-1.with-bg {
+            background-color: rgba(0, 0, 0, 0.8);
+        }
+        .style-1 .level-text,
+        .style-1 .level-number,
+        .style-1 .colon { 
+            color: #ffb200; /* Оранжевые элементы */
+        }
+        .style-1 .timer { color: white; }
+        .style-1 .monsters-info { color: #ff4444; }
+        .style-1 .monsters-info.white { color: white; }
+        .style-1 .respawn-info { color: white; }
+        
+        /* Стиль 2 - чёрный текст */
+        .style-2.with-bg {
+            background-color: rgba(255, 255, 255, 0.8);
+        }
+        .style-2 .level-text,
+        .style-2 .level-number,
+        .style-2 .colon { 
+            color: #ffb200; /* Оранжевые элементы */
+        }
+        .style-2 .timer { color: black; }
+        .style-2 .monsters-info { color: #ff4444; }
+        .style-2 .monsters-info.white { color: black; }
+        .style-2 .respawn-info { color: black; }
+        
+        .level-line {
+            font-size: 32px;
+            margin-bottom: 5px;
+        }
+        
+        .timer {
+            display: inline;
+            font-size: 32px;
+        }
+        
+        .monsters-info {
+            font-size: 20px;
+            margin-bottom: 5px;
+        }
+        
+        .respawn-info {
+            font-size: 20px;
+        }
+        
+        /* Стили для панели управления */
+        .control-panel {
+            padding: 20px;
+            width: 300px;
+            background: #2c3e50;
+            box-sizing: border-box;
+            color: white;
+            overflow-y: auto;
+            height: auto;
+            position: absolute;
+            right: 0;
+            top: 0;
+            border-radius: 0 0 0 10px;
+            font-family: 'Roboto', sans-serif;
+        }
+        
+        .control-panel h2 {
+            margin-top: 0;
+            margin-bottom: 20px;
+            font-size: 24px;
+            color: #ecf0f1;
+        }
+        
+        .timer-controls {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+        
+        button {
+            padding: 8px 12px;
+            background-color: #3498db;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-family: 'Roboto', sans-serif;
+            font-size: 16px;
+            transition: background-color 0.2s;
+            flex-grow: 1;
+        }
+        
+        button:hover {
+            background-color: #2980b9;
+        }
+        
+        #startBtn { background-color: #2ecc71; }
+        #startBtn:hover { background-color: #27ae60; }
+        
+        #stopBtn { background-color: #e74c3c; }
+        #stopBtn:hover { background-color: #c0392b; }
+        
+        #resetBtn { background-color: #f39c12; }
+        #resetBtn:hover { background-color: #d35400; }
+        
+        .level-control {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            margin-bottom: 20px;
+        }
+        
+        .level-control label {
+            font-size: 16px;
+        }
+        
+        input {
+            padding: 8px 12px;
+            border: 2px solid #3498db;
+            border-radius: 4px;
+            font-family: 'Roboto', sans-serif;
+            font-size: 16px;
+            background-color: #34495e;
+            color: white;
+        }
+        
+        .error {
+            color: #e74c3c;
+            font-size: 14px;
+            min-height: 18px;
+            margin-top: 4px;
+        }
+        
+        .style-buttons {
+            margin-top: 20px;
+        }
+        
+        .style-buttons button {
+            background-color: #555;
+            margin-bottom: 5px;
+        }
+        
+        /* Тумблер подложки */
+        .bg-toggle {
+            display: flex;
+            align-items: center;
+            margin-top: 10px;
+        }
+        
+        .toggle-switch {
+            position: relative;
+            display: inline-block;
+            width: 50px;
+            height: 24px;
+            margin-left: 10px;
+        }
+        
+        .toggle-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+        
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #ccc;
+            transition: .4s;
+            border-radius: 24px;
+        }
+        
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 16px;
+            width: 16px;
+            left: 4px;
+            bottom: 4px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+        
+        input:checked + .slider {
+            background-color: #2ecc71;
+        }
+        
+        input:checked + .slider:before {
+            transform: translateX(26px);
+        }
+    </style>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <!-- Оверлей -->
+    <div class="overlay">
+        <div class="overlay-container style-1 with-bg" id="overlayContainer">
+            <div class="level-line">
+                <span class="level-text">Уровень</span> 
+                <span class="level-number">1</span><span class="colon">:</span> 
+                <span class="timer" id="timer">00:00</span>
+            </div>
+            <div class="monsters-info" id="monstersInfo">Монстры: 1/0/1</div>
+            <div class="respawn-info" id="respawnInfo">Респавн: 4-5 минут</div>
+        </div>
+    </div>
+    
+    <!-- Панель управления -->
+    <div class="control-panel">
+        <h2>Управление оверлеем</h2>
+        <div class="timer-controls">
+            <button id="startBtn">Старт</button>
+            <button id="stopBtn">Стоп</button>
+            <button id="resetBtn">Сброс</button>
+        </div>
+        
+        <div class="level-control">
+            <label for="levelInput">Уровень:</label>
+            <input type="number" id="levelInput" min="1" value="1">
+            <div id="errorMsg" class="error"></div>
+            <button id="setLevelBtn">Установить уровень</button>
+        </div>
+        
+        <div class="style-buttons">
+            <h3>Стили оверлея:</h3>
+            <button id="style1Btn">Стиль 1 (белый текст)</button>
+            <button id="style2Btn">Стиль 2 (чёрный текст)</button>
+            
+            <div class="bg-toggle">
+                <span>Подложка:</span>
+                <label class="toggle-switch">
+                    <input type="checkbox" id="bgToggle" checked>
+                    <span class="slider"></span>
+                </label>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let seconds = 0;
+        let timerInterval;
+        let currentLevel = 1;
+        let currentStyle = 1;
+        let bgEnabled = true;
+        
+        // Элементы оверлея
+        const levelNumberEl = document.querySelector('.level-number');
+        const timerEl = document.getElementById('timer');
+        const monstersInfoEl = document.getElementById('monstersInfo');
+        const respawnInfoEl = document.getElementById('respawnInfo');
+        const overlayContainer = document.getElementById('overlayContainer');
+        const bgToggle = document.getElementById('bgToggle');
+        
+        // Обработчики кнопок
+        document.getElementById('startBtn').addEventListener('click', startTimer);
+        document.getElementById('stopBtn').addEventListener('click', stopTimer);
+        document.getElementById('resetBtn').addEventListener('click', resetTimer);
+        document.getElementById('setLevelBtn').addEventListener('click', setLevel);
+        
+        // Обработчики стилей
+        document.getElementById('style1Btn').addEventListener('click', () => {
+            currentStyle = 1;
+            setStyle();
+        });
+        document.getElementById('style2Btn').addEventListener('click', () => {
+            currentStyle = 2;
+            setStyle();
+        });
+        
+        // Обработчик тумблера подложки
+        bgToggle.addEventListener('change', () => {
+            bgEnabled = bgToggle.checked;
+            setStyle();
+        });
+        
+        // Горячие клавиши для стилей
+        document.addEventListener('keydown', (e) => {
+            if (e.key === '1') {
+                currentStyle = 1;
+                setStyle();
+            }
+            else if (e.key === '2') {
+                currentStyle = 2;
+                setStyle();
+            }
+        });
+        
+        function setStyle() {
+            overlayContainer.className = 'overlay-container';
+            overlayContainer.classList.add(`style-${currentStyle}`);
+            if (bgEnabled) {
+                overlayContainer.classList.add('with-bg');
+            }
+        }
+        
+        function startTimer() {
+            if (!timerInterval) {
+                timerInterval = setInterval(updateTimer, 1000);
+            }
+        }
+        
+        function stopTimer() {
+            if (timerInterval) {
+                clearInterval(timerInterval);
+                timerInterval = null;
+            }
+        }
+        
+        function resetTimer() {
+            stopTimer();
+            seconds = 0;
+            updateDisplay();
+        }
+        
+        function setLevel() {
+            const level = parseInt(document.getElementById('levelInput').value);
+            const errorMsg = document.getElementById('errorMsg');
+            
+            if (isNaN(level) || level < 1) {
+                errorMsg.textContent = "Введите число ≥ 1";
+                return;
+            }
+            
+            errorMsg.textContent = "";
+            currentLevel = level;
+            updateMonsterInfo();
+        }
+        
+        function updateTimer() {
+            seconds++;
+            updateDisplay();
+        }
+        
+        function updateDisplay() {
+            timerEl.textContent = formatTime(seconds);
+            updateMonsterInfo();
+            updateRespawnInfo();
+            
+            // Изменение цвета текста после 4 минут (240 секунд)
+            if (seconds > 240) {
+                monstersInfoEl.classList.add('white');
+            } else {
+                monstersInfoEl.classList.remove('white');
+            }
+        }
+        
+        function updateMonsterInfo() {
+            let lvl1, lvl2, lvl3;
+            
+            if (currentLevel <= 2) {
+                lvl1 = 1; lvl2 = 0; lvl3 = 1;
+            } else if (currentLevel <= 5) {
+                lvl1 = 1; lvl2 = 1; lvl3 = 1;
+            } else if (currentLevel <= 8) {
+                lvl1 = 2; lvl2 = 2; lvl3 = 2;
+            } else if (currentLevel <= 10) {
+                lvl1 = 2; lvl2 = 3; lvl3 = 2;
+            } else {
+                lvl1 = 2; lvl2 = 3; lvl3 = 3;
+            }
+            
+            levelNumberEl.textContent = currentLevel;
+            monstersInfoEl.textContent = `Монстры: ${lvl1}/${lvl2}/${lvl3}`;
+        }
+        
+        function updateRespawnInfo() {
+            const minutes = Math.floor(seconds / 60);
+            let respawnText;
+            
+            if (minutes < 10) respawnText = "4-5 минут";
+            else if (minutes < 20) respawnText = "3.2-4 минут";
+            else if (minutes < 30) respawnText = "2.4-3 минут";
+            else if (minutes < 40) respawnText = "1.6-2 минут";
+            else if (minutes < 50) respawnText = "0.8-1 минута";
+            else respawnText = "1 секунда";
+            
+            respawnInfoEl.textContent = `Респавн: ${respawnText}`;
+        }
+        
+        function formatTime(totalSeconds) {
+            const mins = Math.floor(totalSeconds / 60);
+            const secs = totalSeconds % 60;
+            return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+        }
+        
+        // Инициализация
+        updateMonsterInfo();
+    </script>
+</body>
+</html>
