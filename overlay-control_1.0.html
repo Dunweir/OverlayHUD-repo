@@ -80,7 +80,36 @@
         
         .respawn-info {
             font-size: 20px;
+            margin-bottom: 10px;
         }
+
+        /* Стили для квадратиков монстров */
+        .monsters-squares {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .monster-square {
+            width: 40px;
+            height: 40px;
+            border-radius: 8px;
+            background: rgba(0, 0, 0, 0.8);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+        }
+
+        .monster-square img {
+            width: 30px;
+            height: 30px;
+            object-fit: contain;
+        }
+
+        .monster-square.level-1 { border: 2px solid #4CAF50; }
+        .monster-square.level-2 { border: 2px solid #2196F3; }
+        .monster-square.level-3 { border: 2px solid #F44336; }
         
         /* Стили для панели управления */
         .control-panel {
@@ -241,9 +270,10 @@
             </div>
             <div class="monsters-info" id="monstersInfo">Монстры: 1/0/1</div>
             <div class="respawn-info" id="respawnInfo">Респавн: 4-5 минут</div>
+            <div class="monsters-squares" id="monstersSquares"></div>
         </div>
     </div>
-    
+
     <!-- Панель управления -->
     <div class="control-panel">
         <h2>Управление оверлеем</h2>
@@ -282,6 +312,19 @@
         let currentStyle = 1;
         let bgEnabled = true;
         
+        // Данные о монстрах по уровням
+        const monstersByLevel = {
+            1: ['Peeper', 'Shadow Child', 'Gnomes', 'Apex Predator', 'Spewer'],
+            2: ['Rugrat', 'Animal', 'Upscream', 'Chef', 'Hidden', 'Bowtie', 'Mentalist', 'Banger'],
+            3: ['Headman', 'Robe', 'Huntsman', 'Reaper', 'Clown', 'Trudge']
+        };
+
+        const replacementMonsters = [
+            'Animals', 'Upscreams', 'Bowties', 'Rugrat', 'Mentalists', 'Peepers',
+            'Hidden', 'Apex Predators', 'Chefs', 'Spewers', 'Shadow Children',
+            'Bangers', 'Gnomes'
+        ];
+
         // Элементы оверлея
         const levelNumberEl = document.querySelector('.level-number');
         const timerEl = document.getElementById('timer');
