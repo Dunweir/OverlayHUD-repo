@@ -536,9 +536,25 @@
                             // Преобразуем имена монстров в соответствующие имена файлов
                             let fileName = this.value.toLowerCase();
                             switch(fileName) {
+                                // Основные монстры
                                 case 'peeper': fileName = 'eye_monster'; break;
+                                case 'shadow child': fileName = 'shadow_child'; break;
+                                case 'gnomes': fileName = 'gnome'; break;
+                                case 'apex predator': fileName = 'apex_predator'; break;
                                 case 'chef': fileName = 'chef_frog'; break;
                                 case 'clown': fileName = 'clown_beamer'; break;
+                                case 'hidden': fileName = 'hidden'; break;
+                                
+                                // Замены во множественном числе
+                                case 'animals': fileName = 'animal'; break;
+                                case 'upscreams': fileName = 'upscream'; break;
+                                case 'bowties': fileName = 'bowtie'; break;
+                                case 'mentalists': fileName = 'mentalist'; break;
+                                case 'peepers': fileName = 'eye_monster'; break;
+                                case 'chefs': fileName = 'chef_frog'; break;
+                                case 'spewers': fileName = 'spewer'; break;
+                                case 'shadow children': fileName = 'shadow_child'; break;
+                                case 'bangers': fileName = 'banger'; break;
                             }
                             img.src = `monsters/${fileName}.webp`;
                             img.alt = this.value;
