@@ -133,6 +133,37 @@
             font-size: 24px;
             color: #ecf0f1;
         }
+
+        .monster-selects {
+            margin-top: 20px;
+        }
+
+        .monster-select-container {
+            margin-bottom: 10px;
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .monster-select-container select {
+            padding: 8px;
+            background-color: #34495e;
+            color: white;
+            border: 2px solid #3498db;
+            border-radius: 4px;
+            width: 200px;
+        }
+
+        .monster-level-indicator {
+            width: 20px;
+            height: 20px;
+            border-radius: 4px;
+            display: inline-block;
+        }
+
+        .monster-level-1 { border: 2px solid #4CAF50; }
+        .monster-level-2 { border: 2px solid #2196F3; }
+        .monster-level-3 { border: 2px solid #F44336; }
         
         .timer-controls {
             display: flex;
@@ -289,6 +320,10 @@
             <div id="errorMsg" class="error"></div>
             <button id="setLevelBtn">Установить уровень</button>
         </div>
+
+        <div class="monster-selects" id="monsterSelects">
+            <!-- Здесь будут выпадающие списки для выбора монстров -->
+        </div>
         
         <div class="style-buttons">
             <h3>Стили оверлея:</h3>
@@ -313,17 +348,28 @@
         let bgEnabled = true;
         
         // Данные о монстрах по уровням
-        const monstersByLevel = {
-            1: ['Peeper', 'Shadow Child', 'Gnomes', 'Apex Predator', 'Spewer'],
-            2: ['Rugrat', 'Animal', 'Upscream', 'Chef', 'Hidden', 'Bowtie', 'Mentalist', 'Banger'],
-            3: ['Headman', 'Robe', 'Huntsman', 'Reaper', 'Clown', 'Trudge']
+        // Конфигурация монстров по уровням
+        const monsterConfig = {
+            levels: {
+                1: { monsters: ['Peeper', 'Shadow Child', 'Gnomes', 'Apex Predator', 'Spewer'] },
+                2: { monsters: ['Rugrat', 'Animal', 'Upscream', 'Chef', 'Hidden', 'Bowtie', 'Mentalist', 'Banger'] },
+                3: { monsters: ['Headman', 'Robe', 'Huntsman', 'Reaper', 'Clown', 'Trudge'] }
+            },
+            replacements: [
+                'Animals', 'Upscreams', 'Bowties', 'Rugrat', 'Mentalists', 'Peepers',
+                'Hidden', 'Apex Predators', 'Chefs', 'Spewers', 'Shadow Children',
+                'Bangers', 'Gnomes'
+            ]
         };
 
-        const replacementMonsters = [
-            'Animals', 'Upscreams', 'Bowties', 'Rugrat', 'Mentalists', 'Peepers',
-            'Hidden', 'Apex Predators', 'Chefs', 'Spewers', 'Shadow Children',
-            'Bangers', 'Gnomes'
-        ];
+        // Конфигурация количества монстров по уровням
+        const levelMonsterCounts = {
+            '1-2': { level1: 1, level2: 0, level3: 1 },
+            '3-5': { level1: 1, level2: 1, level3: 1 },
+            '6-8': { level1: 2, level2: 2, level3: 2 },
+            '9-10': { level1: 2, level2: 3, level3: 2 },
+            '11+': { level1: 2, level2: 3, level3: 3 }
+        };
 
         // Элементы оверлея
         const levelNumberEl = document.querySelector('.level-number');
@@ -394,6 +440,114 @@
             updateDisplay();
         }
         
+        function getMonsterCountsForLevel(level) {
+            if (level <= 2) return levelMonsterCounts['1-2'];
+            if (level <= 5) return levelMonsterCounts['3-5'];
+            if (level <= 8) return levelMonsterCounts['6-8'];
+            if (level <= 10) return levelMonsterCounts['9-10'];
+            return levelMonsterCounts['11+'];
+        }
+
+        function createMonsterSquares() {
+            const monstersSquares = document.getElementById('monstersSquares');
+            monstersSquares.innerHTML = '';
+            
+            const counts = getMonsterCountsForLevel(currentLevel);
+            const totalSquares = counts.level1 + counts.level2 + counts.level3;
+            
+            for (let i = 0; i < totalSquares; i++) {
+                const square = document.createElement('div');
+                square.className = 'monster-square';
+                
+                // Определяем уровень монстра для квадрата
+                let monsterLevel;
+                if (i < counts.level1) monsterLevel = 1;
+                else if (i < counts.level1 + counts.level2) monsterLevel = 2;
+                else monsterLevel = 3;
+                
+                square.classList.add(`level-${monsterLevel}`);
+                
+                const img = document.createElement('img');
+                img.src = 'monsters/unknown.jpg';
+                img.alt = '???';
+                square.appendChild(img);
+                
+                monstersSquares.appendChild(square);
+            }
+            
+            updateMonsterSelects(counts);
+        }
+
+        function updateMonsterSelects(counts) {
+            const selectsContainer = document.getElementById('monsterSelects');
+            selectsContainer.innerHTML = '';
+            
+            let currentIndex = 0;
+            
+            // Создаем селекты для каждого уровня монстров
+            for (let level = 1; level <= 3; level++) {
+                const count = level === 1 ? counts.level1 : (level === 2 ? counts.level2 : counts.level3);
+                
+                for (let i = 0; i < count; i++) {
+                    const container = document.createElement('div');
+                    container.className = 'monster-select-container';
+                    
+                    const indicator = document.createElement('div');
+                    indicator.className = `monster-level-indicator monster-level-${level}`;
+                    
+                    const select = document.createElement('select');
+                    select.dataset.index = currentIndex++;
+                    select.dataset.level = level;
+                    
+                    // Добавляем опции
+                    const defaultOption = document.createElement('option');
+                    defaultOption.value = '';
+                    defaultOption.textContent = 'Выберите монстра';
+                    select.appendChild(defaultOption);
+                    
+                    // Добавляем монстров соответствующего уровня
+                    const monsters = monsterConfig.levels[level].monsters;
+                    monsters.forEach(monster => {
+                        const option = document.createElement('option');
+                        option.value = monster;
+                        option.textContent = monster;
+                        select.appendChild(option);
+                    });
+                    
+                    // Для монстров 3 уровня добавляем замены
+                    if (level === 3) {
+                        const replacementsOptgroup = document.createElement('optgroup');
+                        replacementsOptgroup.label = 'Замены';
+                        monsterConfig.replacements.forEach(monster => {
+                            const option = document.createElement('option');
+                            option.value = monster;
+                            option.textContent = monster;
+                            replacementsOptgroup.appendChild(option);
+                        });
+                        select.appendChild(replacementsOptgroup);
+                    }
+                    
+                    select.addEventListener('change', function() {
+                        const squares = document.querySelectorAll('.monster-square');
+                        const square = squares[this.dataset.index];
+                        const img = square.querySelector('img');
+                        
+                        if (this.value) {
+                            img.src = `monsters/${this.value.toLowerCase()}.jpg`;
+                            img.alt = this.value;
+                        } else {
+                            img.src = 'monsters/unknown.jpg';
+                            img.alt = '???';
+                        }
+                    });
+                    
+                    container.appendChild(indicator);
+                    container.appendChild(select);
+                    selectsContainer.appendChild(container);
+                }
+            }
+        }
+
         function setLevel() {
             const level = parseInt(document.getElementById('levelInput').value);
             const errorMsg = document.getElementById('errorMsg');
@@ -406,6 +560,7 @@
             errorMsg.textContent = "";
             currentLevel = level;
             updateMonsterInfo();
+            createMonsterSquares();
         }
         
         function updateTimer() {
