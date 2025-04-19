@@ -653,26 +653,12 @@
                             }
                             
                             // Добавляем счетчик для заменяющих монстров
-                            if (parseInt(this.dataset.level) === 3 && this.value) {
-                                let count;
-                                if (['Animals', 'Upscreams', 'Bowties', 'Rugrat', 'Mentalists', 'Peepers', 'Chefs'].includes(this.value)) {
-                                    count = 3;
-                                } else if (['Hidden'].includes(this.value)) {
-                                    count = 2;
-                                } else if (['Apex Predators', 'Spewers', 'Shadow Children'].includes(this.value)) {
-                                    count = 4;
-                                } else if (['Bangers'].includes(this.value)) {
-                                    count = 6;
-                                } else if (['Gnomes'].includes(this.value)) {
-                                    count = 10;
-                                }
-                                
-                                if (count) {
-                                    const countElement = document.createElement('div');
-                                    countElement.className = 'monster-count';
-                                    countElement.textContent = `x${count}`;
-                                    square.appendChild(countElement);
-                                }
+                            // Если есть количество монстров, показываем его
+                            if (count) {
+                                const countElement = document.createElement('div');
+                                countElement.className = 'monster-count';
+                                countElement.textContent = `x${count}`;
+                                square.appendChild(countElement);
                             }
                         } else {
                             img.src = 'monsters/unknown.webp'; // Используем unknown как placeholder
