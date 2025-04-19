@@ -647,7 +647,7 @@
                             }
                             
                             // Добавляем счетчик для заменяющих монстров
-                            if (level === '3' && this.value) {
+                            if (parseInt(this.dataset.level) === 3 && this.value) {
                                 let count;
                                 if (['Animals', 'Upscreams', 'Bowties', 'Rugrat', 'Mentalists', 'Peepers', 'Chefs'].includes(this.value)) {
                                     count = 3;
