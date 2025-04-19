@@ -533,10 +533,17 @@
                         const img = square.querySelector('img');
                         
                         if (this.value) {
-                            img.src = `monsters/${this.value.toLowerCase()}.jpg`;
+                            // Преобразуем имена монстров в соответствующие имена файлов
+                            let fileName = this.value.toLowerCase();
+                            switch(fileName) {
+                                case 'peeper': fileName = 'eye_monster'; break;
+                                case 'chef': fileName = 'chef_frog'; break;
+                                case 'clown': fileName = 'clown_beamer'; break;
+                            }
+                            img.src = `monsters/${fileName}.webp`;
                             img.alt = this.value;
                         } else {
-                            img.src = 'monsters/unknown.jpg';
+                            img.src = 'monsters/eye_monster.webp'; // Используем peeper как placeholder
                             img.alt = '???';
                         }
                     });
