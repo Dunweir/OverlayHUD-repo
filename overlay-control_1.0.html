@@ -91,9 +91,9 @@
         }
 
         .monster-square {
-            width: 40px;
-            height: 40px;
-            border-radius: 8px;
+            width: var(--square-size);
+            height: var(--square-size);
+            border-radius: calc(var(--square-size) * 0.2);
             background: rgba(0, 0, 0, 0.8);
             display: flex;
             align-items: center;
@@ -102,9 +102,13 @@
         }
 
         .monster-square img {
-            width: 36px;
-            height: 36px;
+            width: calc(var(--square-size) * 0.9);
+            height: calc(var(--square-size) * 0.9);
             object-fit: cover;
+        }
+
+        :root {
+            --square-size: 40px;
         }
 
         .monster-square.level-1 { border: 2px solid #4CAF50; }
@@ -236,6 +240,36 @@
         }
         
         /* Тумблер подложки */
+        .size-control {
+            margin: 15px 0;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .size-control input[type="range"] {
+            flex-grow: 1;
+            height: 6px;
+            background: #3498db;
+            border-radius: 3px;
+            appearance: none;
+            outline: none;
+        }
+
+        .size-control input[type="range"]::-webkit-slider-thumb {
+            appearance: none;
+            width: 16px;
+            height: 16px;
+            background: #2ecc71;
+            border-radius: 50%;
+            cursor: pointer;
+        }
+
+        .size-control #sizeValue {
+            min-width: 50px;
+            text-align: right;
+        }
+
         .bg-toggle {
             display: flex;
             align-items: center;
@@ -330,6 +364,12 @@
             <button id="style1Btn">Стиль 1 (белый текст)</button>
             <button id="style2Btn">Стиль 2 (чёрный текст)</button>
             
+            <div class="size-control">
+                <span>Размер квадратиков:</span>
+                <input type="range" id="sizeSlider" min="30" max="60" value="40" step="2">
+                <span id="sizeValue">40px</span>
+            </div>
+
             <div class="bg-toggle">
                 <span>Подложка:</span>
                 <label class="toggle-switch">
@@ -346,6 +386,7 @@
         let currentLevel = 1;
         let currentStyle = 1;
         let bgEnabled = true;
+        let squareSize = 40;
         
         // Данные о монстрах по уровням
         // Конфигурация монстров по уровням
@@ -644,6 +685,13 @@
             return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
         }
         
+        // Обработчик изменения размера
+        document.getElementById('sizeSlider').addEventListener('input', function() {
+            const size = this.value;
+            document.getElementById('sizeValue').textContent = size + 'px';
+            document.documentElement.style.setProperty('--square-size', size + 'px');
+        });
+
         // Инициализация
         updateMonsterInfo();
     </script>
