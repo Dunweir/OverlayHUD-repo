@@ -573,7 +573,16 @@
                         monsterConfig.replacements.forEach(monster => {
                             const option = document.createElement('option');
                             option.value = monster;
-                            option.textContent = monster;
+                            // Определяем количество монстров для замены
+                            let count;
+                            if (['Animals', 'Upscreams', 'Bowties'].includes(monster)) {
+                                count = 3;
+                            } else if (['Mentalists', 'Peepers', 'Chefs', 'Spewers', 'Shadow Children', 'Bangers'].includes(monster)) {
+                                count = 2;
+                            } else {
+                                count = 1;
+                            }
+                            option.textContent = `${monster} (x${count})`;
                             replacementsOptgroup.appendChild(option);
                         });
                         select.appendChild(replacementsOptgroup);
