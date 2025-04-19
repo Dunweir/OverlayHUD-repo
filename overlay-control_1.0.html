@@ -575,7 +575,13 @@
                     monsters.forEach(monster => {
                         const option = document.createElement('option');
                         option.value = monster;
-                        option.textContent = monster;
+                        let displayText = monster;
+                        if (monster === 'Gnomes') {
+                            displayText += ' (x4)';
+                        } else if (monster === 'Bangers') {
+                            displayText += ' (x3)';
+                        }
+                        option.textContent = displayText;
                         select.appendChild(option);
                     });
                     
