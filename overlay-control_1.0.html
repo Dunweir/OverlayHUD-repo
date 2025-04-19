@@ -575,12 +575,18 @@
                             option.value = monster;
                             // Определяем количество монстров для замены
                             let count;
-                            if (['Animals', 'Upscreams', 'Bowties'].includes(monster)) {
+                            if (['Animals', 'Upscreams', 'Bowties', 'Rugrat', 'Mentalists', 'Peepers', 'Chefs'].includes(monster)) {
                                 count = 3;
-                            } else if (['Mentalists', 'Peepers', 'Chefs', 'Spewers', 'Shadow Children', 'Bangers'].includes(monster)) {
+                            } else if (['Hidden'].includes(monster)) {
                                 count = 2;
+                            } else if (['Apex Predators', 'Spewers', 'Shadow Children'].includes(monster)) {
+                                count = 4;
+                            } else if (['Bangers'].includes(monster)) {
+                                count = 6;
+                            } else if (['Gnomes'].includes(monster)) {
+                                count = 10;
                             } else {
-                                count = 1;
+                                count = 1; // для неизвестных монстров
                             }
                             option.textContent = `${monster} (x${count})`;
                             replacementsOptgroup.appendChild(option);
