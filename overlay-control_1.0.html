@@ -621,6 +621,15 @@
                         if (this.value) {
                             // Преобразуем имена монстров в соответствующие имена файлов
                             let fileName = this.value.toLowerCase();
+                            let count;
+                            
+                            // Определяем количество для базовых монстров
+                            if (this.value === 'Gnomes') {
+                                count = 4;
+                            } else if (this.value === 'Bangers') {
+                                count = 3;
+                            }
+                            
                             switch(fileName) {
                                 // Основные монстры
                                 case 'peeper': fileName = 'eye_monster'; break;
