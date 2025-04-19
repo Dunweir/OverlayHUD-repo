@@ -108,6 +108,19 @@
             left: 0;
         }
 
+        .monster-count {
+            position: absolute;
+            bottom: 2px;
+            right: 2px;
+            background: rgba(0, 0, 0, 0.7);
+            color: #fff;
+            padding: 1px 4px;
+            border-radius: 3px;
+            font-size: 12px;
+            font-family: 'Roboto', sans-serif;
+            z-index: 1;
+        }
+
         :root {
             --square-size: 40px;
         }
@@ -626,9 +639,43 @@
                             }
                             img.src = `monsters/${fileName}.webp`;
                             img.alt = this.value;
+                            
+                            // Удаляем старый счетчик если он есть
+                            const oldCount = square.querySelector('.monster-count');
+                            if (oldCount) {
+                                oldCount.remove();
+                            }
+                            
+                            // Добавляем счетчик для заменяющих монстров
+                            if (level === '3' && this.value) {
+                                let count;
+                                if (['Animals', 'Upscreams', 'Bowties', 'Rugrat', 'Mentalists', 'Peepers', 'Chefs'].includes(this.value)) {
+                                    count = 3;
+                                } else if (['Hidden'].includes(this.value)) {
+                                    count = 2;
+                                } else if (['Apex Predators', 'Spewers', 'Shadow Children'].includes(this.value)) {
+                                    count = 4;
+                                } else if (['Bangers'].includes(this.value)) {
+                                    count = 6;
+                                } else if (['Gnomes'].includes(this.value)) {
+                                    count = 10;
+                                }
+                                
+                                if (count) {
+                                    const countElement = document.createElement('div');
+                                    countElement.className = 'monster-count';
+                                    countElement.textContent = `x${count}`;
+                                    square.appendChild(countElement);
+                                }
+                            }
                         } else {
                             img.src = 'monsters/unknown.webp'; // Используем unknown как placeholder
                             img.alt = '???';
+                            // Удаляем счетчик при сбросе
+                            const oldCount = square.querySelector('.monster-count');
+                            if (oldCount) {
+                                oldCount.remove();
+                            }
                         }
                     });
                     
