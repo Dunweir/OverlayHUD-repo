@@ -729,6 +729,7 @@
             // Изменение цвета текста после 4 минут (240 секунд)
             if (seconds > 240) {
                 monstersInfoEl.classList.add('white');
+                monstersInfoEl.textContent += ' (нет респа)';
             } else {
                 monstersInfoEl.classList.remove('white');
             }
