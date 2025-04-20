@@ -99,6 +99,20 @@
             position: absolute;
             top: 0;
             left: 0;
+            filter: drop-shadow(0 0 3px var(--glow-color));
+        }
+
+        .monster-square.level-1 { 
+            border: 2px solid #4CAF50;
+            --glow-color: #4CAF50;
+        }
+        .monster-square.level-2 { 
+            border: 2px solid #2196F3;
+            --glow-color: #2196F3;
+        }
+        .monster-square.level-3 { 
+            border: 2px solid #F44336;
+            --glow-color: #F44336;
         }
 
         .monster-count {
@@ -118,9 +132,6 @@
             --square-size: 50px;
         }
 
-        .monster-square.level-1 { border: 2px solid #4CAF50; }
-        .monster-square.level-2 { border: 2px solid #2196F3; }
-        .monster-square.level-3 { border: 2px solid #F44336; }
         
         /* Стили для панели управления */
         .control-panel {
