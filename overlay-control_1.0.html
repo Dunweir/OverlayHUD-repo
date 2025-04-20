@@ -64,6 +64,14 @@
         .level-line {
             font-size: 32px;
             margin-bottom: 5px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .strength {
+            color: #ffb200;
+            margin-left: auto;
         }
         
         .timer {
@@ -365,6 +373,7 @@
                 <span class="level-text">Уровень</span> 
                 <span class="level-number">1</span><span class="colon">:</span> 
                 <span class="timer" id="timer">00:00</span>
+                <span class="strength">💪 1</span>
             </div>
             <div class="respawn-info" id="respawnInfo">Респавн: 4-5 минут</div>
             <div class="monsters-squares" id="monstersSquares"></div>
@@ -386,6 +395,11 @@
                 <input type="number" id="levelInput" min="1" value="1">
                 <div id="errorMsg" class="error"></div>
                 <button id="setLevelBtn">Установить уровень</button>
+                
+                <label for="strengthInput">Сила:</label>
+                <input type="number" id="strengthInput" min="1" value="1">
+                <div id="strengthErrorMsg" class="error"></div>
+                <button id="setStrengthBtn">Установить силу</button>
             </div>
             
             <div class="style-buttons">
@@ -423,6 +437,7 @@
         let seconds = 0;
         let timerInterval;
         let currentLevel = 1;
+        let currentStrength = 1;
         let currentStyle = 1;
         let bgEnabled = true;
         let squareSize = 40;
@@ -463,6 +478,7 @@
         document.getElementById('stopBtn').addEventListener('click', stopTimer);
         document.getElementById('resetBtn').addEventListener('click', resetTimer);
         document.getElementById('setLevelBtn').addEventListener('click', setLevel);
+        document.getElementById('setStrengthBtn').addEventListener('click', setStrength);
         
         // Обработчики стилей
         document.getElementById('style1Btn').addEventListener('click', () => {
@@ -729,6 +745,20 @@
             updateMonsterInfo();
             createMonsterSquares();
         }
+
+        function setStrength() {
+            const strength = parseInt(document.getElementById('strengthInput').value);
+            const errorMsg = document.getElementById('strengthErrorMsg');
+            
+            if (isNaN(strength) || strength < 1) {
+                errorMsg.textContent = "Введите число ≥ 1";
+                return;
+            }
+            
+            errorMsg.textContent = "";
+            currentStrength = strength;
+            updateDisplay();
+        }
         
         function updateTimer() {
             seconds++;
@@ -744,6 +774,7 @@
         
         function updateMonsterInfo() {
             levelNumberEl.textContent = currentLevel;
+            document.querySelector('.strength').textContent = `💪 ${currentStrength}`;
         }
         
         function updateRespawnInfo() {
