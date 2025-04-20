@@ -732,20 +732,6 @@
         }
         
         function updateMonsterInfo() {
-            let lvl1, lvl2, lvl3;
-            
-            if (currentLevel <= 2) {
-                lvl1 = 1; lvl2 = 0; lvl3 = 1;
-            } else if (currentLevel <= 5) {
-                lvl1 = 1; lvl2 = 1; lvl3 = 1;
-            } else if (currentLevel <= 8) {
-                lvl1 = 2; lvl2 = 2; lvl3 = 2;
-            } else if (currentLevel <= 10) {
-                lvl1 = 2; lvl2 = 3; lvl3 = 2;
-            } else {
-                lvl1 = 2; lvl2 = 3; lvl3 = 3;
-            }
-            
             levelNumberEl.textContent = currentLevel;
         }
         
@@ -763,6 +749,12 @@
             const noDespawnText = seconds <= 240 ? ' <span class="no-despawn">(без деспавна)</span>' : '';
             respawnInfoEl.innerHTML = `Респавн: ${respawnText}${noDespawnText}`;
         }
+
+        function initializeDisplay() {
+            timerEl.textContent = "00:00";
+            updateRespawnInfo();
+            createMonsterSquares();
+        }
         
         function formatTime(totalSeconds) {
             const mins = Math.floor(totalSeconds / 60);
@@ -778,7 +770,7 @@
         });
 
         // Инициализация
-        updateMonsterInfo();
+        initializeDisplay();
     </script>
 </body>
 </html>
