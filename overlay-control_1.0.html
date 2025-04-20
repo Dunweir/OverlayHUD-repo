@@ -443,7 +443,6 @@
         // Элементы оверлея
         const levelNumberEl = document.querySelector('.level-number');
         const timerEl = document.getElementById('timer');
-        const monstersInfoEl = document.getElementById('monstersInfo');
         const respawnInfoEl = document.getElementById('respawnInfo');
         const overlayContainer = document.getElementById('overlayContainer');
         const bgToggle = document.getElementById('bgToggle');
@@ -748,7 +747,6 @@
             }
             
             levelNumberEl.textContent = currentLevel;
-            monstersInfoEl.textContent = `Монстры: ${lvl1}/${lvl2}/${lvl3}`;
         }
         
         function updateRespawnInfo() {
