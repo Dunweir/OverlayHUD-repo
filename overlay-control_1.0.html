@@ -45,9 +45,8 @@
             color: #ffb200; /* Оранжевые элементы */
         }
         .style-1 .timer { color: white; }
-        .style-1 .monsters-info { color: #ff4444; }
-        .style-1 .monsters-info.white { color: white; }
         .style-1 .respawn-info { color: white; }
+        .style-1 .respawn-info .no-despawn { color: #ff4444; }
         
         /* Стиль 2 - чёрный текст */
         .style-2.with-bg {
@@ -59,9 +58,8 @@
             color: #ffb200; /* Оранжевые элементы */
         }
         .style-2 .timer { color: black; }
-        .style-2 .monsters-info { color: #ff4444; }
-        .style-2 .monsters-info.white { color: black; }
         .style-2 .respawn-info { color: black; }
+        .style-2 .respawn-info .no-despawn { color: #ff4444; }
         
         .level-line {
             font-size: 32px;
@@ -71,11 +69,6 @@
         .timer {
             display: inline;
             font-size: 32px;
-        }
-        
-        .monsters-info {
-            font-size: 20px;
-            margin-bottom: 5px;
         }
         
         .respawn-info {
@@ -362,7 +355,6 @@
                 <span class="level-number">1</span><span class="colon">:</span> 
                 <span class="timer" id="timer">00:00</span>
             </div>
-            <div class="monsters-info" id="monstersInfo">Монстры: 1/0/1</div>
             <div class="respawn-info" id="respawnInfo">Респавн: 4-5 минут</div>
             <div class="monsters-squares" id="monstersSquares"></div>
         </div>
@@ -738,13 +730,6 @@
             updateMonsterInfo();
             updateRespawnInfo();
             
-            // Изменение цвета текста после 4 минут (240 секунд)
-            if (seconds > 240) {
-                monstersInfoEl.classList.add('white');
-            } else {
-                monstersInfoEl.classList.remove('white');
-                monstersInfoEl.textContent += ' (без деспавна)';
-            }
         }
         
         function updateMonsterInfo() {
@@ -777,7 +762,8 @@
             else if (minutes < 50) respawnText = "0.8-1 минута";
             else respawnText = "1 секунда";
             
-            respawnInfoEl.textContent = `Респавн: ${respawnText}`;
+            const noDespawnText = seconds <= 240 ? ' <span class="no-despawn">(без деспавна)</span>' : '';
+            respawnInfoEl.innerHTML = `Респавн: ${respawnText}${noDespawnText}`;
         }
         
         function formatTime(totalSeconds) {
