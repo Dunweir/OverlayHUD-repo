@@ -789,7 +789,7 @@
             else respawnText = "1 секунда";
             
             const noDespawnText = seconds <= 240 ? ' <span class="no-despawn">(без деспавна)</span>' : '';
-            respawnInfoEl.innerHTML = `Респавн: ${respawnText}${noDespawnText}`;
+            respawnInfoEl.innerHTML = `🔄 ${respawnText}${noDespawnText}`;
         }
 
         function initializeDisplay() {
