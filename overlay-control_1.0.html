@@ -372,7 +372,7 @@
             <div class="level-line">
                 <span class="level-text">Уровень</span> 
                 <span class="level-number">1</span>
-                <span class="timer" id="timer" style="margin-left: 15px;">00:00</span>
+                <span class="timer" id="timer" style="margin-left: 10px;">00:00</span>
                 <span class="strength">💪 1</span>
             </div>
             <div class="respawn-info" id="respawnInfo">Респавн: 4-5 минут</div>
@@ -774,7 +774,7 @@
         
         function updateMonsterInfo() {
             levelNumberEl.textContent = currentLevel;
-            document.querySelector('.strength').textContent = `💪 ${currentStrength}`;
+            document.querySelector('.strength').textContent = `💪${currentStrength}`;
         }
         
         function updateRespawnInfo() {
