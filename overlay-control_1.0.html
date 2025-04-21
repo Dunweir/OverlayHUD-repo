@@ -781,14 +781,14 @@
             const minutes = Math.floor(seconds / 60);
             let respawnText;
             
-            if (minutes < 10) respawnText = "4-5 минуты";
-            else if (minutes < 20) respawnText = "3.2-4 минуты";
-            else if (minutes < 30) respawnText = "2.4-3 минуты";
-            else if (minutes < 40) respawnText = "1.6-2 минуты";
-            else if (minutes < 50) respawnText = "0.8-1 минута";
-            else respawnText = "1 секунда";
+            if (minutes < 10) respawnText = "4-5 МИНУТЫ";
+            else if (minutes < 20) respawnText = "3.2-4 МИНУТЫ";
+            else if (minutes < 30) respawnText = "2.4-3 МИНУТЫ";
+            else if (minutes < 40) respawnText = "1.6-2 МИНУТЫ";
+            else if (minutes < 50) respawnText = "0.8-1 МИНУТА";
+            else respawnText = "1 СЕКУНДА";
             
-            const noDespawnText = seconds <= 240 ? ' <span class="no-despawn">(без деспавна)</span>' : '';
+            const noDespawnText = seconds <= 240 ? ' <span class="no-despawn">(БЕЗ ДЕСПАВНА)</span>' : '';
             respawnInfoEl.innerHTML = `🔄 ${respawnText}${noDespawnText}`;
         }
 
