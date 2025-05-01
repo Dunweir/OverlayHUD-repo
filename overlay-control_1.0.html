@@ -98,7 +98,8 @@
             border-radius: calc(var(--square-size) * 0.2);
             background: black;
             position: relative;
-            overflow: hidden;
+            overflow: visible;
+            margin-bottom: 25px;
         }
 
         .monster-square img {
@@ -139,16 +140,17 @@
 
         .strength-required {
             position: absolute;
-            bottom: -20px;
+            bottom: -22px;
             left: 50%;
             transform: translateX(-50%);
-            background: rgba(0, 0, 0, 0.7);
+            background: rgba(0, 0, 0, 0.8);
             color: #ffb200;
-            padding: 1px 6px;
-            border-radius: 3px;
-            font-size: 12px;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 13px;
             font-family: 'Roboto', sans-serif;
             white-space: nowrap;
+            z-index: 2;
         }
 
         :root {
