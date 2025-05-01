@@ -174,7 +174,7 @@
 
         .monster-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(60px, 1fr));
+            grid-template-columns: repeat(auto-fill, minmax(45px, 1fr));
             gap: 10px;
             margin-top: 20px;
         }
@@ -195,8 +195,8 @@
         .category-3 h3 { background: #F44336; }
 
         .monster-icon {
-            width: 60px;
-            height: 60px;
+            width: 45px;
+            height: 45px;
             border-radius: 8px;
             overflow: hidden;
             cursor: pointer;
@@ -627,31 +627,27 @@
                 const monsters = monsterConfig.levels[level].monsters;
                 
                 // Добавляем основных монстров уровня
-                for (let i = 0; i < (level === 1 ? counts.level1 : (level === 2 ? counts.level2 : counts.level3)); i++) {
-                    monsters.forEach(monster => {
-                        const icon = createMonsterIcon(monster, level, currentIndex);
-                        grid.appendChild(icon);
-                    });
-                }
+                monsters.forEach(monster => {
+                    const icon = createMonsterIcon(monster, level, counts);
+                    grid.appendChild(icon);
+                });
                 
                 // Добавляем замены для 3 уровня
                 if (level === 3) {
                     monsterConfig.replacements.forEach(monster => {
-                        const icon = createMonsterIcon(monster, level, currentIndex, true);
+                        const icon = createMonsterIcon(monster, level, counts, true);
                         grid.appendChild(icon);
                     });
                 }
-                
-                currentIndex++;
             }
         }
 
-        function createMonsterIcon(monsterName, level, index, isReplacement = false) {
+        function createMonsterIcon(monsterName, level, counts, isReplacement = false) {
             const icon = document.createElement('div');
             icon.className = 'monster-icon';
             icon.dataset.monster = monsterName;
             icon.dataset.level = level;
-            icon.dataset.index = index;
+            icon.dataset.level = level;
             
             const img = document.createElement('img');
             let fileName = monsterName.toLowerCase();
@@ -710,31 +706,42 @@
             
             // Добавляем обработчик клика
             icon.addEventListener('click', function() {
-                const squares = document.querySelectorAll('.monster-square');
-                const currentSquare = squares[index];
+                const squares = document.querySelectorAll('.monster-square.level-' + level);
+                let availableSquare = null;
                 
-                // Убираем выделение со всех иконок того же уровня
-                document.querySelectorAll(`.monster-icon[data-level="${level}"]`).forEach(i => {
-                    i.classList.remove('selected');
-                });
+                // Ищем первый свободный квадратик нужного уровня
+                for (let square of squares) {
+                    const img = square.querySelector('img');
+                    if (img.src.includes('unknown.webp')) {
+                        availableSquare = square;
+                        break;
+                    }
+                }
                 
-                // Выделяем текущую иконку
-                this.classList.add('selected');
-                
-                // Обновляем квадрат в оверлее
-                const overlayImg = currentSquare.querySelector('img');
-                overlayImg.src = img.src;
-                overlayImg.alt = monsterName;
-                
-                // Обновляем счетчик в оверлее
-                const oldCount = currentSquare.querySelector('.monster-count');
-                if (oldCount) oldCount.remove();
-                
-                if (count) {
-                    const countElement = document.createElement('div');
-                    countElement.className = 'monster-count';
-                    countElement.textContent = `x${count}`;
-                    currentSquare.appendChild(countElement);
+                if (availableSquare) {
+                    // Убираем выделение со всех иконок того же уровня
+                    document.querySelectorAll(`.monster-icon[data-level="${level}"]`).forEach(i => {
+                        i.classList.remove('selected');
+                    });
+                    
+                    // Выделяем текущую иконку
+                    this.classList.add('selected');
+                    
+                    // Обновляем квадрат в оверлее
+                    const overlayImg = availableSquare.querySelector('img');
+                    overlayImg.src = img.src;
+                    overlayImg.alt = monsterName;
+                    
+                    // Обновляем счетчик в оверлее
+                    const oldCount = availableSquare.querySelector('.monster-count');
+                    if (oldCount) oldCount.remove();
+                    
+                    if (count) {
+                        const countElement = document.createElement('div');
+                        countElement.className = 'monster-count';
+                        countElement.textContent = `x${count}`;
+                        availableSquare.appendChild(countElement);
+                    }
                 }
             });
 
@@ -742,19 +749,30 @@
             icon.addEventListener('contextmenu', function(e) {
                 e.preventDefault();
                 
-                const squares = document.querySelectorAll('.monster-square');
-                const currentSquare = squares[index];
+                const squares = document.querySelectorAll('.monster-square.level-' + level);
+                let selectedSquare = null;
+                
+                // Ищем квадратик с этим монстром
+                for (let square of squares) {
+                    const img = square.querySelector('img');
+                    if (img.src === overlayImg.src) {
+                        selectedSquare = square;
+                        break;
+                    }
+                }
+                
+                if (!selectedSquare) return;
                 
                 // Убираем выделение с иконки
                 this.classList.remove('selected');
                 
                 // Возвращаем unknown изображение
-                const overlayImg = currentSquare.querySelector('img');
+                const overlayImg = selectedSquare.querySelector('img');
                 overlayImg.src = 'monsters/unknown.webp';
                 overlayImg.alt = '???';
                 
                 // Удаляем счетчик если есть
-                const oldCount = currentSquare.querySelector('.monster-count');
+                const oldCount = selectedSquare.querySelector('.monster-count');
                 if (oldCount) oldCount.remove();
             });
             
