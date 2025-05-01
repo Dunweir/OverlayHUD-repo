@@ -784,6 +784,7 @@
             
             errorMsg.textContent = "";
             currentLevel = level;
+            resetTimer(); // Сбрасываем таймер при смене уровня
             updateMonsterInfo();
             createMonsterSquares();
         }
