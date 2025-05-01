@@ -137,6 +137,20 @@
             z-index: 1;
         }
 
+        .strength-required {
+            position: absolute;
+            bottom: -20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.7);
+            color: #ffb200;
+            padding: 1px 6px;
+            border-radius: 3px;
+            font-size: 12px;
+            font-family: 'Roboto', sans-serif;
+            white-space: nowrap;
+        }
+
         :root {
             --square-size: 50px;
         }
@@ -490,6 +504,28 @@
                 2: { monsters: ['Rugrat', 'Animal', 'Upscream', 'Chef', 'Hidden', 'Bowtie', 'Mentalist', 'Banger'] },
                 3: { monsters: ['Headman', 'Robe', 'Huntsman', 'Reaper', 'Clown', 'Trudge'] }
             },
+            strength: {
+                'Banger': 0,
+                'Gnome': 0,
+                'Gnomes': 0,
+                'Animal': 4,
+                'Mentalist': 4,
+                'Hidden': 4,
+                'Rugrat': 4,
+                'Spewer': 4,
+                'Upscream': 4,
+                'Bowtie': 7,
+                'Chef': 9,
+                'Huntsman': 9,
+                'Reaper': 9,
+                'Shadow Child': 9,
+                'Clown': 13,
+                'Headman': 13,
+                'Robe': 13,
+                'Trudge': 13,
+                'Apex Predator': 'impossible',
+                'Peeper': 'impossible'
+            },
             replacements: [
                 'Animals', 'Upscreams', 'Bowties', 'Rugrat', 'Mentalists', 'Peepers',
                 'Hidden', 'Apex Predators', 'Chefs', 'Spewers', 'Shadow Children',
@@ -736,6 +772,13 @@
                         countElement.textContent = `x${count}`;
                         availableSquare.appendChild(countElement);
                     }
+
+                    // Добавляем требуемую силу
+                    const strength = monsterConfig.strength[monsterName] || monsterConfig.strength[monsterName.slice(0, -1)] || '?';
+                    const strengthElement = document.createElement('div');
+                    strengthElement.className = 'strength-required';
+                    strengthElement.textContent = strength === 'impossible' ? '💀' : `💪${strength}`;
+                    availableSquare.appendChild(strengthElement);
                 }
             });
 
@@ -765,9 +808,11 @@
                 overlayImg.src = 'monsters/unknown.webp';
                 overlayImg.alt = '???';
                 
-                // Удаляем счетчик если есть
+                // Удаляем счетчик и силу если есть
                 const oldCount = selectedSquare.querySelector('.monster-count');
+                const oldStrength = selectedSquare.querySelector('.strength-required');
                 if (oldCount) oldCount.remove();
+                if (oldStrength) oldStrength.remove();
             });
             
             return icon;
