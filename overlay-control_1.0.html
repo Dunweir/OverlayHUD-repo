@@ -782,6 +782,10 @@
                     strengthElement.textContent = strength === 'impossible' ? '💪❌' : 
                                                 strength === undefined ? '?' :
                                                 `💪${strength}`;
+                    // Добавляем цвет в зависимости от текущей силы
+                    if (strength !== 'impossible' && strength !== undefined) {
+                        strengthElement.style.color = currentStrength >= strength ? '#4CAF50' : '#ff4444';
+                    }
                     availableSquare.appendChild(strengthElement);
                 }
             });
@@ -867,6 +871,15 @@
         function updateMonsterInfo() {
             levelNumberEl.textContent = currentLevel;
             document.querySelector('.strength').textContent = `💪${currentStrength}`;
+            
+            // Обновляем цвета всех индикаторов силы
+            document.querySelectorAll('.strength-required').forEach(el => {
+                const strengthText = el.textContent;
+                if (!strengthText.includes('❌') && strengthText !== '?') {
+                    const requiredStrength = parseInt(strengthText.replace('💪', ''));
+                    el.style.color = currentStrength >= requiredStrength ? '#4CAF50' : '#ff4444';
+                }
+            });
         }
         
         function updateRespawnInfo() {
