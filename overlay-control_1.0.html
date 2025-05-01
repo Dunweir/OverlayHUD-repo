@@ -746,10 +746,10 @@
                 const squares = document.querySelectorAll('.monster-square.level-' + level);
                 let selectedSquare = null;
                 
-                // Ищем квадратик с этим монстром
+                // Ищем квадратик с этим конкретным монстром
                 for (let square of squares) {
-                    const img = square.querySelector('img');
-                    if (img.src === img.src) {
+                    const squareImg = square.querySelector('img');
+                    if (squareImg.src === img.src && squareImg.alt === img.alt) {
                         selectedSquare = square;
                         break;
                     }
