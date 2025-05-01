@@ -442,7 +442,7 @@
                 <button id="setLevelBtn">Установить уровень</button>
                 
                 <label for="strengthInput">Сила:</label>
-                <input type="number" id="strengthInput" min="0" value="0">
+                <input type="number" id="strengthInput" min="0" step="1" value="0">
                 <div id="strengthErrorMsg" class="error"></div>
                 <button id="setStrengthBtn">Установить силу</button>
             </div>
@@ -840,8 +840,8 @@
             const strength = parseInt(document.getElementById('strengthInput').value);
             const errorMsg = document.getElementById('strengthErrorMsg');
             
-            if (isNaN(strength)) {
-                errorMsg.textContent = "Введите число";
+            if (isNaN(strength) || strength < 0) {
+                errorMsg.textContent = "Введите неотрицательное число";
                 return;
             }
             
