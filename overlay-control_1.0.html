@@ -647,7 +647,6 @@
             icon.className = 'monster-icon';
             icon.dataset.monster = monsterName;
             icon.dataset.level = level;
-            icon.dataset.level = level;
             
             const img = document.createElement('img');
             let fileName = monsterName.toLowerCase();
@@ -719,11 +718,6 @@
                 }
                 
                 if (availableSquare) {
-                    // Убираем выделение со всех иконок того же уровня
-                    document.querySelectorAll(`.monster-icon[data-level="${level}"]`).forEach(i => {
-                        i.classList.remove('selected');
-                    });
-                    
                     // Выделяем текущую иконку
                     this.classList.add('selected');
                     
@@ -755,7 +749,7 @@
                 // Ищем квадратик с этим монстром
                 for (let square of squares) {
                     const img = square.querySelector('img');
-                    if (img.src === overlayImg.src) {
+                    if (img.src === img.src) {
                         selectedSquare = square;
                         break;
                     }
