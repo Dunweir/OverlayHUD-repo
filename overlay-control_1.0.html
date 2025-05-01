@@ -779,7 +779,7 @@
                     const strength = monsterConfig.strength[monsterName] || monsterConfig.strength[monsterName.slice(0, -1)] || '?';
                     const strengthElement = document.createElement('div');
                     strengthElement.className = 'strength-required';
-                    strengthElement.textContent = strength === 'impossible' ? '💀' : `💪${strength}`;
+                    strengthElement.textContent = strength === 'impossible' ? '💪❌' : `💪${strength}`;
                     availableSquare.appendChild(strengthElement);
                 }
             });
