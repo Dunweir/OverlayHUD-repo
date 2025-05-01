@@ -776,10 +776,12 @@
                     }
 
                     // Добавляем требуемую силу
-                    const strength = monsterConfig.strength[monsterName] || monsterConfig.strength[monsterName.slice(0, -1)] || '?';
+                    const strength = monsterConfig.strength[monsterName] || monsterConfig.strength[monsterName.slice(0, -1)];
                     const strengthElement = document.createElement('div');
                     strengthElement.className = 'strength-required';
-                    strengthElement.textContent = strength === 'impossible' ? '💪❌' : `💪${strength}`;
+                    strengthElement.textContent = strength === 'impossible' ? '💪❌' : 
+                                                strength === undefined ? '?' :
+                                                `💪${strength}`;
                     availableSquare.appendChild(strengthElement);
                 }
             });
