@@ -442,7 +442,7 @@
                 <button id="setLevelBtn">Установить уровень</button>
                 
                 <label for="strengthInput">Сила:</label>
-                <input type="number" id="strengthInput" min="1" value="1">
+                <input type="number" id="strengthInput" min="0" value="0">
                 <div id="strengthErrorMsg" class="error"></div>
                 <button id="setStrengthBtn">Установить силу</button>
             </div>
@@ -493,7 +493,7 @@
         let seconds = 0;
         let timerInterval;
         let currentLevel = 1;
-        let currentStrength = 1;
+        let currentStrength = 0;
         let currentStyle = 1;
         let bgEnabled = true;
         let squareSize = 40;
@@ -840,8 +840,8 @@
             const strength = parseInt(document.getElementById('strengthInput').value);
             const errorMsg = document.getElementById('strengthErrorMsg');
             
-            if (isNaN(strength) || strength < 1) {
-                errorMsg.textContent = "Введите число ≥ 1";
+            if (isNaN(strength)) {
+                errorMsg.textContent = "Введите число";
                 return;
             }
             
