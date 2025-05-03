@@ -776,7 +776,12 @@
                     }
 
                     // Добавляем требуемую силу
-                    const strength = monsterConfig.strength[monsterName] || monsterConfig.strength[monsterName.slice(0, -1)];
+                    let strength;
+                    if (monsterConfig.strength[monsterName] !== undefined) {
+                        strength = monsterConfig.strength[monsterName];
+                    } else if (monsterName.endsWith('s') && monsterConfig.strength[monsterName.slice(0, -1)] !== undefined) {
+                        strength = monsterConfig.strength[monsterName.slice(0, -1)];
+                    }
                     const strengthElement = document.createElement('div');
                     strengthElement.className = 'strength-required';
                     strengthElement.textContent = strength === 'impossible' ? '💪❌' : 
