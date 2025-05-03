@@ -253,6 +253,12 @@
             margin-bottom: 20px;
             flex-wrap: wrap;
         }
+
+        .timer-toggle {
+            display: flex;
+            align-items: center;
+            margin-top: 10px;
+        }
         
         button {
             padding: 8px 12px;
@@ -467,6 +473,14 @@
                         <span class="slider"></span>
                     </label>
                 </div>
+                
+                <div class="timer-toggle">
+                    <span>Таймер:</span>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="timerToggle" checked>
+                        <span class="slider"></span>
+                    </label>
+                </div>
             </div>
         </div>
 
@@ -496,6 +510,7 @@
         let currentStrength = 0;
         let currentStyle = 1;
         let bgEnabled = true;
+        let timerVisible = true;
         let squareSize = 40;
         
         // Данные о монстрах по уровням
@@ -572,6 +587,12 @@
         bgToggle.addEventListener('change', () => {
             bgEnabled = bgToggle.checked;
             setStyle();
+        });
+
+        // Обработчик тумблера таймера
+        document.getElementById('timerToggle').addEventListener('change', (e) => {
+            timerVisible = e.target.checked;
+            timerEl.style.display = timerVisible ? '' : 'none';
         });
         
         function setStyle() {
