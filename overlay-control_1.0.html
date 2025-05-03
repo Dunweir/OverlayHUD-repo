@@ -574,18 +574,6 @@
             setStyle();
         });
         
-        // Горячие клавиши для стилей
-        document.addEventListener('keydown', (e) => {
-            if (e.key === '1') {
-                currentStyle = 1;
-                setStyle();
-            }
-            else if (e.key === '2') {
-                currentStyle = 2;
-                setStyle();
-            }
-        });
-        
         function setStyle() {
             overlayContainer.className = 'overlay-container';
             overlayContainer.classList.add(`style-${currentStyle}`);
