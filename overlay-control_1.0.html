@@ -593,6 +593,7 @@
         document.getElementById('timerToggle').addEventListener('change', (e) => {
             timerVisible = e.target.checked;
             timerEl.style.display = timerVisible ? '' : 'none';
+            respawnInfoEl.style.display = timerVisible ? '' : 'none';
         });
         
         function setStyle() {
