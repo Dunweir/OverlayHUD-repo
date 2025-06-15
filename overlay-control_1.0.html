@@ -794,16 +794,8 @@
                 // Убираем выделение с иконки
                 this.classList.remove('selected');
                 
-                // Возвращаем unknown изображение
-                const overlayImg = selectedSquare.querySelector('img');
-                overlayImg.src = 'monsters/unknown.webp';
-                overlayImg.alt = '???';
-                
-                // Удаляем счетчик и силу если есть
-                const oldCount = selectedSquare.querySelector('.monster-count');
-                const oldStrength = selectedSquare.querySelector('.strength-required');
-                if (oldCount) oldCount.remove();
-                if (oldStrength) oldStrength.remove();
+                // Удаляем квадратик полностью
+                selectedSquare.remove();
             });
             
             return icon;
