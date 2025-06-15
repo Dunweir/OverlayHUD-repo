@@ -634,35 +634,11 @@
         function createMonsterSquares() {
             const monstersSquares = document.getElementById('monstersSquares');
             monstersSquares.innerHTML = '';
-            
-            const counts = getMonsterCountsForLevel(currentLevel);
-            const totalSquares = counts.level1 + counts.level2 + counts.level3;
-            
-            for (let i = 0; i < totalSquares; i++) {
-                const square = document.createElement('div');
-                square.className = 'monster-square';
-                
-                // Определяем уровень монстра для квадрата
-                let monsterLevel;
-                if (i < counts.level1) monsterLevel = 1;
-                else if (i < counts.level1 + counts.level2) monsterLevel = 2;
-                else monsterLevel = 3;
-                
-                square.classList.add(`level-${monsterLevel}`);
-                
-                const img = document.createElement('img');
-                img.src = 'monsters/unknown.webp';
-                img.alt = '???';
-                square.appendChild(img);
-                
-                monstersSquares.appendChild(square);
-            }
-            
-            updateMonsterSelects(counts);
+            updateMonsterSelects();
         }
 
-        function updateMonsterSelects(counts) {
-            // Очищаем все сетки
+        function updateMonsterSelects() {
+            // Очищаем все сетки монстров
             document.getElementById('level1Grid').innerHTML = '';
             document.getElementById('level2Grid').innerHTML = '';
             document.getElementById('level3Grid').innerHTML = '';
@@ -676,21 +652,21 @@
                 
                 // Добавляем основных монстров уровня
                 monsters.forEach(monster => {
-                    const icon = createMonsterIcon(monster, level, counts);
+                    const icon = createMonsterIcon(monster, level);
                     grid.appendChild(icon);
                 });
                 
                 // Добавляем замены для 3 уровня
                 if (level === 3) {
                     monsterConfig.replacements.forEach(monster => {
-                        const icon = createMonsterIcon(monster, level, counts, true);
+                        const icon = createMonsterIcon(monster, level, true);
                         grid.appendChild(icon);
                     });
                 }
             }
         }
 
-        function createMonsterIcon(monsterName, level, counts, isReplacement = false) {
+        function createMonsterIcon(monsterName, level, isReplacement = false) {
             const icon = document.createElement('div');
             icon.className = 'monster-icon';
             icon.dataset.monster = monsterName;
@@ -753,19 +729,18 @@
             
             // Добавляем обработчик клика
             icon.addEventListener('click', function() {
-                const squares = document.querySelectorAll('.monster-square.level-' + level);
-                let availableSquare = null;
+                // Создаем новый квадратик
+                const square = document.createElement('div');
+                square.className = 'monster-square';
+                square.classList.add(`level-${level}`);
                 
-                // Ищем первый свободный квадратик нужного уровня
-                for (let square of squares) {
-                    const img = square.querySelector('img');
-                    if (img.src.includes('unknown.webp')) {
-                        availableSquare = square;
-                        break;
-                    }
-                }
+                const overlayImg = document.createElement('img');
+                overlayImg.src = img.src;
+                overlayImg.alt = monsterName;
+                square.appendChild(overlayImg);
                 
-                if (availableSquare) {
+                document.getElementById('monstersSquares').appendChild(square);
+                
                     // Выделяем текущую иконку
                     this.classList.add('selected');
                     
