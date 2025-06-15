@@ -477,7 +477,7 @@
                 <div class="timer-toggle">
                     <span>Таймер:</span>
                     <label class="toggle-switch">
-                        <input type="checkbox" id="timerToggle" checked>
+                        <input type="checkbox" id="timerToggle">
                         <span class="slider"></span>
                     </label>
                 </div>
@@ -510,7 +510,7 @@
         let currentStrength = 0;
         let currentStyle = 1;
         let bgEnabled = true;
-        let timerVisible = true;
+        let timerVisible = false;
         let squareSize = 40;
         
         // Данные о монстрах по уровням
@@ -882,6 +882,8 @@
 
         function initializeDisplay() {
             timerEl.textContent = "00:00";
+            timerEl.style.display = timerVisible ? '' : 'none';
+            respawnInfoEl.style.display = timerVisible ? '' : 'none';
             updateMonsterInfo();
             updateRespawnInfo();
             createMonsterSquares();
