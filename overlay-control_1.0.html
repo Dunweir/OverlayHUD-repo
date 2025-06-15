@@ -87,9 +87,10 @@
 
         /* Стили для квадратиков монстров */
         .monsters-squares {
-            display: flex;
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(var(--square-size), 1fr));
+            max-width: calc(var(--square-size) * 8 + 70px);
             gap: 10px;
-            flex-wrap: wrap;
         }
 
         .monster-square {
