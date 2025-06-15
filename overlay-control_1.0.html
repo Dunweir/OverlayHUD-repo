@@ -770,7 +770,28 @@
                 }
                 square.appendChild(strengthElement);
                 
-                document.getElementById('monstersSquares').appendChild(square);
+                // Находим правильное место для вставки квадратика
+                const monstersSquares = document.getElementById('monstersSquares');
+                const squares = monstersSquares.children;
+                let insertIndex = 0;
+                
+                // Ищем позицию для вставки
+                for (let i = 0; i < squares.length; i++) {
+                    const existingSquare = squares[i];
+                    const existingLevel = parseInt(existingSquare.className.match(/level-(\d+)/)[1]);
+                    if (level < existingLevel) {
+                        insertIndex = i;
+                        break;
+                    }
+                    insertIndex = i + 1;
+                }
+                
+                // Вставляем квадратик в нужную позицию
+                if (insertIndex === squares.length) {
+                    monstersSquares.appendChild(square);
+                } else {
+                    monstersSquares.insertBefore(square, squares[insertIndex]);
+                }
             });
 
             // Добавляем обработчик правого клика для сброса
