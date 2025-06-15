@@ -739,45 +739,38 @@
                 overlayImg.alt = monsterName;
                 square.appendChild(overlayImg);
                 
-                document.getElementById('monstersSquares').appendChild(square);
+                // Выделяем текущую иконку
+                this.classList.add('selected');
                 
-                    // Выделяем текущую иконку
-                    this.classList.add('selected');
-                    
-                    // Обновляем квадрат в оверлее
-                    const overlayImg = availableSquare.querySelector('img');
-                    overlayImg.src = img.src;
-                    overlayImg.alt = monsterName;
-                    
-                    // Обновляем счетчик в оверлее
-                    const oldCount = availableSquare.querySelector('.monster-count');
-                    if (oldCount) oldCount.remove();
-                    
-                    if (count) {
-                        const countElement = document.createElement('div');
-                        countElement.className = 'monster-count';
-                        countElement.textContent = `x${count}`;
-                        availableSquare.appendChild(countElement);
-                    }
-
-                    // Добавляем требуемую силу
-                    let strength;
-                    if (monsterConfig.strength[monsterName] !== undefined) {
-                        strength = monsterConfig.strength[monsterName];
-                    } else if (monsterName.endsWith('s') && monsterConfig.strength[monsterName.slice(0, -1)] !== undefined) {
-                        strength = monsterConfig.strength[monsterName.slice(0, -1)];
-                    }
-                    const strengthElement = document.createElement('div');
-                    strengthElement.className = 'strength-required';
-                    strengthElement.textContent = strength === 'impossible' ? '💪❌' : 
-                                                strength === undefined ? '?' :
-                                                `💪${strength}`;
-                    // Добавляем цвет в зависимости от текущей силы
-                    if (strength !== 'impossible' && strength !== undefined) {
-                        strengthElement.style.color = currentStrength >= strength ? '#4CAF50' : '#ff4444';
-                    }
-                    availableSquare.appendChild(strengthElement);
+                // Добавляем счетчик если нужно
+                if (count) {
+                    const countElement = document.createElement('div');
+                    countElement.className = 'monster-count';
+                    countElement.textContent = `x${count}`;
+                    square.appendChild(countElement);
                 }
+
+                // Добавляем требуемую силу
+                let strength;
+                if (monsterConfig.strength[monsterName] !== undefined) {
+                    strength = monsterConfig.strength[monsterName];
+                } else if (monsterName.endsWith('s') && monsterConfig.strength[monsterName.slice(0, -1)] !== undefined) {
+                    strength = monsterConfig.strength[monsterName.slice(0, -1)];
+                }
+                
+                const strengthElement = document.createElement('div');
+                strengthElement.className = 'strength-required';
+                strengthElement.textContent = strength === 'impossible' ? '💪❌' : 
+                                            strength === undefined ? '?' :
+                                            `💪${strength}`;
+                
+                // Добавляем цвет в зависимости от текущей силы
+                if (strength !== 'impossible' && strength !== undefined) {
+                    strengthElement.style.color = currentStrength >= strength ? '#4CAF50' : '#ff4444';
+                }
+                square.appendChild(strengthElement);
+                
+                document.getElementById('monstersSquares').appendChild(square);
             });
 
             // Добавляем обработчик правого клика для сброса
