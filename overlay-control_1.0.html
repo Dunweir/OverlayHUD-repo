@@ -557,7 +557,8 @@
             replacements: [
                 'Animals', 'Upscreams', 'Bowties', 'Rugrat', 'Mentalists', 'Peepers',
                 'Hidden', 'Apex Predators', 'Chefs', 'Spewers', 'Shadow Children',
-                'Bangers', 'Gnomes'
+                'Bangers', 'Gnomes', 'Bella', 'Birthday Boy', 'Elsa', 'Gambit',
+                'Headgrabs', 'Heart Hugger', 'Oogly', 'Tick'
             ]
         };
 
@@ -726,6 +727,10 @@
                     count = 6;
                 } else if (['Gnomes'].includes(monsterName)) {
                     count = 10;
+                } else if (['Bella', 'Birthday Boy', 'Elsa', 'Headgrabs', 'Tick'].includes(monsterName)) {
+                    count = 3;
+                } else if (['Gambit', 'Heart Hugger', 'Oogly'].includes(monsterName)) {
+                    count = 2;
                 }
             }
             
