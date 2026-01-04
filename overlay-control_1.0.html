@@ -880,6 +880,22 @@
             document.getElementById('sizeValue').textContent = newSize + 'px';
             document.documentElement.style.setProperty('--square-size', newSize + 'px');
             
+            // Устанавливаем количество колонок в зависимости от уровня
+            let counts;
+            if (level <= 2) counts = levelMonsterCounts['1-2'];
+            else if (level <= 5) counts = levelMonsterCounts['3-5'];
+            else if (level <= 8) counts = levelMonsterCounts['6-8'];
+            else if (level === 9) counts = levelMonsterCounts['9'];
+            else if (level <= 19) counts = levelMonsterCounts['10-19'];
+            else counts = levelMonsterCounts['20+'];
+            
+            const totalMonsters = counts.level1 + counts.level2 + counts.level3;
+            const columnsCount = level >= 20 ? 7 : (level >= 6 ? Math.min(totalMonsters, 8) : 4);
+            
+            document.getElementById('columnsSlider').value = columnsCount;
+            document.getElementById('columnsValue').textContent = columnsCount;
+            document.documentElement.style.setProperty('--columns-count', columnsCount);
+            
             updateMonsterInfo();
             createMonsterSquares();
         }
