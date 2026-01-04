@@ -828,7 +828,7 @@
                 // Ищем квадратик с этим конкретным монстром
                 for (let square of squares) {
                     const squareImg = square.querySelector('img');
-                    if (squareImg.src === img.src && squareImg.alt === img.alt) {
+                    if (squareImg.alt === monsterName && !squareImg.src.includes('unknown.webp')) {
                         selectedSquare = square;
                         break;
                     }
