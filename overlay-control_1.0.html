@@ -89,7 +89,7 @@
         .monsters-squares {
             display: grid;
             grid-template-columns: repeat(auto-fill, minmax(var(--square-size), 1fr));
-            max-width: calc(var(--square-size) * 8 + 70px);
+            max-width: calc(var(--square-size) * var(--columns-count) + 70px);
             gap: 10px;
         }
 
@@ -156,6 +156,7 @@
 
         :root {
             --square-size: 50px;
+            --columns-count: 8;
         }
 
         
@@ -464,6 +465,11 @@
                     <div class="slider-row">
                         <input type="range" id="sizeSlider" min="30" max="60" value="50" step="2">
                         <span id="sizeValue">50px</span>
+                    </div>
+                    <span>Монстров в ряд:</span>
+                    <div class="slider-row">
+                        <input type="range" id="columnsSlider" min="4" max="12" value="8" step="1">
+                        <span id="columnsValue">8</span>
                     </div>
                 </div>
 
@@ -941,11 +947,17 @@
             return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
         }
         
-        // Обработчик изменения размера
+        // Обработчики изменения размера и количества колонок
         document.getElementById('sizeSlider').addEventListener('input', function() {
             const size = this.value;
             document.getElementById('sizeValue').textContent = size + 'px';
             document.documentElement.style.setProperty('--square-size', size + 'px');
+        });
+
+        document.getElementById('columnsSlider').addEventListener('input', function() {
+            const columns = this.value;
+            document.getElementById('columnsValue').textContent = columns;
+            document.documentElement.style.setProperty('--columns-count', columns);
         });
 
         // Инициализация
