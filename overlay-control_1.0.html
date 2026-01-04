@@ -959,6 +959,13 @@
             timerEl.textContent = "00:00";
             timerEl.style.display = timerVisible ? '' : 'none';
             respawnInfoEl.style.display = timerVisible ? '' : 'none';
+            
+            // Устанавливаем начальное количество колонок
+            const columnsCount = 4;
+            document.getElementById('columnsSlider').value = columnsCount;
+            document.getElementById('columnsValue').textContent = columnsCount;
+            document.documentElement.style.setProperty('--columns-count', columnsCount);
+            
             updateMonsterInfo();
             updateRespawnInfo();
             createMonsterSquares();
