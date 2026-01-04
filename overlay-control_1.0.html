@@ -772,6 +772,21 @@
             
             // Добавляем обработчик клика
             icon.addEventListener('click', function() {
+                // Проверяем текущее количество монстров данного уровня
+                const existingMonsters = document.querySelectorAll(`.monster-square.level-${level}`).length;
+                let maxMonsters;
+                
+                if (currentLevel <= 2) maxMonsters = levelMonsterCounts['1-2'][`level${level}`];
+                else if (currentLevel <= 5) maxMonsters = levelMonsterCounts['3-5'][`level${level}`];
+                else if (currentLevel <= 8) maxMonsters = levelMonsterCounts['6-8'][`level${level}`];
+                else if (currentLevel === 9) maxMonsters = levelMonsterCounts['9'][`level${level}`];
+                else if (currentLevel <= 19) maxMonsters = levelMonsterCounts['10-19'][`level${level}`];
+                else maxMonsters = levelMonsterCounts['20+'][`level${level}`];
+                
+                if (existingMonsters >= maxMonsters) {
+                    return; // Не добавляем нового монстра, если достигнут лимит
+                }
+                
                 // Создаем новый квадратик
                 const square = document.createElement('div');
                 square.className = 'monster-square';
