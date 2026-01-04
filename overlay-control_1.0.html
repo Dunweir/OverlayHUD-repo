@@ -772,30 +772,19 @@
             
             // Добавляем обработчик клика
             icon.addEventListener('click', function() {
-                // Проверяем текущее количество монстров данного уровня
-                const existingMonsters = document.querySelectorAll(`.monster-square.level-${level}`).length;
-                let maxMonsters;
+                // Находим все квадратики с unknown монстрами текущего уровня
+                const unknownSquares = Array.from(document.querySelectorAll(`.monster-square.level-${level}`))
+                    .filter(square => square.querySelector('img').src.includes('unknown.webp'));
                 
-                if (currentLevel <= 2) maxMonsters = levelMonsterCounts['1-2'][`level${level}`];
-                else if (currentLevel <= 5) maxMonsters = levelMonsterCounts['3-5'][`level${level}`];
-                else if (currentLevel <= 8) maxMonsters = levelMonsterCounts['6-8'][`level${level}`];
-                else if (currentLevel === 9) maxMonsters = levelMonsterCounts['9'][`level${level}`];
-                else if (currentLevel <= 19) maxMonsters = levelMonsterCounts['10-19'][`level${level}`];
-                else maxMonsters = levelMonsterCounts['20+'][`level${level}`];
+                if (unknownSquares.length === 0) return; // Нет доступных unknown монстров
                 
-                if (existingMonsters >= maxMonsters) {
-                    return; // Не добавляем нового монстра, если достигнут лимит
-                }
+                // Берем первый доступный unknown квадратик
+                const square = unknownSquares[0];
+                const overlayImg = square.querySelector('img');
                 
-                // Создаем новый квадратик
-                const square = document.createElement('div');
-                square.className = 'monster-square';
-                square.classList.add(`level-${level}`);
-                
-                const overlayImg = document.createElement('img');
+                // Меняем картинку
                 overlayImg.src = img.src;
                 overlayImg.alt = monsterName;
-                square.appendChild(overlayImg);
                 
                 // Выделяем текущую иконку
                 this.classList.add('selected');
@@ -827,29 +816,6 @@
                     strengthElement.style.color = currentStrength >= strength ? '#4CAF50' : '#ff4444';
                 }
                 square.appendChild(strengthElement);
-                
-                // Находим правильное место для вставки квадратика
-                const monstersSquares = document.getElementById('monstersSquares');
-                const squares = monstersSquares.children;
-                let insertIndex = 0;
-                
-                // Ищем позицию для вставки
-                for (let i = 0; i < squares.length; i++) {
-                    const existingSquare = squares[i];
-                    const existingLevel = parseInt(existingSquare.className.match(/level-(\d+)/)[1]);
-                    if (level < existingLevel) {
-                        insertIndex = i;
-                        break;
-                    }
-                    insertIndex = i + 1;
-                }
-                
-                // Вставляем квадратик в нужную позицию
-                if (insertIndex === squares.length) {
-                    monstersSquares.appendChild(square);
-                } else {
-                    monstersSquares.insertBefore(square, squares[insertIndex]);
-                }
             });
 
             // Добавляем обработчик правого клика для сброса
@@ -873,8 +839,17 @@
                 // Убираем выделение с иконки
                 this.classList.remove('selected');
                 
-                // Удаляем квадратик полностью
-                selectedSquare.remove();
+                // Возвращаем unknown иконку
+                const img = selectedSquare.querySelector('img');
+                img.src = 'monsters/unknown.webp';
+                img.alt = 'Unknown Monster';
+                
+                // Удаляем счетчик и индикатор силы
+                const counter = selectedSquare.querySelector('.monster-count');
+                if (counter) counter.remove();
+                
+                const strength = selectedSquare.querySelector('.strength-required');
+                if (strength) strength.remove();
             });
             
             return icon;
