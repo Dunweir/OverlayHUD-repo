@@ -2,6 +2,7 @@ const OverlayApp = (() => {
     const storageKey = "overlay-control-state-v2";
     const channelName = "overlay-control-channel";
     const channel = "BroadcastChannel" in window ? new BroadcastChannel(channelName) : null;
+    const serverSyncEnabled = window.location.protocol === "http:" || window.location.protocol === "https:";
 
     const monsterConfig = {
         levels: {
@@ -75,6 +76,7 @@ const OverlayApp = (() => {
     let state = defaultState;
     state = normalizeState(loadState());
     const listeners = new Set();
+    let serverSyncReady = false;
 
     function loadState() {
         try {
@@ -110,6 +112,59 @@ const OverlayApp = (() => {
         if (shouldBroadcast && channel) {
             channel.postMessage(state);
         }
+        if (shouldBroadcast && serverSyncEnabled && serverSyncReady) {
+            postStateToServer(state);
+        }
+    }
+
+    async function postStateToServer(nextState) {
+        try {
+            await fetch("/api/state", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ state: nextState })
+            });
+        } catch {
+            serverSyncReady = false;
+        }
+    }
+
+    async function initializeServerSync() {
+        if (!serverSyncEnabled) return;
+
+        try {
+            const response = await fetch("/api/state", { cache: "no-store" });
+            if (!response.ok) return;
+
+            serverSyncReady = true;
+            const payload = await response.json();
+            if (payload.state) {
+                saveState(payload.state, false);
+            } else {
+                postStateToServer(getState());
+            }
+        } catch {
+            serverSyncReady = false;
+            return;
+        }
+
+        if ("EventSource" in window) {
+            const events = new EventSource("/api/events");
+            events.onmessage = (event) => {
+                if (!event.data) return;
+                try {
+                    saveState(JSON.parse(event.data), false);
+                } catch {
+                    // Ignore malformed server events.
+                }
+            };
+            events.onerror = () => {
+                serverSyncReady = false;
+            };
+            events.onopen = () => {
+                serverSyncReady = true;
+            };
+        }
     }
 
     function updateState(updater) {
@@ -134,6 +189,8 @@ const OverlayApp = (() => {
             listeners.forEach((listener) => listener(getState()));
         }
     });
+
+    initializeServerSync();
 
     function getCountsForLevel(level) {
         if (level <= 2) return levelMonsterCounts["1-2"];

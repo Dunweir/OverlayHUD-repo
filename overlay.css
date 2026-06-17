@@ -36,84 +36,147 @@ body {
     position: absolute;
     left: 20px;
     bottom: 20px;
-    min-width: 230px;
+    min-width: 250px;
     width: max-content;
-    padding: 15px 25px;
-    border-radius: 10px;
+    max-width: min(720px, calc(100vw - 40px));
+    padding: 10px;
+    border-radius: 8px;
+    filter: drop-shadow(0 10px 24px rgba(0, 0, 0, 0.42));
 }
 
 .style-1.with-bg {
-    background-color: rgba(0, 0, 0, 0.8);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    background-color: rgba(9, 12, 16, 0.86);
 }
 
 .style-2.with-bg {
-    background-color: rgba(255, 255, 255, 0.8);
+    border: 1px solid rgba(0, 0, 0, 0.14);
+    background-color: rgba(245, 247, 250, 0.88);
+}
+
+.style-1 .level-badge {
+    background: rgba(255, 178, 0, 0.16);
+}
+
+.style-2 .level-badge {
+    background: rgba(255, 178, 0, 0.22);
 }
 
 .style-1 .level-text,
-.style-1 .level-number,
-.style-1 .strength {
+.style-1 .level-number {
     color: #ffb200;
+}
+
+.style-1 .strength {
+    color: #ffd884;
 }
 
 .style-1 .timer,
 .style-1 .respawn-info {
-    color: white;
+    color: #f7fbff;
 }
 
 .style-2 .level-text,
-.style-2 .level-number,
-.style-2 .strength {
+.style-2 .level-number {
     color: #ffb200;
+}
+
+.style-2 .strength {
+    color: #6f4b00;
 }
 
 .style-2 .timer,
 .style-2 .respawn-info {
-    color: black;
+    color: #111820;
 }
 
 .respawn-info .no-despawn {
     color: #ff4444;
 }
 
-.level-line {
+.overlay-header {
     display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 8px;
+}
+
+.level-badge {
+    display: inline-flex;
     align-items: baseline;
-    gap: 5px;
-    margin-bottom: 5px;
-    font-size: 32px;
+    gap: 6px;
+    min-height: 38px;
+    padding: 3px 10px 2px;
+    border-radius: 6px;
+    white-space: nowrap;
+}
+
+.level-text {
+    font-size: 22px;
+    line-height: 1;
+}
+
+.level-number {
+    font-size: 38px;
+    line-height: 0.95;
 }
 
 .strength {
-    margin-left: auto;
+    display: inline-flex;
+    align-items: center;
+    min-height: 28px;
+    padding: 1px 8px 0;
+    border-radius: 5px;
+    background: rgba(255, 178, 0, 0.14);
+    font-size: 20px;
+    line-height: 1;
+    white-space: nowrap;
+}
+
+.overlay-meta {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
 }
 
 .timer {
     display: inline;
-    margin-left: 10px;
-    font-size: 32px;
+    min-width: 58px;
+    font-size: 26px;
+    line-height: 1;
+    text-align: right;
 }
 
 .respawn-info {
-    margin-bottom: 10px;
-    font-size: 20px;
+    width: max-content;
+    max-width: 100%;
+    margin: -2px 0 8px;
+    padding: 3px 8px 2px;
+    border-radius: 5px;
+    background: rgba(0, 0, 0, 0.18);
+    font-size: 18px;
+    line-height: 1.05;
 }
 
 .monsters-squares {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(var(--square-size), 1fr));
-    max-width: calc(var(--square-size) * var(--columns-count) + 70px);
-    gap: 10px;
+    grid-template-columns: repeat(var(--columns-count), var(--square-size));
+    width: max-content;
+    max-width: 100%;
+    gap: 8px;
 }
 
 .monster-square {
     position: relative;
     width: var(--square-size);
     height: var(--square-size);
-    margin-bottom: 25px;
+    margin-bottom: 18px;
     overflow: visible;
-    border-radius: calc(var(--square-size) * 0.2);
-    background: black;
+    border-radius: calc(var(--square-size) * 0.16);
+    background: #07090c;
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08), 0 5px 14px rgba(0, 0, 0, 0.28);
 }
 
 .monster-square img {
@@ -121,8 +184,9 @@ body {
     inset: 0;
     width: 100%;
     height: 100%;
+    border-radius: inherit;
     object-fit: cover;
-    filter: drop-shadow(0 0 5px var(--glow-color));
+    filter: drop-shadow(0 0 4px var(--glow-color));
 }
 
 .monster-square.level-1 {
@@ -142,29 +206,39 @@ body {
 
 .monster-count {
     position: absolute;
-    right: 2px;
-    bottom: 2px;
+    right: -4px;
+    bottom: -4px;
     z-index: 1;
-    padding: 1px 4px;
-    border-radius: 3px;
-    background: rgba(0, 0, 0, 0.7);
+    min-width: 20px;
+    padding: 2px 5px 1px;
+    border-radius: 999px;
+    background: rgba(0, 0, 0, 0.82);
     color: white;
     font-family: Arial, sans-serif;
-    font-size: 12px;
+    font-size: 11px;
+    font-weight: 700;
+    line-height: 1;
+    text-align: center;
 }
 
 .strength-required {
     position: absolute;
-    bottom: -23px;
+    bottom: -18px;
     left: 50%;
     z-index: 2;
+    min-width: 34px;
+    max-width: calc(var(--square-size) + 12px);
+    padding: 3px 7px 2px;
     transform: translateX(-50%);
-    padding: 2px 8px;
-    border-radius: 4px;
-    background: rgba(0, 0, 0, 0.8);
+    overflow: visible;
+    border-radius: 999px;
+    background: rgba(0, 0, 0, 0.84);
     color: #ffb200;
     font-family: Arial, sans-serif;
-    font-size: 13px;
+    font-size: 14px;
+    font-weight: 700;
+    line-height: 1;
+    text-align: center;
     white-space: nowrap;
 }
 

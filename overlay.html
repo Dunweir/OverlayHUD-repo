@@ -9,11 +9,15 @@
 <body class="overlay-page">
     <div class="overlay">
         <div class="overlay-container" id="overlayContainer">
-            <div class="level-line">
-                <span class="level-text">УРОВЕНЬ</span>
-                <span class="level-number" id="levelNumber">1</span>
-                <span class="timer" id="timer">00:00</span>
-                <span class="strength" id="strength">💪0</span>
+            <div class="overlay-header">
+                <div class="level-badge">
+                    <span class="level-text">УРОВЕНЬ</span>
+                    <span class="level-number" id="levelNumber">1</span>
+                </div>
+                <div class="overlay-meta">
+                    <span class="timer" id="timer">00:00</span>
+                    <span class="strength" id="strength">СИЛА 0</span>
+                </div>
             </div>
             <div class="respawn-info" id="respawnInfo">🔄 4-5 МИНУТ <span class="no-despawn">(БЕЗ ДЕСПАВНА)</span></div>
             <div class="monsters-squares" id="monstersSquares"></div>
@@ -29,7 +33,7 @@
         const respawnInfo = document.getElementById("respawnInfo");
         const monstersSquares = document.getElementById("monstersSquares");
 
-        function renderMonsterSquare(level, monster) {
+        function renderMonsterSquare(level, monster, currentStrength) {
             const square = document.createElement("div");
             square.className = `monster-square level-${level}`;
 
@@ -49,12 +53,12 @@
                 const required = document.createElement("div");
                 required.className = "strength-required";
                 if (monster.strength === "impossible") {
-                    required.textContent = "💪❌";
+                    required.textContent = "💪X";
                 } else if (monster.strength === undefined) {
                     required.textContent = "?";
                 } else {
                     required.textContent = `💪${monster.strength}`;
-                    required.style.color = OverlayApp.getState().strength >= monster.strength ? "#4CAF50" : "#ff4444";
+                    required.style.color = currentStrength >= monster.strength ? "#4CAF50" : "#ff4444";
                 }
                 square.appendChild(required);
             }
@@ -72,7 +76,7 @@
             if (state.bgEnabled) overlayContainer.classList.add("with-bg");
 
             levelNumber.textContent = state.level;
-            strength.textContent = `💪${state.strength}`;
+            strength.textContent = `СИЛА ${state.strength}`;
             timer.textContent = OverlayApp.formatTime(seconds);
             timer.style.display = state.timerVisible ? "" : "none";
             respawnInfo.style.display = state.timerVisible ? "" : "none";
@@ -83,13 +87,18 @@
             for (let level = 1; level <= 3; level++) {
                 const selected = state.monsters.filter((monster) => monster.level === level);
                 for (let index = 0; index < counts[`level${level}`]; index++) {
-                    monstersSquares.appendChild(renderMonsterSquare(level, selected[index]));
+                    monstersSquares.appendChild(renderMonsterSquare(level, selected[index], state.strength));
                 }
             }
         }
 
         OverlayApp.subscribe(render);
-        setInterval(() => render(OverlayApp.getState()), 1000);
+        setInterval(() => {
+            const state = OverlayApp.getState();
+            if (state.running && state.timerVisible) {
+                render(state);
+            }
+        }, 1000);
     </script>
 </body>
 </html>
