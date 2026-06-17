@@ -1,0 +1,212 @@
+<!doctype html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stream Overlay Controller</title>
+    <link rel="stylesheet" href="overlay.css">
+</head>
+<body class="control-page">
+    <main class="control-panel">
+        <section class="control-column">
+            <h1>Управление оверлеем</h1>
+
+            <div class="control-section">
+                <h2>Таймер</h2>
+                <div class="button-row">
+                    <button id="startBtn">Старт</button>
+                    <button id="stopBtn">Стоп</button>
+                    <button id="resetBtn">Сброс</button>
+                </div>
+            </div>
+
+            <div class="control-section field-stack">
+                <h2>Параметры</h2>
+                <label for="levelInput">Уровень</label>
+                <input type="number" id="levelInput" min="1" value="1">
+                <div id="levelError" class="error"></div>
+                <button id="setLevelBtn">Установить уровень</button>
+
+                <label for="strengthInput">Сила</label>
+                <input type="number" id="strengthInput" min="0" step="1" value="0">
+                <div id="strengthError" class="error"></div>
+                <button id="setStrengthBtn">Установить силу</button>
+            </div>
+
+            <div class="control-section">
+                <h2>Вид</h2>
+                <div class="style-buttons">
+                    <button id="style1Btn">Стиль 1</button>
+                    <button id="style2Btn">Стиль 2</button>
+                </div>
+            </div>
+
+            <div class="control-section field-stack">
+                <label for="sizeSlider">Размер квадратиков</label>
+                <div class="slider-row">
+                    <input type="range" id="sizeSlider" min="30" max="60" value="50" step="2">
+                    <span class="value-readout" id="sizeValue">50px</span>
+                </div>
+
+                <label for="columnsSlider">Монстров в ряд</label>
+                <div class="slider-row">
+                    <input type="range" id="columnsSlider" min="4" max="12" value="4" step="1">
+                    <span class="value-readout" id="columnsValue">4</span>
+                </div>
+            </div>
+
+            <div class="control-section field-stack">
+                <div class="toggle-row">
+                    <span>Подложка</span>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="bgToggle" checked>
+                        <span></span>
+                    </label>
+                </div>
+
+                <div class="toggle-row">
+                    <span>Таймер на оверлее</span>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="timerToggle">
+                        <span></span>
+                    </label>
+                </div>
+            </div>
+
+            <div class="control-section">
+                <button id="clearMonstersBtn">Сбросить монстров</button>
+            </div>
+        </section>
+
+        <section class="control-column">
+            <h1>Выбор монстров</h1>
+            <div class="monster-category category-1">
+                <h3>Уровень 1</h3>
+                <div class="monster-grid" id="level1Grid"></div>
+            </div>
+            <div class="monster-category category-2">
+                <h3>Уровень 2</h3>
+                <div class="monster-grid" id="level2Grid"></div>
+            </div>
+            <div class="monster-category category-3">
+                <h3>Уровень 3</h3>
+                <div class="monster-grid" id="level3Grid"></div>
+            </div>
+        </section>
+    </main>
+
+    <script src="overlay-state.js"></script>
+    <script>
+        const levelInput = document.getElementById("levelInput");
+        const strengthInput = document.getElementById("strengthInput");
+        const levelError = document.getElementById("levelError");
+        const strengthError = document.getElementById("strengthError");
+        const sizeSlider = document.getElementById("sizeSlider");
+        const sizeValue = document.getElementById("sizeValue");
+        const columnsSlider = document.getElementById("columnsSlider");
+        const columnsValue = document.getElementById("columnsValue");
+        const bgToggle = document.getElementById("bgToggle");
+        const timerToggle = document.getElementById("timerToggle");
+
+        function createMonsterIcon(monsterName, level, isReplacement = false) {
+            const icon = document.createElement("div");
+            icon.className = "monster-icon";
+            icon.dataset.monster = monsterName;
+            icon.dataset.level = level;
+
+            const img = document.createElement("img");
+            img.src = OverlayApp.getMonsterImage(monsterName);
+            img.alt = monsterName;
+            icon.appendChild(img);
+
+            const count = OverlayApp.getMonsterCount(monsterName, level, isReplacement);
+            if (count) {
+                const countElement = document.createElement("div");
+                countElement.className = "count";
+                countElement.textContent = `x${count}`;
+                icon.appendChild(countElement);
+            }
+
+            icon.addEventListener("click", () => {
+                OverlayApp.addMonster(monsterName, level, isReplacement);
+            });
+
+            icon.addEventListener("contextmenu", (event) => {
+                event.preventDefault();
+                OverlayApp.removeMonster(monsterName, level);
+            });
+
+            return icon;
+        }
+
+        function buildMonsterGrid() {
+            for (let level = 1; level <= 3; level++) {
+                const grid = document.getElementById(`level${level}Grid`);
+                grid.innerHTML = "";
+                OverlayApp.monsterConfig.levels[level].monsters.forEach((monster) => {
+                    grid.appendChild(createMonsterIcon(monster, level));
+                });
+
+                if (level === 3) {
+                    OverlayApp.monsterConfig.replacements.forEach((monster) => {
+                        grid.appendChild(createMonsterIcon(monster, level, true));
+                    });
+                }
+            }
+        }
+
+        function renderControlState(state) {
+            levelInput.value = state.level;
+            strengthInput.value = state.strength;
+            sizeSlider.value = state.squareSize;
+            sizeValue.textContent = `${state.squareSize}px`;
+            columnsSlider.value = state.columnsCount;
+            columnsValue.textContent = state.columnsCount;
+            bgToggle.checked = state.bgEnabled;
+            timerToggle.checked = state.timerVisible;
+
+            document.querySelectorAll(".monster-icon").forEach((icon) => {
+                const level = parseInt(icon.dataset.level, 10);
+                const name = icon.dataset.monster;
+                icon.classList.toggle("selected", state.monsters.some((monster) => monster.level === level && monster.name === name));
+            });
+        }
+
+        document.getElementById("startBtn").addEventListener("click", OverlayApp.startTimer);
+        document.getElementById("stopBtn").addEventListener("click", OverlayApp.stopTimer);
+        document.getElementById("resetBtn").addEventListener("click", OverlayApp.resetTimer);
+
+        document.getElementById("setLevelBtn").addEventListener("click", () => {
+            const level = parseInt(levelInput.value, 10);
+            if (Number.isNaN(level) || level < 1) {
+                levelError.textContent = "Введите число >= 1";
+                return;
+            }
+            levelError.textContent = "";
+            OverlayApp.setLevel(level);
+        });
+
+        document.getElementById("setStrengthBtn").addEventListener("click", () => {
+            const strength = parseInt(strengthInput.value, 10);
+            if (Number.isNaN(strength) || strength < 0) {
+                strengthError.textContent = "Введите неотрицательное число";
+                return;
+            }
+            strengthError.textContent = "";
+            OverlayApp.setStrength(strength);
+        });
+
+        document.getElementById("style1Btn").addEventListener("click", () => OverlayApp.setStyle(1));
+        document.getElementById("style2Btn").addEventListener("click", () => OverlayApp.setStyle(2));
+        document.getElementById("clearMonstersBtn").addEventListener("click", OverlayApp.clearMonsters);
+
+        bgToggle.addEventListener("change", () => OverlayApp.setBgEnabled(bgToggle.checked));
+        timerToggle.addEventListener("change", () => OverlayApp.setTimerVisible(timerToggle.checked));
+        sizeSlider.addEventListener("input", () => OverlayApp.setSquareSize(parseInt(sizeSlider.value, 10)));
+        columnsSlider.addEventListener("input", () => OverlayApp.setColumnsCount(parseInt(columnsSlider.value, 10)));
+
+        buildMonsterGrid();
+        OverlayApp.subscribe(renderControlState);
+    </script>
+</body>
+</html>

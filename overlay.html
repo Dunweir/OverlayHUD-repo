@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stream Overlay</title>
+    <link rel="stylesheet" href="overlay.css">
+</head>
+<body class="overlay-page">
+    <div class="overlay">
+        <div class="overlay-container" id="overlayContainer">
+            <div class="level-line">
+                <span class="level-text">УРОВЕНЬ</span>
+                <span class="level-number" id="levelNumber">1</span>
+                <span class="timer" id="timer">00:00</span>
+                <span class="strength" id="strength">💪0</span>
+            </div>
+            <div class="respawn-info" id="respawnInfo">🔄 4-5 МИНУТ <span class="no-despawn">(БЕЗ ДЕСПАВНА)</span></div>
+            <div class="monsters-squares" id="monstersSquares"></div>
+        </div>
+    </div>
+
+    <script src="overlay-state.js"></script>
+    <script>
+        const overlayContainer = document.getElementById("overlayContainer");
+        const levelNumber = document.getElementById("levelNumber");
+        const strength = document.getElementById("strength");
+        const timer = document.getElementById("timer");
+        const respawnInfo = document.getElementById("respawnInfo");
+        const monstersSquares = document.getElementById("monstersSquares");
+
+        function renderMonsterSquare(level, monster) {
+            const square = document.createElement("div");
+            square.className = `monster-square level-${level}`;
+
+            const img = document.createElement("img");
+            img.src = monster ? monster.image : "monsters/unknown.webp";
+            img.alt = monster ? monster.name : "Unknown Monster";
+            square.appendChild(img);
+
+            if (monster && monster.count) {
+                const count = document.createElement("div");
+                count.className = "monster-count";
+                count.textContent = `x${monster.count}`;
+                square.appendChild(count);
+            }
+
+            if (monster) {
+                const required = document.createElement("div");
+                required.className = "strength-required";
+                if (monster.strength === "impossible") {
+                    required.textContent = "💪❌";
+                } else if (monster.strength === undefined) {
+                    required.textContent = "?";
+                } else {
+                    required.textContent = `💪${monster.strength}`;
+                    required.style.color = OverlayApp.getState().strength >= monster.strength ? "#4CAF50" : "#ff4444";
+                }
+                square.appendChild(required);
+            }
+
+            return square;
+        }
+
+        function render(state) {
+            const seconds = OverlayApp.getTimerSeconds(state);
+            document.documentElement.style.setProperty("--square-size", `${state.squareSize}px`);
+            document.documentElement.style.setProperty("--columns-count", state.columnsCount);
+
+            overlayContainer.className = "overlay-container";
+            overlayContainer.classList.add(`style-${state.style}`);
+            if (state.bgEnabled) overlayContainer.classList.add("with-bg");
+
+            levelNumber.textContent = state.level;
+            strength.textContent = `💪${state.strength}`;
+            timer.textContent = OverlayApp.formatTime(seconds);
+            timer.style.display = state.timerVisible ? "" : "none";
+            respawnInfo.style.display = state.timerVisible ? "" : "none";
+            respawnInfo.innerHTML = OverlayApp.getRespawnHtml(seconds);
+
+            const counts = OverlayApp.getCountsForLevel(state.level);
+            monstersSquares.innerHTML = "";
+            for (let level = 1; level <= 3; level++) {
+                const selected = state.monsters.filter((monster) => monster.level === level);
+                for (let index = 0; index < counts[`level${level}`]; index++) {
+                    monstersSquares.appendChild(renderMonsterSquare(level, selected[index]));
+                }
+            }
+        }
+
+        OverlayApp.subscribe(render);
+        setInterval(() => render(OverlayApp.getState()), 1000);
+    </script>
+</body>
+</html>
