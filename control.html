@@ -7,92 +7,110 @@
     <link rel="stylesheet" href="overlay.css">
 </head>
 <body class="control-page">
-    <main class="control-panel">
-        <section class="control-column">
-            <h1>Управление оверлеем</h1>
-
-            <div class="control-section">
-                <h2>Таймер</h2>
-                <div class="button-row">
-                    <button id="startBtn">Старт</button>
-                    <button id="stopBtn">Стоп</button>
-                    <button id="resetBtn">Сброс</button>
+    <main class="control-shell">
+        <header class="control-header">
+            <div>
+                <h1>Управление оверлеем</h1>
+                <div class="status-strip">
+                    <span>Уровень <strong id="levelStatus">1</strong></span>
+                    <span>Сила <strong id="strengthStatus">0</strong></span>
+                    <span id="timerStatus">Таймер остановлен</span>
                 </div>
             </div>
+            <button class="danger-button" id="clearMonstersBtn">Сбросить монстров</button>
+        </header>
 
-            <div class="control-section field-stack">
-                <h2>Параметры</h2>
-                <label for="levelInput">Уровень</label>
-                <input type="number" id="levelInput" min="1" value="1">
-                <div id="levelError" class="error"></div>
-                <button id="setLevelBtn">Установить уровень</button>
-
-                <label for="strengthInput">Сила</label>
-                <input type="number" id="strengthInput" min="0" step="1" value="0">
-                <div id="strengthError" class="error"></div>
-                <button id="setStrengthBtn">Установить силу</button>
-            </div>
-
-            <div class="control-section">
-                <h2>Вид</h2>
-                <div class="style-buttons">
-                    <button id="style1Btn">Стиль 1</button>
-                    <button id="style2Btn">Стиль 2</button>
-                </div>
-            </div>
-
-            <div class="control-section field-stack">
-                <label for="sizeSlider">Размер квадратиков</label>
-                <div class="slider-row">
-                    <input type="range" id="sizeSlider" min="30" max="60" value="50" step="2">
-                    <span class="value-readout" id="sizeValue">50px</span>
+        <div class="control-layout">
+            <section class="control-sidebar">
+                <div class="control-card">
+                    <h2>Таймер</h2>
+                    <div class="button-row segmented-row">
+                        <button id="startBtn">Старт</button>
+                        <button id="stopBtn">Стоп</button>
+                        <button id="resetBtn">Сброс</button>
+                    </div>
                 </div>
 
-                <label for="columnsSlider">Монстров в ряд</label>
-                <div class="slider-row">
-                    <input type="range" id="columnsSlider" min="4" max="12" value="4" step="1">
-                    <span class="value-readout" id="columnsValue">4</span>
+                <div class="control-card">
+                    <h2>Параметры</h2>
+                    <div class="field-grid">
+                        <label for="levelInput">Уровень</label>
+                        <div class="input-action">
+                            <input type="number" id="levelInput" min="1" value="1">
+                            <button id="setLevelBtn">ОК</button>
+                        </div>
+                        <div id="levelError" class="error"></div>
+
+                        <label for="strengthInput">Сила</label>
+                        <div class="input-action">
+                            <input type="number" id="strengthInput" min="0" step="1" value="0">
+                            <button id="setStrengthBtn">ОК</button>
+                        </div>
+                        <div id="strengthError" class="error"></div>
+                    </div>
                 </div>
-            </div>
 
-            <div class="control-section field-stack">
-                <div class="toggle-row">
-                    <span>Подложка</span>
-                    <label class="toggle-switch">
-                        <input type="checkbox" id="bgToggle" checked>
-                        <span></span>
-                    </label>
+                <div class="control-card">
+                    <h2>Вид</h2>
+                    <div class="style-buttons segmented-row">
+                        <button id="style1Btn">Темный</button>
+                        <button id="style2Btn">Светлый</button>
+                    </div>
+
+                    <div class="range-stack">
+                        <label for="sizeSlider">Размер квадратиков</label>
+                        <div class="slider-row">
+                            <input type="range" id="sizeSlider" min="30" max="60" value="50" step="2">
+                            <span class="value-readout" id="sizeValue">50px</span>
+                        </div>
+
+                        <label for="columnsSlider">Монстров в ряд</label>
+                        <div class="slider-row">
+                            <input type="range" id="columnsSlider" min="4" max="12" value="4" step="1">
+                            <span class="value-readout" id="columnsValue">4</span>
+                        </div>
+                    </div>
+
+                    <div class="toggle-list">
+                        <label class="toggle-row">
+                            <span>Подложка</span>
+                            <span class="toggle-switch">
+                                <input type="checkbox" id="bgToggle" checked>
+                                <span></span>
+                            </span>
+                        </label>
+
+                        <label class="toggle-row">
+                            <span>Таймер на оверлее</span>
+                            <span class="toggle-switch">
+                                <input type="checkbox" id="timerToggle">
+                                <span></span>
+                            </span>
+                        </label>
+                    </div>
+                </div>
+            </section>
+
+            <section class="monster-picker">
+                <div class="monster-picker-header">
+                    <h2>Выбор монстров</h2>
+                    <div class="monster-counter" id="monsterCounter">0 выбрано</div>
                 </div>
 
-                <div class="toggle-row">
-                    <span>Таймер на оверлее</span>
-                    <label class="toggle-switch">
-                        <input type="checkbox" id="timerToggle">
-                        <span></span>
-                    </label>
+                <div class="monster-category category-1">
+                    <h3>Уровень 1</h3>
+                    <div class="monster-grid" id="level1Grid"></div>
                 </div>
-            </div>
-
-            <div class="control-section">
-                <button id="clearMonstersBtn">Сбросить монстров</button>
-            </div>
-        </section>
-
-        <section class="control-column">
-            <h1>Выбор монстров</h1>
-            <div class="monster-category category-1">
-                <h3>Уровень 1</h3>
-                <div class="monster-grid" id="level1Grid"></div>
-            </div>
-            <div class="monster-category category-2">
-                <h3>Уровень 2</h3>
-                <div class="monster-grid" id="level2Grid"></div>
-            </div>
-            <div class="monster-category category-3">
-                <h3>Уровень 3</h3>
-                <div class="monster-grid" id="level3Grid"></div>
-            </div>
-        </section>
+                <div class="monster-category category-2">
+                    <h3>Уровень 2</h3>
+                    <div class="monster-grid" id="level2Grid"></div>
+                </div>
+                <div class="monster-category category-3">
+                    <h3>Уровень 3</h3>
+                    <div class="monster-grid" id="level3Grid"></div>
+                </div>
+            </section>
+        </div>
     </main>
 
     <script src="overlay-state.js"></script>
@@ -107,12 +125,21 @@
         const columnsValue = document.getElementById("columnsValue");
         const bgToggle = document.getElementById("bgToggle");
         const timerToggle = document.getElementById("timerToggle");
+        const levelStatus = document.getElementById("levelStatus");
+        const strengthStatus = document.getElementById("strengthStatus");
+        const timerStatus = document.getElementById("timerStatus");
+        const monsterCounter = document.getElementById("monsterCounter");
+        const style1Btn = document.getElementById("style1Btn");
+        const style2Btn = document.getElementById("style2Btn");
+        const startBtn = document.getElementById("startBtn");
 
         function createMonsterIcon(monsterName, level, isReplacement = false) {
-            const icon = document.createElement("div");
+            const icon = document.createElement("button");
+            icon.type = "button";
             icon.className = "monster-icon";
             icon.dataset.monster = monsterName;
             icon.dataset.level = level;
+            icon.title = monsterName;
 
             const img = document.createElement("img");
             img.src = OverlayApp.getMonsterImage(monsterName);
@@ -121,7 +148,7 @@
 
             const count = OverlayApp.getMonsterCount(monsterName, level, isReplacement);
             if (count) {
-                const countElement = document.createElement("div");
+                const countElement = document.createElement("span");
                 countElement.className = "count";
                 countElement.textContent = `x${count}`;
                 icon.appendChild(countElement);
@@ -165,6 +192,17 @@
             bgToggle.checked = state.bgEnabled;
             timerToggle.checked = state.timerVisible;
 
+            levelStatus.textContent = state.level;
+            strengthStatus.textContent = state.strength;
+            timerStatus.textContent = state.running ? "Таймер идет" : "Таймер остановлен";
+            const counts = OverlayApp.getCountsForLevel(state.level);
+            const monsterLimit = counts.level1 + counts.level2 + counts.level3;
+            monsterCounter.textContent = `${state.monsters.length}/${monsterLimit} выбрано`;
+
+            style1Btn.classList.toggle("is-active", state.style === 1);
+            style2Btn.classList.toggle("is-active", state.style === 2);
+            startBtn.classList.toggle("is-active", state.running);
+
             document.querySelectorAll(".monster-icon").forEach((icon) => {
                 const level = parseInt(icon.dataset.level, 10);
                 const name = icon.dataset.monster;
@@ -172,11 +210,7 @@
             });
         }
 
-        document.getElementById("startBtn").addEventListener("click", OverlayApp.startTimer);
-        document.getElementById("stopBtn").addEventListener("click", OverlayApp.stopTimer);
-        document.getElementById("resetBtn").addEventListener("click", OverlayApp.resetTimer);
-
-        document.getElementById("setLevelBtn").addEventListener("click", () => {
+        function applyLevel() {
             const level = parseInt(levelInput.value, 10);
             if (Number.isNaN(level) || level < 1) {
                 levelError.textContent = "Введите число >= 1";
@@ -184,9 +218,9 @@
             }
             levelError.textContent = "";
             OverlayApp.setLevel(level);
-        });
+        }
 
-        document.getElementById("setStrengthBtn").addEventListener("click", () => {
+        function applyStrength() {
             const strength = parseInt(strengthInput.value, 10);
             if (Number.isNaN(strength) || strength < 0) {
                 strengthError.textContent = "Введите неотрицательное число";
@@ -194,12 +228,23 @@
             }
             strengthError.textContent = "";
             OverlayApp.setStrength(strength);
-        });
+        }
 
+        document.getElementById("startBtn").addEventListener("click", OverlayApp.startTimer);
+        document.getElementById("stopBtn").addEventListener("click", OverlayApp.stopTimer);
+        document.getElementById("resetBtn").addEventListener("click", OverlayApp.resetTimer);
+        document.getElementById("setLevelBtn").addEventListener("click", applyLevel);
+        document.getElementById("setStrengthBtn").addEventListener("click", applyStrength);
         document.getElementById("style1Btn").addEventListener("click", () => OverlayApp.setStyle(1));
         document.getElementById("style2Btn").addEventListener("click", () => OverlayApp.setStyle(2));
         document.getElementById("clearMonstersBtn").addEventListener("click", OverlayApp.clearMonsters);
 
+        levelInput.addEventListener("keydown", (event) => {
+            if (event.key === "Enter") applyLevel();
+        });
+        strengthInput.addEventListener("keydown", (event) => {
+            if (event.key === "Enter") applyStrength();
+        });
         bgToggle.addEventListener("change", () => OverlayApp.setBgEnabled(bgToggle.checked));
         timerToggle.addEventListener("change", () => OverlayApp.setTimerVisible(timerToggle.checked));
         sizeSlider.addEventListener("input", () => OverlayApp.setSquareSize(parseInt(sizeSlider.value, 10)));

@@ -171,49 +171,102 @@ body {
 .control-page {
     min-height: 100vh;
     overflow-y: auto;
-    background: #1f2b38;
-    color: white;
+    background: #121820;
+    color: #eef4f8;
     font-family: Arial, sans-serif;
     font-weight: 400;
 }
 
-.control-panel {
-    display: grid;
-    grid-template-columns: minmax(260px, 360px) minmax(420px, 1fr);
-    gap: 24px;
+.control-shell {
     width: min(1180px, calc(100vw - 32px));
     margin: 0 auto;
     padding: 24px 0;
 }
 
-.control-panel h1,
-.control-panel h2,
-.control-panel h3 {
-    margin-top: 0;
-    color: #ecf0f1;
-}
-
-.control-panel h1 {
+.control-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 18px;
     margin-bottom: 18px;
-    font-size: 26px;
 }
 
-.control-panel h2 {
-    margin-bottom: 14px;
+.control-header h1,
+.control-card h2,
+.monster-picker h2,
+.monster-category h3 {
+    margin-top: 0;
+    color: #f7fbff;
+}
+
+.control-header h1 {
+    margin-bottom: 8px;
+    font-size: 28px;
+    line-height: 1.05;
+}
+
+.control-card h2,
+.monster-picker h2 {
+    margin-bottom: 12px;
     font-size: 20px;
 }
 
-.control-panel h3 {
-    margin-bottom: 10px;
-    font-size: 16px;
+.status-strip {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
 }
 
-.control-column {
+.status-strip span,
+.monster-counter {
+    min-height: 28px;
+    padding: 5px 10px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.06);
+    color: #b9c7d3;
+    font-size: 13px;
+}
+
+.status-strip strong {
+    color: #ffb200;
+}
+
+.control-layout {
+    display: grid;
+    grid-template-columns: 340px minmax(0, 1fr);
+    gap: 18px;
+    align-items: start;
+}
+
+.control-sidebar {
+    display: grid;
+    gap: 14px;
+}
+
+.control-card,
+.monster-picker {
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    background: #1a2430;
+    box-shadow: 0 12px 28px rgba(0, 0, 0, 0.18);
+}
+
+.control-card {
+    padding: 16px;
+}
+
+.monster-picker {
     min-width: 0;
+    padding: 16px;
 }
 
-.control-section {
-    margin-bottom: 20px;
+.monster-picker-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 10px;
 }
 
 .button-row,
@@ -226,9 +279,9 @@ body {
 button {
     min-height: 38px;
     padding: 8px 12px;
-    border: 0;
+    border: 1px solid transparent;
     border-radius: 4px;
-    background-color: #3498db;
+    background-color: #263645;
     color: white;
     cursor: pointer;
     font: inherit;
@@ -237,7 +290,7 @@ button {
 }
 
 button:hover {
-    background-color: #2980b9;
+    background-color: #314557;
 }
 
 button:active {
@@ -245,32 +298,55 @@ button:active {
 }
 
 #startBtn {
-    background-color: #2ecc71;
+    background-color: #24895b;
 }
 
 #startBtn:hover {
-    background-color: #27ae60;
+    background-color: #2ca66f;
 }
 
 #stopBtn {
-    background-color: #e74c3c;
+    background-color: #9b3b36;
 }
 
 #stopBtn:hover {
-    background-color: #c0392b;
+    background-color: #bd463f;
 }
 
 #resetBtn {
-    background-color: #f39c12;
+    background-color: #a96e18;
 }
 
 #resetBtn:hover {
-    background-color: #d35400;
+    background-color: #c9821b;
 }
 
-.field-stack {
+button.is-active {
+    border-color: #ffb200;
+    box-shadow: inset 0 0 0 1px rgba(255, 178, 0, 0.24), 0 0 0 3px rgba(255, 178, 0, 0.08);
+}
+
+.danger-button {
+    flex: 0 0 auto;
+    background: #5d2d38;
+}
+
+.danger-button:hover {
+    background: #74404c;
+}
+
+.segmented-row {
     display: grid;
-    gap: 8px;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.style-buttons.segmented-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.field-grid {
+    display: grid;
+    gap: 7px;
 }
 
 label {
@@ -280,18 +356,36 @@ label {
 input {
     width: 100%;
     padding: 8px 12px;
-    border: 2px solid #3498db;
+    border: 1px solid #3e5367;
     border-radius: 4px;
-    background-color: #34495e;
-    color: white;
+    background-color: #101821;
+    color: #f7fbff;
     font: inherit;
     font-size: 16px;
+}
+
+input:focus {
+    border-color: #ffb200;
+    outline: 3px solid rgba(255, 178, 0, 0.12);
+}
+
+.input-action {
+    display: grid;
+    grid-template-columns: 1fr 58px;
+    gap: 8px;
 }
 
 .error {
     min-height: 18px;
     color: #e74c3c;
     font-size: 14px;
+}
+
+.range-stack,
+.toggle-list {
+    display: grid;
+    gap: 10px;
+    margin-top: 14px;
 }
 
 .slider-row,
@@ -301,15 +395,22 @@ input {
     gap: 10px;
 }
 
+.toggle-row {
+    justify-content: space-between;
+    min-height: 30px;
+    color: #dce6ee;
+}
+
 .slider-row input[type="range"] {
-    min-width: 120px;
-    max-width: 260px;
+    width: 100%;
+    min-width: 0;
+    max-width: none;
     height: 6px;
     padding: 0;
     border: 0;
     border-radius: 3px;
     appearance: none;
-    background: #3498db;
+    background: #3e5367;
     outline: none;
 }
 
@@ -318,7 +419,7 @@ input {
     height: 16px;
     border-radius: 50%;
     appearance: none;
-    background: #2ecc71;
+    background: #ffb200;
     cursor: pointer;
 }
 
@@ -370,13 +471,16 @@ input {
 }
 
 .monster-category {
-    margin-bottom: 22px;
+    margin-bottom: 18px;
 }
 
 .monster-category h3 {
-    padding: 6px 8px;
+    display: inline-flex;
+    margin-bottom: 10px;
+    padding: 5px 9px;
     border-radius: 4px;
     color: white;
+    font-size: 14px;
 }
 
 .category-1 h3 {
@@ -393,29 +497,34 @@ input {
 
 .monster-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(45px, 1fr));
-    gap: 10px;
-    margin-top: 12px;
+    grid-template-columns: repeat(auto-fill, 48px);
+    gap: 9px;
 }
 
 .monster-icon {
     position: relative;
-    width: 45px;
-    height: 45px;
+    width: 48px;
+    height: 48px;
+    min-height: 48px;
+    padding: 0;
     overflow: hidden;
-    border: 2px solid transparent;
+    border: 1px solid rgba(255, 255, 255, 0.1);
     border-radius: 8px;
+    background: #0d141c;
+    color: inherit;
     cursor: pointer;
     transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s;
 }
 
 .monster-icon:hover {
-    transform: scale(1.1);
+    transform: translateY(-1px);
+    border-color: rgba(255, 178, 0, 0.55);
+    background: #0d141c;
 }
 
 .monster-icon.selected {
     border-color: #ffb200;
-    box-shadow: 0 0 10px rgba(255, 178, 0, 0.5);
+    box-shadow: 0 0 0 3px rgba(255, 178, 0, 0.16);
 }
 
 .monster-icon img {
@@ -436,9 +545,22 @@ input {
 }
 
 @media (max-width: 760px) {
-    .control-panel {
-        grid-template-columns: 1fr;
+    .control-shell {
         width: min(560px, calc(100vw - 24px));
         padding: 16px 0;
+    }
+
+    .control-header,
+    .monster-picker-header {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .control-layout {
+        grid-template-columns: 1fr;
+    }
+
+    .monster-grid {
+        grid-template-columns: repeat(auto-fill, 48px);
     }
 }
