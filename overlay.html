@@ -32,42 +32,97 @@
         const timer = document.getElementById("timer");
         const respawnInfo = document.getElementById("respawnInfo");
         const monstersSquares = document.getElementById("monstersSquares");
+        let latestState = null;
+        let renderedSquareCount = 0;
 
-        function renderMonsterSquare(level, monster, currentStrength) {
-            const square = document.createElement("div");
+        function clearSquare(square) {
+            const img = square.querySelector("img");
+            if (!img.src.includes("monsters/unknown.webp")) {
+                img.src = "monsters/unknown.webp";
+            }
+            if (img.alt !== "Unknown Monster") {
+                img.alt = "Unknown Monster";
+            }
+            square.querySelectorAll(".monster-count, .strength-required").forEach((element) => element.remove());
+        }
+
+        function updateMonsterSquare(square, level, monster, currentStrength) {
             square.className = `monster-square level-${level}`;
 
-            const img = document.createElement("img");
-            img.src = monster ? monster.image : "monsters/unknown.webp";
-            img.alt = monster ? monster.name : "Unknown Monster";
-            square.appendChild(img);
-
-            if (monster && monster.count) {
-                const count = document.createElement("div");
-                count.className = "monster-count";
-                count.textContent = `x${monster.count}`;
-                square.appendChild(count);
+            if (!monster) {
+                clearSquare(square);
+                return;
             }
 
-            if (monster) {
-                const required = document.createElement("div");
-                required.className = "strength-required";
-                if (monster.strength === "impossible") {
-                    required.textContent = "💪X";
-                } else if (monster.strength === undefined) {
-                    required.textContent = "?";
-                } else {
-                    required.textContent = `💪${monster.strength}`;
-                    required.style.color = currentStrength >= monster.strength ? "#4CAF50" : "#ff4444";
+            const img = square.querySelector("img");
+            if (!img.src.includes(monster.image)) {
+                img.src = monster.image;
+            }
+            if (img.alt !== monster.name) {
+                img.alt = monster.name;
+            }
+
+            let count = square.querySelector(".monster-count");
+            if (!monster.count && count) {
+                count.remove();
+            }
+
+            if (monster.count) {
+                if (!count) {
+                    count = document.createElement("div");
+                    count.className = "monster-count";
+                    square.appendChild(count);
                 }
+                count.textContent = `x${monster.count}`;
+            }
+
+            let required = square.querySelector(".strength-required");
+            if (!required) {
+                required = document.createElement("div");
+                required.className = "strength-required";
                 square.appendChild(required);
             }
 
-            return square;
+            if (monster.strength === "impossible") {
+                required.textContent = "💪X";
+                required.style.color = "";
+            } else if (monster.strength === undefined) {
+                required.textContent = "?";
+                required.style.color = "";
+            } else {
+                required.textContent = `💪${monster.strength}`;
+                required.style.color = currentStrength >= monster.strength ? "#4CAF50" : "#ff4444";
+            }
+        }
+
+        function ensureMonsterSquares(totalCount) {
+            while (renderedSquareCount < totalCount) {
+                const square = document.createElement("div");
+                square.className = "monster-square level-1";
+
+                const img = document.createElement("img");
+                img.src = "monsters/unknown.webp";
+                img.alt = "Unknown Monster";
+                square.appendChild(img);
+
+                monstersSquares.appendChild(square);
+                renderedSquareCount++;
+            }
+
+            while (renderedSquareCount > totalCount) {
+                monstersSquares.lastElementChild.remove();
+                renderedSquareCount--;
+            }
+        }
+
+        function renderTimer(state) {
+            const seconds = OverlayApp.getTimerSeconds(state);
+            timer.textContent = OverlayApp.formatTime(seconds);
+            respawnInfo.innerHTML = OverlayApp.getRespawnHtml(seconds);
         }
 
         function render(state) {
-            const seconds = OverlayApp.getTimerSeconds(state);
+            latestState = state;
             document.documentElement.style.setProperty("--square-size", `${state.squareSize}px`);
             document.documentElement.style.setProperty("--columns-count", state.columnsCount);
 
@@ -77,26 +132,28 @@
 
             levelNumber.textContent = state.level;
             strength.textContent = `СИЛА ${state.strength}`;
-            timer.textContent = OverlayApp.formatTime(seconds);
             timer.style.display = state.timerVisible ? "" : "none";
             respawnInfo.style.display = state.timerVisible ? "" : "none";
-            respawnInfo.innerHTML = OverlayApp.getRespawnHtml(seconds);
+            renderTimer(state);
 
             const counts = OverlayApp.getCountsForLevel(state.level);
-            monstersSquares.innerHTML = "";
+            const totalCount = counts.level1 + counts.level2 + counts.level3;
+            ensureMonsterSquares(totalCount);
+
+            let squareIndex = 0;
             for (let level = 1; level <= 3; level++) {
                 const selected = state.monsters.filter((monster) => monster.level === level);
                 for (let index = 0; index < counts[`level${level}`]; index++) {
-                    monstersSquares.appendChild(renderMonsterSquare(level, selected[index], state.strength));
+                    updateMonsterSquare(monstersSquares.children[squareIndex], level, selected[index], state.strength);
+                    squareIndex++;
                 }
             }
         }
 
         OverlayApp.subscribe(render);
         setInterval(() => {
-            const state = OverlayApp.getState();
-            if (state.running && state.timerVisible) {
-                render(state);
+            if (latestState && latestState.running && latestState.timerVisible) {
+                renderTimer(latestState);
             }
         }, 1000);
     </script>

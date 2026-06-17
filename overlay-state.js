@@ -65,7 +65,8 @@ const OverlayApp = (() => {
         style: 1,
         bgEnabled: true,
         timerVisible: false,
-        squareSize: 50,
+        squareSize: 64,
+        overlayScaleVersion: 2,
         columnsCount: 4,
         seconds: 0,
         running: false,
@@ -89,9 +90,12 @@ const OverlayApp = (() => {
 
     function normalizeState(nextState) {
         const source = nextState || defaultState;
+        const squareSize = source.overlayScaleVersion === 2 || source.squareSize !== 50 ? source.squareSize : defaultState.squareSize;
         return {
             ...defaultState,
             ...source,
+            overlayScaleVersion: defaultState.overlayScaleVersion,
+            squareSize,
             monsters: Array.isArray(source.monsters) ? source.monsters : []
         };
     }
@@ -315,9 +319,9 @@ const OverlayApp = (() => {
                 seconds: 0,
                 running: false,
                 startedAt: null,
+                monsters: [],
                 columnsCount: getRecommendedColumns(level)
             };
-            nextState.monsters = trimMonstersForLevel(nextState);
             return nextState;
         });
     }

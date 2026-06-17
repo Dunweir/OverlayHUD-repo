@@ -4,7 +4,7 @@
 }
 
 :root {
-    --square-size: 50px;
+    --square-size: 64px;
     --columns-count: 4;
 }
 
@@ -36,10 +36,10 @@ body {
     position: absolute;
     left: 20px;
     bottom: 20px;
-    min-width: 250px;
+    min-width: 310px;
     width: max-content;
-    max-width: min(720px, calc(100vw - 40px));
-    padding: 10px;
+    max-width: min(860px, calc(100vw - 40px));
+    padding: 14px;
     border-radius: 8px;
     filter: drop-shadow(0 10px 24px rgba(0, 0, 0, 0.42));
 }
@@ -98,38 +98,38 @@ body {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 10px;
-    margin-bottom: 8px;
+    gap: 14px;
+    margin-bottom: 10px;
 }
 
 .level-badge {
     display: inline-flex;
     align-items: baseline;
-    gap: 6px;
-    min-height: 38px;
-    padding: 3px 10px 2px;
+    gap: 8px;
+    min-height: 56px;
+    padding: 5px 15px 4px;
     border-radius: 6px;
     white-space: nowrap;
 }
 
 .level-text {
-    font-size: 22px;
+    font-size: 34px;
     line-height: 1;
 }
 
 .level-number {
-    font-size: 38px;
+    font-size: 58px;
     line-height: 0.95;
 }
 
 .strength {
     display: inline-flex;
     align-items: center;
-    min-height: 28px;
-    padding: 1px 8px 0;
+    min-height: 40px;
+    padding: 3px 12px 2px;
     border-radius: 5px;
     background: rgba(255, 178, 0, 0.14);
-    font-size: 20px;
+    font-size: 32px;
     line-height: 1;
     white-space: nowrap;
 }
@@ -138,13 +138,13 @@ body {
     display: flex;
     align-items: center;
     justify-content: flex-end;
-    gap: 8px;
+    gap: 10px;
 }
 
 .timer {
     display: inline;
-    min-width: 58px;
-    font-size: 26px;
+    min-width: 86px;
+    font-size: 38px;
     line-height: 1;
     text-align: right;
 }
@@ -152,11 +152,11 @@ body {
 .respawn-info {
     width: max-content;
     max-width: 100%;
-    margin: -2px 0 8px;
-    padding: 3px 8px 2px;
+    margin: -2px 0 11px;
+    padding: 4px 10px 3px;
     border-radius: 5px;
     background: rgba(0, 0, 0, 0.18);
-    font-size: 18px;
+    font-size: 23px;
     line-height: 1.05;
 }
 
@@ -165,14 +165,14 @@ body {
     grid-template-columns: repeat(var(--columns-count), var(--square-size));
     width: max-content;
     max-width: 100%;
-    gap: 8px;
+    gap: 10px;
 }
 
 .monster-square {
     position: relative;
     width: var(--square-size);
     height: var(--square-size);
-    margin-bottom: 18px;
+    margin-bottom: 22px;
     overflow: visible;
     border-radius: calc(var(--square-size) * 0.16);
     background: #07090c;
@@ -209,13 +209,13 @@ body {
     right: -4px;
     bottom: -4px;
     z-index: 1;
-    min-width: 20px;
-    padding: 2px 5px 1px;
+    min-width: 24px;
+    padding: 3px 6px 2px;
     border-radius: 999px;
     background: rgba(0, 0, 0, 0.82);
     color: white;
     font-family: Arial, sans-serif;
-    font-size: 11px;
+    font-size: 13px;
     font-weight: 700;
     line-height: 1;
     text-align: center;
@@ -223,19 +223,19 @@ body {
 
 .strength-required {
     position: absolute;
-    bottom: -18px;
+    bottom: -21px;
     left: 50%;
     z-index: 2;
-    min-width: 34px;
+    min-width: 40px;
     max-width: calc(var(--square-size) + 12px);
-    padding: 3px 7px 2px;
+    padding: 4px 8px 3px;
     transform: translateX(-50%);
     overflow: visible;
     border-radius: 999px;
     background: rgba(0, 0, 0, 0.84);
     color: #ffb200;
     font-family: Arial, sans-serif;
-    font-size: 14px;
+    font-size: 16px;
     font-weight: 700;
     line-height: 1;
     text-align: center;
