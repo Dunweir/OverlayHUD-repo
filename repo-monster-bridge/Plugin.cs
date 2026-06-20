@@ -9,11 +9,13 @@ using System.Net.Sockets;
 using System.Reflection;
 using System.Text;
 using System.Text.RegularExpressions;
+using System.Threading;
+using System.Threading.Tasks;
 using UnityEngine;
 
 namespace RepoMonsterBridge
 {
-    [BepInPlugin("local.overlay.repo_monster_bridge", "REPO Monster Bridge", "0.2.31")]
+    [BepInPlugin("local.overlay.repo_monster_bridge", "REPO Monster Bridge", "0.2.37")]
     public sealed class Plugin : BaseUnityPlugin
     {
         private static Plugin instance;
@@ -22,6 +24,11 @@ namespace RepoMonsterBridge
         private static readonly HashSet<int> sentEnemyInstanceIds = new HashSet<int>();
         private static readonly object seenLock = new object();
         private static readonly object enemyLock = new object();
+        private static readonly object reflectionCacheLock = new object();
+        private static readonly object networkQueueLock = new object();
+        private static readonly Dictionary<string, MemberInfo> memberCache = new Dictionary<string, MemberInfo>();
+        private static readonly HashSet<string> missingMemberCache = new HashSet<string>();
+        private static Task networkQueueTail = Task.CompletedTask;
 
         private static readonly Dictionary<string, string> KnownMonsters = new Dictionary<string, string>
         {
@@ -74,7 +81,9 @@ namespace RepoMonsterBridge
         };
 
         private readonly Dictionary<string, float> lastSeenLoggedAt = new Dictionary<string, float>();
+        private readonly Dictionary<int, string> resolvedMonsterNames = new Dictionary<int, string>();
         private float nextScanAt;
+        private float nextStrengthCheckAt;
         private float nextDebugSummaryAt;
         private float scanPausedUntil;
         private int fallbackLevel = 1;
@@ -109,7 +118,7 @@ namespace RepoMonsterBridge
             viewportPadding = Config.Bind("Detection", "ViewportPadding", 0.03f, "Allowed viewport padding outside the screen edges.");
             preferGameOnScreen = Config.Bind("Detection", "PreferGameOnScreen", true, "Use the game's local on-screen state when line of sight is enabled.");
             requireLineOfSight = Config.Bind("Detection", "RequireLineOfSight", false, "Reveal only enemies marked on-screen for the local player by the game.");
-            debugLogging = Config.Bind("Debug", "Logging", true, "Write bridge debug logs.");
+            debugLogging = Config.Bind("Debug", "Logging", false, "Write periodic bridge debug logs.");
             testSendOnStart = Config.Bind("Debug", "TestSendOnStart", false, "Send one Spewer event when the plugin starts. Disable after network testing.");
             sendToWebOverlay = Config.Bind("Overlay", "SendToWebOverlay", true, "Also send encountered monsters to the HTML/OBS overlay endpoint.");
             if (!sendToWebOverlay.Value)
@@ -136,27 +145,12 @@ namespace RepoMonsterBridge
             try
             {
                 harmony = new Harmony("local.overlay.repo_monster_bridge");
-                MethodInfo enemyDirectorUpdate = AccessTools.Method("EnemyDirector:Update");
-                MethodInfo levelUiUpdate = AccessTools.Method("LevelUI:Update");
                 MethodInfo enemyParentSpawnRpc = AccessTools.Method("EnemyParent:SpawnRPC");
                 MethodInfo levelGeneratorGenerateDone = AccessTools.Method("LevelGenerator:GenerateDone");
                 MethodInfo runManagerChangeLevel = AccessTools.Method("RunManager:ChangeLevel");
-                HarmonyMethod updatePostfix = new HarmonyMethod(typeof(Plugin).GetMethod(nameof(GameUpdatePostfix), BindingFlags.NonPublic | BindingFlags.Static));
                 HarmonyMethod levelGeneratedPostfix = new HarmonyMethod(typeof(Plugin).GetMethod(nameof(LevelGeneratedPostfix), BindingFlags.NonPublic | BindingFlags.Static));
                 HarmonyMethod enemySpawnedPostfix = new HarmonyMethod(typeof(Plugin).GetMethod(nameof(EnemyParentSpawnedPostfix), BindingFlags.NonPublic | BindingFlags.Static));
                 HarmonyMethod levelChangingPrefix = new HarmonyMethod(typeof(Plugin).GetMethod(nameof(LevelChangingPrefix), BindingFlags.NonPublic | BindingFlags.Static));
-
-                if (enemyDirectorUpdate != null)
-                {
-                    harmony.Patch(enemyDirectorUpdate, postfix: updatePostfix);
-                    Logger.LogInfo("Patched EnemyDirector.Update for scan ticks.");
-                }
-
-                if (levelUiUpdate != null)
-                {
-                    harmony.Patch(levelUiUpdate, postfix: updatePostfix);
-                    Logger.LogInfo("Patched LevelUI.Update for scan ticks.");
-                }
 
                 if (enemyParentSpawnRpc != null)
                 {
@@ -176,20 +170,11 @@ namespace RepoMonsterBridge
                     Logger.LogInfo("Patched RunManager.ChangeLevel for overlay visibility.");
                 }
 
-                if (enemyDirectorUpdate == null && levelUiUpdate == null)
-                {
-                    Logger.LogWarning("Could not patch enemy update methods; scan ticks may not run.");
-                }
             }
             catch (Exception error)
             {
                 Logger.LogWarning("Failed to patch game updates: " + error.GetType().Name + ": " + error.Message);
             }
-        }
-
-        private static void GameUpdatePostfix()
-        {
-            instance?.TickScan();
         }
 
         private void Update()
@@ -218,9 +203,17 @@ namespace RepoMonsterBridge
         private void TickScan()
         {
             if (!gameplayActive) return;
-            if (Time.realtimeSinceStartup < scanPausedUntil) return;
-            if (Time.realtimeSinceStartup < nextScanAt) return;
-            nextScanAt = Time.realtimeSinceStartup + Math.Max(0.05f, scanInterval.Value);
+            float now = Time.realtimeSinceStartup;
+            if (now < scanPausedUntil) return;
+
+            if (now >= nextStrengthCheckAt)
+            {
+                nextStrengthCheckAt = now + 1f;
+                SyncStrengthIfChanged();
+            }
+
+            if (now < nextScanAt) return;
+            nextScanAt = now + Math.Max(0.05f, scanInterval.Value);
 
             try
             {
@@ -270,6 +263,7 @@ namespace RepoMonsterBridge
                 sentEnemyInstanceIds.Clear();
             }
             lastSeenLoggedAt.Clear();
+            resolvedMonsterNames.Clear();
             lastRosterFingerprint = "";
             pendingRosterFingerprint = "";
             rosterStableScans = 0;
@@ -277,13 +271,13 @@ namespace RepoMonsterBridge
             visibilityProbeIndex = 0;
             scanPausedUntil = Time.realtimeSinceStartup + 2f;
             nextScanAt = scanPausedUntil;
+            nextStrengthCheckAt = scanPausedUntil;
             nextDebugSummaryAt = 0f;
             Logger.LogInfo("Cleared seen monsters: " + reason + ".");
         }
 
         private void ScanVisibleEnemies()
         {
-            SyncStrengthIfChanged();
             Camera camera = FindBestCamera();
             bool revealAll = !requireLineOfSight.Value;
 
@@ -294,7 +288,12 @@ namespace RepoMonsterBridge
 
             foreach (EnemyCandidate candidate in found)
             {
-                string monsterName = ResolveMonsterName(candidate.Component);
+                int instanceId = candidate.Root.GetInstanceID();
+                if (!resolvedMonsterNames.TryGetValue(instanceId, out string monsterName))
+                {
+                    monsterName = ResolveMonsterName(candidate.Component);
+                    if (monsterName != null) resolvedMonsterNames[instanceId] = monsterName;
+                }
                 if (monsterName == null)
                 {
                     if (debugLogging.Value && Time.realtimeSinceStartup >= nextDebugSummaryAt)
@@ -308,9 +307,9 @@ namespace RepoMonsterBridge
 
             if (!SyncMonsterRoster(resolvedEnemies))
             {
-                if (Time.realtimeSinceStartup >= nextDebugSummaryAt)
+                if (debugLogging.Value && Time.realtimeSinceStartup >= nextDebugSummaryAt)
                 {
-                    nextDebugSummaryAt = Time.realtimeSinceStartup + 5f;
+                    nextDebugSummaryAt = Time.realtimeSinceStartup + 30f;
                     Logger.LogInfo("Collecting monster roster: candidates=" + candidates + ", resolved=" + resolvedEnemies.Count + ".");
                 }
                 return;
@@ -343,10 +342,11 @@ namespace RepoMonsterBridge
                 }
             }
             if (pendingEnemies.Count > 0) visibilityProbeIndex = (probeIndex + 1) % pendingEnemies.Count;
+            else nextScanAt = Time.realtimeSinceStartup + 5f;
 
-            if (Time.realtimeSinceStartup >= nextDebugSummaryAt)
+            if (debugLogging.Value && Time.realtimeSinceStartup >= nextDebugSummaryAt)
             {
-                nextDebugSummaryAt = Time.realtimeSinceStartup + 5f;
+                nextDebugSummaryAt = Time.realtimeSinceStartup + 30f;
                 Logger.LogInfo("Scan summary: camera=" + (camera == null ? "none" : camera.name) + ", candidates=" + candidates + ", resolved=" + resolvedEnemies.Count + ", visible=" + visible);
             }
         }
@@ -355,16 +355,12 @@ namespace RepoMonsterBridge
         {
             enemies.Sort((left, right) => left.Candidate.Root.GetInstanceID().CompareTo(right.Candidate.Root.GetInstanceID()));
             var fingerprint = new StringBuilder();
-            var json = new StringBuilder("{\"monsters\":[");
             for (int index = 0; index < enemies.Count; index++)
             {
                 ResolvedEnemyCandidate enemy = enemies[index];
                 int instanceId = enemy.Candidate.Root.GetInstanceID();
                 fingerprint.Append(instanceId).Append(':').Append(enemy.MonsterName).Append(';');
-                if (index > 0) json.Append(',');
-                json.Append("{\"id\":").Append(instanceId).Append(",\"name\":\"").Append(EscapeJson(enemy.MonsterName)).Append("\"}");
             }
-            json.Append("]}");
 
             string nextFingerprint = fingerprint.ToString();
             if (!rosterPublished)
@@ -384,7 +380,18 @@ namespace RepoMonsterBridge
 
             if (nextFingerprint == lastRosterFingerprint) return true;
             lastRosterFingerprint = nextFingerprint;
-            if (sendToWebOverlay.Value) StartCoroutine(PostMonsterRoster(json.ToString()));
+            if (sendToWebOverlay.Value)
+            {
+                var json = new StringBuilder("{\"monsters\":[");
+                for (int index = 0; index < enemies.Count; index++)
+                {
+                    ResolvedEnemyCandidate enemy = enemies[index];
+                    if (index > 0) json.Append(',');
+                    json.Append("{\"id\":").Append(enemy.Candidate.Root.GetInstanceID()).Append(",\"name\":\"").Append(EscapeJson(enemy.MonsterName)).Append("\"}");
+                }
+                json.Append("]}");
+                StartCoroutine(PostMonsterRoster(json.ToString()));
+            }
             return true;
         }
 
@@ -553,12 +560,15 @@ namespace RepoMonsterBridge
                 AddEnemyCandidate(result, seenRoots, component);
             }
 
-            foreach (Component component in FindSpawnedEnemiesFromDirector())
+            if (result.Count == 0 && !rosterPublished)
             {
-                AddEnemyCandidate(result, seenRoots, component);
+                foreach (Component component in FindSpawnedEnemiesFromDirector())
+                {
+                    AddEnemyCandidate(result, seenRoots, component);
+                }
             }
 
-            if (result.Count == 0)
+            if (result.Count == 0 && !rosterPublished)
             {
                 foreach (Component component in FindComponentsByTypeName("EnemyParent"))
                 {
@@ -566,7 +576,7 @@ namespace RepoMonsterBridge
                 }
             }
 
-            if (result.Count == 0)
+            if (result.Count == 0 && !rosterPublished)
             {
                 foreach (Component component in FindComponentsByTypeName("Enemy"))
                 {
@@ -586,7 +596,11 @@ namespace RepoMonsterBridge
                 if (!knownEnemyParents.Contains(component))
                 {
                     knownEnemyParents.Add(component);
-                    Plugin.instance?.Logger.LogInfo("Registered spawned enemy parent: " + component.name + ".");
+                    if (Plugin.instance != null) Plugin.instance.nextScanAt = 0f;
+                    if (Plugin.instance?.debugLogging.Value == true)
+                    {
+                        Plugin.instance.Logger.LogInfo("Registered spawned enemy parent: " + component.name + ".");
+                    }
                 }
             }
         }
@@ -743,7 +757,7 @@ namespace RepoMonsterBridge
 
         private bool IsSmallMonsterFallbackVisible(Camera camera, EnemyCandidate candidate, string monsterName)
         {
-            if (monsterName != "Peeper" && monsterName != "Headgrab" && monsterName != "Spewer"
+            if (monsterName != "Peeper" && monsterName != "Headgrab" && monsterName != "Spewer" && monsterName != "Hidden" && monsterName != "Rugrat" && monsterName != "Upscream"
                 && monsterName != "Gnomes" && monsterName != "Tick" && monsterName != "Banger") return false;
 
             float fallbackDistance = Math.Min(maxDistance.Value, 8f);
@@ -812,16 +826,38 @@ namespace RepoMonsterBridge
 
             Type type = source as Type ?? source.GetType();
             const BindingFlags flags = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static;
+            string cacheKey = type.AssemblyQualifiedName + "\n" + memberName;
+            MemberInfo member;
 
-            FieldInfo field = type.GetField(memberName, flags);
-            if (field != null)
+            lock (reflectionCacheLock)
+            {
+                if (missingMemberCache.Contains(cacheKey)) return null;
+                memberCache.TryGetValue(cacheKey, out member);
+            }
+
+            if (member == null)
+            {
+                member = type.GetField(memberName, flags);
+                if (member == null)
+                {
+                    PropertyInfo candidate = type.GetProperty(memberName, flags);
+                    if (candidate != null && candidate.GetIndexParameters().Length == 0) member = candidate;
+                }
+
+                lock (reflectionCacheLock)
+                {
+                    if (member == null) missingMemberCache.Add(cacheKey);
+                    else memberCache[cacheKey] = member;
+                }
+            }
+
+            if (member is FieldInfo field)
             {
                 if (!field.IsStatic && source is Type) return null;
                 return field.GetValue(field.IsStatic ? null : source);
             }
 
-            PropertyInfo property = type.GetProperty(memberName, flags);
-            if (property != null && property.GetIndexParameters().Length == 0)
+            if (member is PropertyInfo property)
             {
                 try
                 {
@@ -838,14 +874,30 @@ namespace RepoMonsterBridge
             return null;
         }
 
+        private static Task<string> QueueNetworkRequest(Func<string> request)
+        {
+            lock (networkQueueLock)
+            {
+                Task<string> queued = networkQueueTail.ContinueWith(
+                    _ => request(),
+                    CancellationToken.None,
+                    TaskContinuationOptions.None,
+                    TaskScheduler.Default);
+                networkQueueTail = queued;
+                return queued;
+            }
+        }
+
         private IEnumerator PostSeenMonster(string monsterName, int instanceId)
         {
             string json = "{\"name\":\"" + EscapeJson(monsterName) + "\",\"id\":" + instanceId + "}";
-
-            string result = SendHttpPost(endpoint.Value, json);
+            string endpointUrl = endpoint.Value;
+            Task<string> request = QueueNetworkRequest(() => SendHttpPost(endpointUrl, json));
+            while (!request.IsCompleted) yield return null;
+            string result = request.IsFaulted ? "ERROR:" + request.Exception.GetBaseException().Message : request.Result;
             if (result.StartsWith("ERROR:", StringComparison.Ordinal))
             {
-                Logger.LogWarning("Failed to send monster " + monsterName + " to " + endpoint.Value + ": " + result.Substring(6));
+                Logger.LogWarning("Failed to send monster " + monsterName + " to " + endpointUrl + ": " + result.Substring(6));
             }
             else if (debugLogging.Value)
             {
@@ -858,7 +910,9 @@ namespace RepoMonsterBridge
         private IEnumerator PostMonsterRoster(string json)
         {
             string rosterEndpoint = BuildSiblingEndpoint(levelEndpoint.Value, "/api/roster");
-            string result = SendHttpPost(rosterEndpoint, json);
+            Task<string> request = QueueNetworkRequest(() => SendHttpPost(rosterEndpoint, json));
+            while (!request.IsCompleted) yield return null;
+            string result = request.IsFaulted ? "ERROR:" + request.Exception.GetBaseException().Message : request.Result;
             if (!IsHttpSuccess(result))
             {
                 Logger.LogWarning("Failed to sync monster roster: " + TrimHttpResult(result));
@@ -874,8 +928,10 @@ namespace RepoMonsterBridge
         private IEnumerator PostLevel(int level)
         {
             string json = "{\"level\":" + level + "}";
-
-            string result = SendHttpPost(levelEndpoint.Value, json);
+            string endpointUrl = levelEndpoint.Value;
+            Task<string> request = QueueNetworkRequest(() => SendHttpPost(endpointUrl, json));
+            while (!request.IsCompleted) yield return null;
+            string result = request.IsFaulted ? "ERROR:" + request.Exception.GetBaseException().Message : request.Result;
             if (IsHttpSuccess(result))
             {
                 if (debugLogging.Value)
@@ -885,8 +941,10 @@ namespace RepoMonsterBridge
             }
             else
             {
-                Logger.LogWarning("Failed to sync level " + level + " to " + levelEndpoint.Value + ": " + TrimHttpResult(result) + ". Trying /api/state fallback.");
-                string fallbackResult = SendStateLevelFallback(level);
+                Logger.LogWarning("Failed to sync level " + level + " to " + endpointUrl + ": " + TrimHttpResult(result) + ". Trying /api/state fallback.");
+                Task<string> fallbackRequest = QueueNetworkRequest(() => SendStateLevelFallback(level, endpointUrl));
+                while (!fallbackRequest.IsCompleted) yield return null;
+                string fallbackResult = fallbackRequest.IsFaulted ? "ERROR:" + fallbackRequest.Exception.GetBaseException().Message : fallbackRequest.Result;
                 if (IsHttpSuccess(fallbackResult))
                 {
                     Logger.LogInfo("Synced level " + level + " through /api/state fallback: " + fallbackResult);
@@ -903,7 +961,10 @@ namespace RepoMonsterBridge
         private IEnumerator PostVisibility(bool visible)
         {
             string visibilityEndpoint = BuildSiblingEndpoint(levelEndpoint.Value, "/api/visibility");
-            string result = SendHttpPost(visibilityEndpoint, "{\"visible\":" + (visible ? "true" : "false") + "}");
+            string json = "{\"visible\":" + (visible ? "true" : "false") + "}";
+            Task<string> request = QueueNetworkRequest(() => SendHttpPost(visibilityEndpoint, json));
+            while (!request.IsCompleted) yield return null;
+            string result = request.IsFaulted ? "ERROR:" + request.Exception.GetBaseException().Message : request.Result;
             if (!IsHttpSuccess(result))
             {
                 Logger.LogWarning("Failed to sync overlay visibility: " + TrimHttpResult(result));
@@ -919,7 +980,10 @@ namespace RepoMonsterBridge
         private IEnumerator PostStrength(int strength)
         {
             string strengthEndpoint = BuildSiblingEndpoint(levelEndpoint.Value, "/api/strength");
-            string result = SendHttpPost(strengthEndpoint, "{\"strength\":" + strength + "}");
+            string json = "{\"strength\":" + strength + "}";
+            Task<string> request = QueueNetworkRequest(() => SendHttpPost(strengthEndpoint, json));
+            while (!request.IsCompleted) yield return null;
+            string result = request.IsFaulted ? "ERROR:" + request.Exception.GetBaseException().Message : request.Result;
             if (!IsHttpSuccess(result))
             {
                 Logger.LogWarning("Failed to sync player strength: " + TrimHttpResult(result));
@@ -932,9 +996,9 @@ namespace RepoMonsterBridge
             yield break;
         }
 
-        private string SendStateLevelFallback(int level)
+        private static string SendStateLevelFallback(int level, string levelEndpointUrl)
         {
-            string stateEndpoint = BuildSiblingEndpoint(levelEndpoint.Value, "/api/state");
+            string stateEndpoint = BuildSiblingEndpoint(levelEndpointUrl, "/api/state");
             string stateJson = BuildFallbackStateJson(level, SendHttpGet(stateEndpoint));
             return SendHttpPost(stateEndpoint, "{\"state\":" + stateJson + "}");
         }

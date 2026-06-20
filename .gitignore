@@ -1,0 +1,28 @@
+# Local logs and configuration
+*.log
+.env
+.env.*
+!.env.example
+
+# Editor and operating-system files
+.vs/
+.vscode/
+*.suo
+*.user
+*.tmp
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Node dependencies
+node_modules/
+
+# .NET build output
+**/bin/
+**/obj/
+
+# Generated mod packages and release archives
+repo-monster-bridge/dist/
+repo-monster-bridge/package/plugins/
+repo-monster-bridge/package-flat/*.dll
+repo-monster-bridge/package-*-flat/

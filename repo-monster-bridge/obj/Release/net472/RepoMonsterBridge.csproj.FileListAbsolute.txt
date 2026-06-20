@@ -1,9 +1,0 @@
-C:\Users\Egr\Yandex.Disk\CODE\overlay_repo\repo-monster-bridge\bin\Release\net472\RepoMonsterBridge.dll
-C:\Users\Egr\Yandex.Disk\CODE\overlay_repo\repo-monster-bridge\bin\Release\net472\RepoMonsterBridge.pdb
-C:\Users\Egr\Yandex.Disk\CODE\overlay_repo\repo-monster-bridge\obj\Release\net472\RepoMonsterBridge.csproj.AssemblyReference.cache
-C:\Users\Egr\Yandex.Disk\CODE\overlay_repo\repo-monster-bridge\obj\Release\net472\RepoMonsterBridge.GeneratedMSBuildEditorConfig.editorconfig
-C:\Users\Egr\Yandex.Disk\CODE\overlay_repo\repo-monster-bridge\obj\Release\net472\RepoMonsterBridge.AssemblyInfoInputs.cache
-C:\Users\Egr\Yandex.Disk\CODE\overlay_repo\repo-monster-bridge\obj\Release\net472\RepoMonsterBridge.AssemblyInfo.cs
-C:\Users\Egr\Yandex.Disk\CODE\overlay_repo\repo-monster-bridge\obj\Release\net472\RepoMonsterBridge.csproj.CoreCompileInputs.cache
-C:\Users\Egr\Yandex.Disk\CODE\overlay_repo\repo-monster-bridge\obj\Release\net472\RepoMonsterBridge.dll
-C:\Users\Egr\Yandex.Disk\CODE\overlay_repo\repo-monster-bridge\obj\Release\net472\RepoMonsterBridge.pdb

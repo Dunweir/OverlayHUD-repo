@@ -1,9 +1,0 @@
-C:\Users\Egr\Yandex.Disk\CODE\overlay_repo\repo-monster-bridge\stubs\BepInEx\bin\Release\net472\BepInEx.dll
-C:\Users\Egr\Yandex.Disk\CODE\overlay_repo\repo-monster-bridge\stubs\BepInEx\bin\Release\net472\BepInEx.pdb
-C:\Users\Egr\Yandex.Disk\CODE\overlay_repo\repo-monster-bridge\stubs\BepInEx\obj\Release\net472\BepInEx.csproj.AssemblyReference.cache
-C:\Users\Egr\Yandex.Disk\CODE\overlay_repo\repo-monster-bridge\stubs\BepInEx\obj\Release\net472\BepInEx.GeneratedMSBuildEditorConfig.editorconfig
-C:\Users\Egr\Yandex.Disk\CODE\overlay_repo\repo-monster-bridge\stubs\BepInEx\obj\Release\net472\BepInEx.AssemblyInfoInputs.cache
-C:\Users\Egr\Yandex.Disk\CODE\overlay_repo\repo-monster-bridge\stubs\BepInEx\obj\Release\net472\BepInEx.AssemblyInfo.cs
-C:\Users\Egr\Yandex.Disk\CODE\overlay_repo\repo-monster-bridge\stubs\BepInEx\obj\Release\net472\BepInEx.csproj.CoreCompileInputs.cache
-C:\Users\Egr\Yandex.Disk\CODE\overlay_repo\repo-monster-bridge\stubs\BepInEx\obj\Release\net472\BepInEx.dll
-C:\Users\Egr\Yandex.Disk\CODE\overlay_repo\repo-monster-bridge\stubs\BepInEx\obj\Release\net472\BepInEx.pdb

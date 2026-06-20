@@ -206,8 +206,13 @@ body {
     animation: monster-slot-enter 0.36s cubic-bezier(0.2, 0.75, 0.25, 1) both;
 }
 
-.monster-square.is-revealing img {
-    animation: monster-image-reveal 0.55s cubic-bezier(0.2, 0.75, 0.25, 1) both;
+.monster-square .monster-reveal-image {
+    opacity: 0;
+    animation: monster-image-reveal 0.72s cubic-bezier(0.22, 0.7, 0.25, 1) both;
+}
+
+.monster-square.is-revealing > .monster-base-image {
+    animation: monster-image-hide 0.72s cubic-bezier(0.22, 0.7, 0.25, 1) both;
 }
 
 .monster-square.is-revealing .strength-required {
@@ -221,18 +226,22 @@ body {
 @keyframes monster-image-reveal {
     0% {
         opacity: 0;
-        clip-path: inset(100% 0 0 0);
-        transform: scale(0.9);
-    }
-    70% {
-        opacity: 1;
-        clip-path: inset(0 0 0 0);
-        transform: scale(1.04);
+        transform: scale(0.96);
     }
     100% {
         opacity: 1;
-        clip-path: inset(0 0 0 0);
         transform: scale(1);
+    }
+}
+
+@keyframes monster-image-hide {
+    from {
+        opacity: 1;
+        transform: scale(1);
+    }
+    to {
+        opacity: 0;
+        transform: scale(0.98);
     }
 }
 
@@ -274,11 +283,22 @@ body {
         transition: none;
     }
 
-    .monster-square.is-revealing img,
+    .monster-square .monster-reveal-image,
+    .monster-square.is-revealing > .monster-base-image,
     .monster-square.is-slot-entering,
     .monster-square.is-revealing .monster-count,
     .monster-square.is-revealing .strength-required {
         animation: none;
+    }
+
+    .monster-square .monster-reveal-image {
+        opacity: 1;
+        transform: none;
+    }
+
+    .monster-square.is-revealing > .monster-base-image {
+        opacity: 0;
+        transform: none;
     }
 }
 

@@ -34,11 +34,39 @@
         const monstersSquares = document.getElementById("monstersSquares");
         let latestState = null;
         let renderedSquareCount = 0;
+        let lastTimerText = "";
+        let lastRespawnHtml = "";
+        const monsterImageLoads = new Map();
+
+        function preloadMonsterImage(src) {
+            if (!monsterImageLoads.has(src)) {
+                monsterImageLoads.set(src, new Promise((resolve) => {
+                    const preload = new Image();
+                    let finished = false;
+                    const finish = () => {
+                        if (finished) return;
+                        finished = true;
+                        if (typeof preload.decode === "function") {
+                            preload.decode().catch(() => {}).finally(() => resolve(src));
+                        } else {
+                            resolve(src);
+                        }
+                    };
+                    preload.onload = finish;
+                    preload.onerror = () => resolve(src);
+                    preload.src = src;
+                    if (preload.complete) finish();
+                }));
+            }
+            return monsterImageLoads.get(src);
+        }
 
         function clearSquare(square) {
             square.dataset.monsterKey = "";
+            square.dataset.imagePending = "";
             square.classList.remove("is-revealing");
-            const img = square.querySelector("img");
+            square.querySelectorAll(".monster-reveal-image").forEach((element) => element.remove());
+            const img = square.firstElementChild;
             if (!img.src.includes("monsters/unknown.webp")) {
                 img.src = "monsters/unknown.webp";
             }
@@ -57,16 +85,11 @@
                 return;
             }
 
-            const img = square.querySelector("img");
+            const img = square.firstElementChild;
             const monsterKey = String(monster.id || monster.name);
             const shouldReveal = square.dataset.monsterKey !== monsterKey;
             square.dataset.monsterKey = monsterKey;
-            if (!img.src.includes(monster.image)) {
-                img.src = monster.image;
-            }
-            if (img.alt !== monster.name) {
-                img.alt = monster.name;
-            }
+            if (shouldReveal) square.dataset.imagePending = monster.image;
 
             let count = square.querySelector(".monster-count");
             if (!monster.count && count) {
@@ -101,9 +124,39 @@
             }
 
             if (shouldReveal) {
-                square.classList.remove("is-revealing");
-                void square.offsetWidth;
-                square.classList.add("is-revealing");
+                preloadMonsterImage(monster.image).then(() => {
+                    if (square.dataset.monsterKey !== monsterKey) return;
+                    square.querySelectorAll(".monster-reveal-image").forEach((element) => element.remove());
+
+                    const revealImage = document.createElement("img");
+                    revealImage.className = "monster-reveal-image";
+                    revealImage.src = monster.image;
+                    revealImage.alt = monster.name;
+                    square.appendChild(revealImage);
+
+                    square.classList.remove("is-revealing");
+                    requestAnimationFrame(() => {
+                        if (square.dataset.monsterKey === monsterKey) square.classList.add("is-revealing");
+                    });
+
+                    let finalized = false;
+                    const finalizeReveal = () => {
+                        if (finalized) return;
+                        finalized = true;
+                        if (square.dataset.monsterKey === monsterKey) {
+                            img.src = monster.image;
+                            img.alt = monster.name;
+                            square.dataset.imagePending = "";
+                        }
+                        revealImage.remove();
+                        if (!square.querySelector(".monster-reveal-image")) square.classList.remove("is-revealing");
+                    };
+                    revealImage.addEventListener("animationend", finalizeReveal, { once: true });
+                    setTimeout(finalizeReveal, 900);
+                });
+            } else if (square.dataset.imagePending !== monster.image && !img.src.includes(monster.image)) {
+                img.src = monster.image;
+                img.alt = monster.name;
             }
         }
 
@@ -113,6 +166,7 @@
                 square.className = "monster-square level-1 is-slot-entering";
 
                 const img = document.createElement("img");
+                img.className = "monster-base-image";
                 img.src = "monsters/unknown.webp";
                 img.alt = "Unknown Monster";
                 square.appendChild(img);
@@ -129,8 +183,16 @@
 
         function renderTimer(state) {
             const seconds = OverlayApp.getTimerSeconds(state);
-            timer.textContent = OverlayApp.formatTime(seconds);
-            respawnInfo.innerHTML = OverlayApp.getRespawnHtml(seconds);
+            const timerText = OverlayApp.formatTime(seconds);
+            const respawnHtml = OverlayApp.getRespawnHtml(seconds);
+            if (timerText !== lastTimerText) {
+                timer.textContent = timerText;
+                lastTimerText = timerText;
+            }
+            if (respawnHtml !== lastRespawnHtml) {
+                respawnInfo.innerHTML = respawnHtml;
+                lastRespawnHtml = respawnHtml;
+            }
         }
 
         function render(state) {
