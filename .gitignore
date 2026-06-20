@@ -16,6 +16,8 @@ desktop.ini
 
 # Node dependencies
 node_modules/
+game-overlay/dist/
+game-overlay/.electron-cache/
 
 # .NET build output
 **/bin/

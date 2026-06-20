@@ -15,7 +15,7 @@ using UnityEngine;
 
 namespace RepoMonsterBridge
 {
-    [BepInPlugin("local.overlay.repo_monster_bridge", "REPO Monster Bridge", "0.2.38")]
+    [BepInPlugin("local.overlay.repo_monster_bridge", "REPO Monster Bridge", "0.2.39")]
     public sealed class Plugin : BaseUnityPlugin
     {
         private static Plugin instance;
@@ -111,8 +111,8 @@ namespace RepoMonsterBridge
         private void Awake()
         {
             instance = this;
-            endpoint = Config.Bind("Overlay", "Endpoint", "http://192.168.1.198:8787/api/monster-seen", "Overlay endpoint on the OBS PC.");
-            levelEndpoint = Config.Bind("Overlay", "LevelEndpoint", "http://192.168.1.198:8787/api/level", "Level sync endpoint on the OBS PC.");
+            endpoint = Config.Bind("Overlay", "Endpoint", "http://127.0.0.1:8787/api/monster-seen", "Monster endpoint on this PC.");
+            levelEndpoint = Config.Bind("Overlay", "LevelEndpoint", "http://127.0.0.1:8787/api/level", "Level sync endpoint on this PC.");
             scanInterval = Config.Bind("Detection", "ScanIntervalSeconds", 1f, "How often visible enemies are scanned.");
             maxDistance = Config.Bind("Detection", "MaxDistance", 45f, "Maximum distance from camera to count an enemy as encountered.");
             viewportPadding = Config.Bind("Detection", "ViewportPadding", 0.03f, "Allowed viewport padding outside the screen edges.");
@@ -121,11 +121,23 @@ namespace RepoMonsterBridge
             debugLogging = Config.Bind("Debug", "Logging", false, "Write periodic bridge debug logs.");
             testSendOnStart = Config.Bind("Debug", "TestSendOnStart", false, "Send one Spewer event when the plugin starts. Disable after network testing.");
             sendToWebOverlay = Config.Bind("Overlay", "SendToWebOverlay", true, "Also send encountered monsters to the HTML/OBS overlay endpoint.");
+            bool configChanged = false;
+            if (endpoint.Value == "http://192.168.1.198:8787/api/monster-seen")
+            {
+                endpoint.Value = "http://127.0.0.1:8787/api/monster-seen";
+                configChanged = true;
+            }
+            if (levelEndpoint.Value == "http://192.168.1.198:8787/api/level")
+            {
+                levelEndpoint.Value = "http://127.0.0.1:8787/api/level";
+                configChanged = true;
+            }
             if (!sendToWebOverlay.Value)
             {
                 sendToWebOverlay.Value = true;
-                Config.Save();
+                configChanged = true;
             }
+            if (configChanged) Config.Save();
 
             Logger.LogInfo("REPO Monster Bridge is running. MonsterEndpoint=" + endpoint.Value + ", LevelEndpoint=" + levelEndpoint.Value + ", Logging=" + debugLogging.Value + ", TestSendOnStart=" + testSendOnStart.Value + ", SendToWebOverlay=" + sendToWebOverlay.Value);
             if (testSendOnStart.Value)

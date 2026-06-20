@@ -4,7 +4,7 @@ const path = require("path");
 
 const host = process.env.HOST || "0.0.0.0";
 const port = Number(process.env.PORT || 8787);
-const root = __dirname;
+let serverRoot = __dirname;
 const clients = new Set();
 
 let overlayState = null;
@@ -389,9 +389,9 @@ function setPlayerStrength(rawStrength) {
 function serveFile(request, response) {
     const requestUrl = new URL(request.url, `http://${request.headers.host}`);
     const pathname = decodeURIComponent(requestUrl.pathname === "/" ? "/control.html" : requestUrl.pathname);
-    const filePath = path.normalize(path.join(root, pathname));
+    const filePath = path.normalize(path.join(serverRoot, pathname));
 
-    if (!filePath.startsWith(root)) {
+    if (!filePath.startsWith(serverRoot)) {
         response.writeHead(403);
         response.end("Forbidden");
         return;
@@ -506,7 +506,37 @@ const server = http.createServer(async (request, response) => {
     }
 });
 
-server.listen(port, host, () => {
-    console.log(`Overlay server: http://${host}:${port}/control.html`);
-    console.log(`OBS overlay:     http://${host}:${port}/overlay.html`);
-});
+function startOverlayServer(options = {}) {
+    if (server.listening) return Promise.resolve(server);
+
+    serverRoot = path.resolve(options.root || __dirname);
+    const listenHost = options.host || host;
+    const listenPort = Number(options.port || port);
+
+    return new Promise((resolve, reject) => {
+        const handleError = (error) => reject(error);
+        server.once("error", handleError);
+        server.listen(listenPort, listenHost, () => {
+            server.off("error", handleError);
+            console.log(`Overlay server: http://${listenHost}:${listenPort}/control.html`);
+            console.log(`Game overlay:   http://${listenHost}:${listenPort}/overlay.html`);
+            resolve(server);
+        });
+    });
+}
+
+function stopOverlayServer() {
+    for (const client of clients) client.end();
+    clients.clear();
+    if (!server.listening) return Promise.resolve();
+    return new Promise((resolve) => server.close(resolve));
+}
+
+if (require.main === module) {
+    startOverlayServer().catch((error) => {
+        console.error(`Overlay server failed: ${error.message}`);
+        process.exitCode = 1;
+    });
+}
+
+module.exports = { startOverlayServer, stopOverlayServer };
