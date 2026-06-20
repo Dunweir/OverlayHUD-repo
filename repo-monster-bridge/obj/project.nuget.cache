@@ -1,0 +1,11 @@
+{
+  "version": 2,
+  "dgSpecHash": "Li6fA+yNX4k=",
+  "success": true,
+  "projectFilePath": "C:\\Users\\Egr\\Yandex.Disk\\CODE\\overlay_repo\\repo-monster-bridge\\RepoMonsterBridge.csproj",
+  "expectedPackageFiles": [
+    "C:\\Users\\Egr\\.nuget\\packages\\microsoft.netframework.referenceassemblies\\1.0.3\\microsoft.netframework.referenceassemblies.1.0.3.nupkg.sha512",
+    "C:\\Users\\Egr\\.nuget\\packages\\microsoft.netframework.referenceassemblies.net472\\1.0.3\\microsoft.netframework.referenceassemblies.net472.1.0.3.nupkg.sha512"
+  ],
+  "logs": []
+}

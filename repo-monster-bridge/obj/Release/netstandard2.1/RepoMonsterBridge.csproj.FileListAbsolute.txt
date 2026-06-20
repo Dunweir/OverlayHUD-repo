@@ -1,0 +1,10 @@
+C:\Users\Egr\Yandex.Disk\CODE\overlay_repo\repo-monster-bridge\obj\Release\netstandard2.1\RepoMonsterBridge.csproj.AssemblyReference.cache
+C:\Users\Egr\Yandex.Disk\CODE\overlay_repo\repo-monster-bridge\obj\Release\netstandard2.1\RepoMonsterBridge.GeneratedMSBuildEditorConfig.editorconfig
+C:\Users\Egr\Yandex.Disk\CODE\overlay_repo\repo-monster-bridge\obj\Release\netstandard2.1\RepoMonsterBridge.AssemblyInfoInputs.cache
+C:\Users\Egr\Yandex.Disk\CODE\overlay_repo\repo-monster-bridge\obj\Release\netstandard2.1\RepoMonsterBridge.AssemblyInfo.cs
+C:\Users\Egr\Yandex.Disk\CODE\overlay_repo\repo-monster-bridge\obj\Release\netstandard2.1\RepoMonsterBridge.csproj.CoreCompileInputs.cache
+C:\Users\Egr\Yandex.Disk\CODE\overlay_repo\repo-monster-bridge\bin\Release\netstandard2.1\RepoMonsterBridge.deps.json
+C:\Users\Egr\Yandex.Disk\CODE\overlay_repo\repo-monster-bridge\bin\Release\netstandard2.1\RepoMonsterBridge.dll
+C:\Users\Egr\Yandex.Disk\CODE\overlay_repo\repo-monster-bridge\bin\Release\netstandard2.1\RepoMonsterBridge.pdb
+C:\Users\Egr\Yandex.Disk\CODE\overlay_repo\repo-monster-bridge\obj\Release\netstandard2.1\RepoMonsterBridge.dll
+C:\Users\Egr\Yandex.Disk\CODE\overlay_repo\repo-monster-bridge\obj\Release\netstandard2.1\RepoMonsterBridge.pdb

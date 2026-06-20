@@ -61,9 +61,10 @@ const OverlayApp = (() => {
 
     const defaultState = {
         level: 1,
+        gameplayVisible: false,
         strength: 0,
         style: 1,
-        bgEnabled: true,
+        bgEnabled: false,
         timerVisible: false,
         squareSize: 64,
         overlayScaleVersion: 2,
@@ -71,7 +72,9 @@ const OverlayApp = (() => {
         seconds: 0,
         running: false,
         startedAt: null,
-        monsters: []
+        monsters: [],
+        roster: [],
+        rosterPending: false
     };
 
     let state = defaultState;
@@ -96,13 +99,14 @@ const OverlayApp = (() => {
             ...source,
             overlayScaleVersion: defaultState.overlayScaleVersion,
             squareSize,
-            monsters: Array.isArray(source.monsters) ? source.monsters : []
+            monsters: Array.isArray(source.monsters) ? source.monsters : [],
+            roster: Array.isArray(source.roster) ? source.roster : []
         };
     }
 
     function getState() {
         state = normalizeState(loadState());
-        return { ...state, monsters: [...state.monsters] };
+        return { ...state, monsters: [...state.monsters], roster: [...state.roster] };
     }
 
     function saveState(nextState, shouldBroadcast = true) {
@@ -320,6 +324,8 @@ const OverlayApp = (() => {
                 running: false,
                 startedAt: null,
                 monsters: [],
+                roster: [],
+                rosterPending: false,
                 columnsCount: getRecommendedColumns(level)
             };
             return nextState;

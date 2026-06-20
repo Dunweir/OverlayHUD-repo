@@ -1,0 +1,1230 @@
+using BepInEx;
+using BepInEx.Configuration;
+using HarmonyLib;
+using System;
+using System.Collections;
+using System.Collections.Generic;
+using System.IO;
+using System.Net.Sockets;
+using System.Reflection;
+using System.Text;
+using System.Text.RegularExpressions;
+using UnityEngine;
+
+namespace RepoMonsterBridge
+{
+    [BepInPlugin("local.overlay.repo_monster_bridge", "REPO Monster Bridge", "0.2.31")]
+    public sealed class Plugin : BaseUnityPlugin
+    {
+        private static Plugin instance;
+        private static readonly List<string> seenMonsters = new List<string>();
+        private static readonly List<Component> knownEnemyParents = new List<Component>();
+        private static readonly HashSet<int> sentEnemyInstanceIds = new HashSet<int>();
+        private static readonly object seenLock = new object();
+        private static readonly object enemyLock = new object();
+
+        private static readonly Dictionary<string, string> KnownMonsters = new Dictionary<string, string>
+        {
+            { "apexpredator", "Apex Predator" },
+            { "animal", "Animal" },
+            { "banger", "Banger" },
+            { "bang", "Banger" },
+            { "bella", "Bella" },
+            { "beamer", "Clown" },
+            { "birthdayboy", "Birthday Boy" },
+            { "bowtie", "Bowtie" },
+            { "chef", "Chef" },
+            { "cheffrog", "Chef" },
+            { "ceilingeye", "Peeper" },
+            { "cleanupcrew", "Cleanup Crew" },
+            { "clown", "Clown" },
+            { "clownbeamer", "Clown" },
+            { "duck", "Rugrat" },
+            { "elsa", "Elsa" },
+            { "floater", "Mentalist" },
+            { "gambit", "Gambit" },
+            { "gnome", "Gnomes" },
+            { "headgrab", "Headgrab" },
+            { "headgrabber", "Headgrab" },
+            { "headman", "Headman" },
+            { "hearthugger", "Heart Hugger" },
+            { "hidden", "Hidden" },
+            { "huntsman", "Huntsman" },
+            { "hunter", "Huntsman" },
+            { "loom", "Loom" },
+            { "mentalist", "Mentalist" },
+            { "oogly", "Oogly" },
+            { "peeper", "Peeper" },
+            { "reaper", "Reaper" },
+            { "robe", "Robe" },
+            { "rugrat", "Rugrat" },
+            { "runner", "Gambit" },
+            { "shadowchild", "Shadow Child" },
+            { "shadow", "Shadow Child" },
+            { "spewer", "Spewer" },
+            { "slowmouth", "Spewer" },
+            { "slowwalker", "Trudge" },
+            { "spinny", "Bowtie" },
+            { "thinman", "Reaper" },
+            { "tick", "Tick" },
+            { "trudge", "Trudge" },
+            { "tricycle", "Birthday Boy" },
+            { "tumbler", "Apex Predator" },
+            { "upscream", "Upscream" }
+        };
+
+        private readonly Dictionary<string, float> lastSeenLoggedAt = new Dictionary<string, float>();
+        private float nextScanAt;
+        private float nextDebugSummaryAt;
+        private float scanPausedUntil;
+        private int fallbackLevel = 1;
+        private int lastSyncedLevel;
+        private int lastSyncedStrength = -1;
+        private string lastRosterFingerprint = "";
+        private string pendingRosterFingerprint = "";
+        private int rosterStableScans;
+        private bool rosterPublished;
+        private int visibilityProbeIndex;
+        private bool gameplayActive;
+
+        private ConfigEntry<string> endpoint;
+        private ConfigEntry<string> levelEndpoint;
+        private ConfigEntry<float> scanInterval;
+        private ConfigEntry<float> maxDistance;
+        private ConfigEntry<float> viewportPadding;
+        private ConfigEntry<bool> preferGameOnScreen;
+        private ConfigEntry<bool> requireLineOfSight;
+        private ConfigEntry<bool> debugLogging;
+        private ConfigEntry<bool> testSendOnStart;
+        private ConfigEntry<bool> sendToWebOverlay;
+        private Harmony harmony;
+
+        private void Awake()
+        {
+            instance = this;
+            endpoint = Config.Bind("Overlay", "Endpoint", "http://192.168.1.198:8787/api/monster-seen", "Overlay endpoint on the OBS PC.");
+            levelEndpoint = Config.Bind("Overlay", "LevelEndpoint", "http://192.168.1.198:8787/api/level", "Level sync endpoint on the OBS PC.");
+            scanInterval = Config.Bind("Detection", "ScanIntervalSeconds", 1f, "How often visible enemies are scanned.");
+            maxDistance = Config.Bind("Detection", "MaxDistance", 45f, "Maximum distance from camera to count an enemy as encountered.");
+            viewportPadding = Config.Bind("Detection", "ViewportPadding", 0.03f, "Allowed viewport padding outside the screen edges.");
+            preferGameOnScreen = Config.Bind("Detection", "PreferGameOnScreen", true, "Use the game's local on-screen state when line of sight is enabled.");
+            requireLineOfSight = Config.Bind("Detection", "RequireLineOfSight", false, "Reveal only enemies marked on-screen for the local player by the game.");
+            debugLogging = Config.Bind("Debug", "Logging", true, "Write bridge debug logs.");
+            testSendOnStart = Config.Bind("Debug", "TestSendOnStart", false, "Send one Spewer event when the plugin starts. Disable after network testing.");
+            sendToWebOverlay = Config.Bind("Overlay", "SendToWebOverlay", true, "Also send encountered monsters to the HTML/OBS overlay endpoint.");
+            if (!sendToWebOverlay.Value)
+            {
+                sendToWebOverlay.Value = true;
+                Config.Save();
+            }
+
+            Logger.LogInfo("REPO Monster Bridge is running. MonsterEndpoint=" + endpoint.Value + ", LevelEndpoint=" + levelEndpoint.Value + ", Logging=" + debugLogging.Value + ", TestSendOnStart=" + testSendOnStart.Value + ", SendToWebOverlay=" + sendToWebOverlay.Value);
+            if (testSendOnStart.Value)
+            {
+                StartCoroutine(PostSeenMonster("Spewer", 0));
+            }
+
+            PatchGameUpdates();
+            if (sendToWebOverlay.Value)
+            {
+                StartCoroutine(PostVisibility(false));
+            }
+        }
+
+        private void PatchGameUpdates()
+        {
+            try
+            {
+                harmony = new Harmony("local.overlay.repo_monster_bridge");
+                MethodInfo enemyDirectorUpdate = AccessTools.Method("EnemyDirector:Update");
+                MethodInfo levelUiUpdate = AccessTools.Method("LevelUI:Update");
+                MethodInfo enemyParentSpawnRpc = AccessTools.Method("EnemyParent:SpawnRPC");
+                MethodInfo levelGeneratorGenerateDone = AccessTools.Method("LevelGenerator:GenerateDone");
+                MethodInfo runManagerChangeLevel = AccessTools.Method("RunManager:ChangeLevel");
+                HarmonyMethod updatePostfix = new HarmonyMethod(typeof(Plugin).GetMethod(nameof(GameUpdatePostfix), BindingFlags.NonPublic | BindingFlags.Static));
+                HarmonyMethod levelGeneratedPostfix = new HarmonyMethod(typeof(Plugin).GetMethod(nameof(LevelGeneratedPostfix), BindingFlags.NonPublic | BindingFlags.Static));
+                HarmonyMethod enemySpawnedPostfix = new HarmonyMethod(typeof(Plugin).GetMethod(nameof(EnemyParentSpawnedPostfix), BindingFlags.NonPublic | BindingFlags.Static));
+                HarmonyMethod levelChangingPrefix = new HarmonyMethod(typeof(Plugin).GetMethod(nameof(LevelChangingPrefix), BindingFlags.NonPublic | BindingFlags.Static));
+
+                if (enemyDirectorUpdate != null)
+                {
+                    harmony.Patch(enemyDirectorUpdate, postfix: updatePostfix);
+                    Logger.LogInfo("Patched EnemyDirector.Update for scan ticks.");
+                }
+
+                if (levelUiUpdate != null)
+                {
+                    harmony.Patch(levelUiUpdate, postfix: updatePostfix);
+                    Logger.LogInfo("Patched LevelUI.Update for scan ticks.");
+                }
+
+                if (enemyParentSpawnRpc != null)
+                {
+                    harmony.Patch(enemyParentSpawnRpc, postfix: enemySpawnedPostfix);
+                    Logger.LogInfo("Patched EnemyParent.SpawnRPC for enemy registration.");
+                }
+
+                if (levelGeneratorGenerateDone != null)
+                {
+                    harmony.Patch(levelGeneratorGenerateDone, postfix: levelGeneratedPostfix);
+                    Logger.LogInfo("Patched LevelGenerator.GenerateDone for monster reset.");
+                }
+
+                if (runManagerChangeLevel != null)
+                {
+                    harmony.Patch(runManagerChangeLevel, prefix: levelChangingPrefix);
+                    Logger.LogInfo("Patched RunManager.ChangeLevel for overlay visibility.");
+                }
+
+                if (enemyDirectorUpdate == null && levelUiUpdate == null)
+                {
+                    Logger.LogWarning("Could not patch enemy update methods; scan ticks may not run.");
+                }
+            }
+            catch (Exception error)
+            {
+                Logger.LogWarning("Failed to patch game updates: " + error.GetType().Name + ": " + error.Message);
+            }
+        }
+
+        private static void GameUpdatePostfix()
+        {
+            instance?.TickScan();
+        }
+
+        private void Update()
+        {
+            TickScan();
+        }
+
+        private static void LevelGeneratedPostfix()
+        {
+            instance?.HandleLevelGenerated();
+        }
+
+        private static void LevelChangingPrefix()
+        {
+            instance?.HandleLevelChanging();
+        }
+
+        private static void EnemyParentSpawnedPostfix(object __instance)
+        {
+            if (__instance is Component component)
+            {
+                RegisterEnemyParent(component);
+            }
+        }
+
+        private void TickScan()
+        {
+            if (!gameplayActive) return;
+            if (Time.realtimeSinceStartup < scanPausedUntil) return;
+            if (Time.realtimeSinceStartup < nextScanAt) return;
+            nextScanAt = Time.realtimeSinceStartup + Math.Max(0.05f, scanInterval.Value);
+
+            try
+            {
+                ScanVisibleEnemies();
+            }
+            catch (Exception error)
+            {
+                Logger.LogWarning("Scan failed: " + error.GetType().Name + ": " + error.Message + "\n" + error.StackTrace);
+            }
+        }
+
+        private void OnDestroy()
+        {
+            harmony?.UnpatchSelf();
+            if (instance == this) instance = null;
+        }
+
+        private void HandleLevelGenerated()
+        {
+            ResetSeenMonsters("new level generated");
+            gameplayActive = IsRegularGameplayLevel();
+            if (!gameplayActive)
+            {
+                if (sendToWebOverlay.Value) StartCoroutine(PostVisibility(false));
+                return;
+            }
+
+            int level = ResolveCurrentLevel();
+            if (level > 0) SyncLevelToOverlay(level);
+        }
+
+        private void HandleLevelChanging()
+        {
+            gameplayActive = false;
+            if (sendToWebOverlay.Value) StartCoroutine(PostVisibility(false));
+        }
+
+        private void ResetSeenMonsters(string reason)
+        {
+            lock (seenLock)
+            {
+                seenMonsters.Clear();
+            }
+            lock (enemyLock)
+            {
+                knownEnemyParents.Clear();
+                sentEnemyInstanceIds.Clear();
+            }
+            lastSeenLoggedAt.Clear();
+            lastRosterFingerprint = "";
+            pendingRosterFingerprint = "";
+            rosterStableScans = 0;
+            rosterPublished = false;
+            visibilityProbeIndex = 0;
+            scanPausedUntil = Time.realtimeSinceStartup + 2f;
+            nextScanAt = scanPausedUntil;
+            nextDebugSummaryAt = 0f;
+            Logger.LogInfo("Cleared seen monsters: " + reason + ".");
+        }
+
+        private void ScanVisibleEnemies()
+        {
+            SyncStrengthIfChanged();
+            Camera camera = FindBestCamera();
+            bool revealAll = !requireLineOfSight.Value;
+
+            List<EnemyCandidate> found = FindEnemyCandidates();
+            var resolvedEnemies = new List<ResolvedEnemyCandidate>();
+            int candidates = found.Count;
+            int visible = 0;
+
+            foreach (EnemyCandidate candidate in found)
+            {
+                string monsterName = ResolveMonsterName(candidate.Component);
+                if (monsterName == null)
+                {
+                    if (debugLogging.Value && Time.realtimeSinceStartup >= nextDebugSummaryAt)
+                    {
+                        Logger.LogInfo("Unresolved enemy candidate: " + candidate.Component.GetType().Name + " / " + candidate.Root.name);
+                    }
+                    continue;
+                }
+                resolvedEnemies.Add(new ResolvedEnemyCandidate { Candidate = candidate, MonsterName = monsterName });
+            }
+
+            if (!SyncMonsterRoster(resolvedEnemies))
+            {
+                if (Time.realtimeSinceStartup >= nextDebugSummaryAt)
+                {
+                    nextDebugSummaryAt = Time.realtimeSinceStartup + 5f;
+                    Logger.LogInfo("Collecting monster roster: candidates=" + candidates + ", resolved=" + resolvedEnemies.Count + ".");
+                }
+                return;
+            }
+            var pendingEnemies = new List<ResolvedEnemyCandidate>();
+            foreach (ResolvedEnemyCandidate resolvedEnemy in resolvedEnemies)
+            {
+                if (!IsEnemySent(resolvedEnemy.Candidate.Root.GetInstanceID())) pendingEnemies.Add(resolvedEnemy);
+            }
+
+            int probeIndex = pendingEnemies.Count == 0 ? -1 : visibilityProbeIndex % pendingEnemies.Count;
+            for (int index = 0; index < pendingEnemies.Count; index++)
+            {
+                ResolvedEnemyCandidate resolvedEnemy = pendingEnemies[index];
+                EnemyCandidate candidate = resolvedEnemy.Candidate;
+                string monsterName = resolvedEnemy.MonsterName;
+
+                if (!revealAll && !IsVisibleEncounter(camera, candidate, monsterName, index == probeIndex)) continue;
+                visible++;
+
+                if (!TryMarkEnemySent(candidate.Root.GetInstanceID())) continue;
+                MarkMonsterSeen(monsterName, candidate);
+                if (debugLogging.Value)
+                {
+                    Logger.LogInfo((revealAll ? "Revealed level monster: " : "Encountered visible monster: ") + monsterName + " from " + candidate.Component.GetType().Name + " / " + candidate.Root.name);
+                }
+                if (sendToWebOverlay.Value)
+                {
+                    StartCoroutine(PostSeenMonster(monsterName, candidate.Root.GetInstanceID()));
+                }
+            }
+            if (pendingEnemies.Count > 0) visibilityProbeIndex = (probeIndex + 1) % pendingEnemies.Count;
+
+            if (Time.realtimeSinceStartup >= nextDebugSummaryAt)
+            {
+                nextDebugSummaryAt = Time.realtimeSinceStartup + 5f;
+                Logger.LogInfo("Scan summary: camera=" + (camera == null ? "none" : camera.name) + ", candidates=" + candidates + ", resolved=" + resolvedEnemies.Count + ", visible=" + visible);
+            }
+        }
+
+        private bool SyncMonsterRoster(List<ResolvedEnemyCandidate> enemies)
+        {
+            enemies.Sort((left, right) => left.Candidate.Root.GetInstanceID().CompareTo(right.Candidate.Root.GetInstanceID()));
+            var fingerprint = new StringBuilder();
+            var json = new StringBuilder("{\"monsters\":[");
+            for (int index = 0; index < enemies.Count; index++)
+            {
+                ResolvedEnemyCandidate enemy = enemies[index];
+                int instanceId = enemy.Candidate.Root.GetInstanceID();
+                fingerprint.Append(instanceId).Append(':').Append(enemy.MonsterName).Append(';');
+                if (index > 0) json.Append(',');
+                json.Append("{\"id\":").Append(instanceId).Append(",\"name\":\"").Append(EscapeJson(enemy.MonsterName)).Append("\"}");
+            }
+            json.Append("]}");
+
+            string nextFingerprint = fingerprint.ToString();
+            if (!rosterPublished)
+            {
+                if (enemies.Count == 0) return false;
+                if (nextFingerprint != pendingRosterFingerprint)
+                {
+                    pendingRosterFingerprint = nextFingerprint;
+                    rosterStableScans = 0;
+                    return false;
+                }
+
+                rosterStableScans++;
+                if (rosterStableScans < 2) return false;
+                rosterPublished = true;
+            }
+
+            if (nextFingerprint == lastRosterFingerprint) return true;
+            lastRosterFingerprint = nextFingerprint;
+            if (sendToWebOverlay.Value) StartCoroutine(PostMonsterRoster(json.ToString()));
+            return true;
+        }
+
+        private static bool TryMarkEnemySent(int instanceId)
+        {
+            lock (enemyLock)
+            {
+                return sentEnemyInstanceIds.Add(instanceId);
+            }
+        }
+
+        private static bool IsEnemySent(int instanceId)
+        {
+            lock (enemyLock)
+            {
+                return sentEnemyInstanceIds.Contains(instanceId);
+            }
+        }
+
+        private void MarkMonsterSeen(string monsterName, EnemyCandidate candidate)
+        {
+            bool added = false;
+            lock (seenLock)
+            {
+                if (!seenMonsters.Contains(monsterName))
+                {
+                    seenMonsters.Add(monsterName);
+                    added = true;
+                }
+            }
+
+            if (added || ShouldLogSeen(monsterName))
+            {
+                lastSeenLoggedAt[monsterName] = Time.realtimeSinceStartup;
+                Logger.LogInfo("Marked monster for web overlay: " + monsterName + " from " + candidate.Component.GetType().Name + " / " + candidate.Root.name);
+            }
+        }
+
+        private bool ShouldLogSeen(string monsterName)
+        {
+            if (!debugLogging.Value) return false;
+            if (!lastSeenLoggedAt.TryGetValue(monsterName, out float lastLogged)) return true;
+            return Time.realtimeSinceStartup - lastLogged >= 30f;
+        }
+
+        private int ResolveCurrentLevel()
+        {
+            Type runManagerType = AccessTools.TypeByName("RunManager");
+            object runManager = ReadMember(runManagerType, "instance");
+            object levelsCompletedValue = ReadMember(runManager, "levelsCompleted");
+            if (levelsCompletedValue != null)
+            {
+                try
+                {
+                    int level = Math.Max(1, Convert.ToInt32(levelsCompletedValue) + 1);
+                    fallbackLevel = level;
+                    Logger.LogInfo("Resolved overlay level from completed levels: " + level + ".");
+                    return level;
+                }
+                catch (Exception error)
+                {
+                    Logger.LogWarning("Could not convert RunManager.levelsCompleted: " + error.Message);
+                }
+            }
+
+            fallbackLevel = Math.Max(1, lastSyncedLevel + 1);
+            Logger.LogInfo("Using generated-level counter for overlay level: " + fallbackLevel + ".");
+            return fallbackLevel;
+        }
+
+        private static bool IsRegularGameplayLevel()
+        {
+            Type runManagerType = AccessTools.TypeByName("RunManager");
+            object runManager = ReadMember(runManagerType, "instance");
+            object currentLevel = ReadMember(runManager, "levelCurrent");
+            object levelsValue = ReadMember(runManager, "levels");
+            if (currentLevel == null || !(levelsValue is IList levels)) return false;
+            return levels.Contains(currentLevel);
+        }
+
+        private void SyncLevelToOverlay(int level)
+        {
+            bool startingNewRun = level == 1 && lastSyncedLevel > 1;
+            lastSyncedLevel = level;
+            StartCoroutine(PostLevel(level));
+            if (!startingNewRun)
+            {
+                lastSyncedStrength = -1;
+                SyncStrengthIfChanged();
+            }
+        }
+
+        private void SyncStrengthIfChanged()
+        {
+            int? strength = ResolveLocalPlayerStrength();
+            if (!strength.HasValue || strength.Value == lastSyncedStrength) return;
+
+            lastSyncedStrength = strength.Value;
+            if (sendToWebOverlay.Value) StartCoroutine(PostStrength(strength.Value));
+        }
+
+        private static int? ResolveLocalPlayerStrength()
+        {
+            Type statsManagerType = AccessTools.TypeByName("StatsManager");
+            object statsManager = ReadMember(statsManagerType, "instance");
+            object strengthsValue = ReadMember(statsManager, "playerUpgradeStrength");
+            if (!(strengthsValue is IDictionary strengths)) return null;
+
+            Type playerControllerType = AccessTools.TypeByName("PlayerController");
+            object playerController = ReadMember(playerControllerType, "instance");
+            string steamId = ReadMember(playerController, "playerSteamID") as string;
+            if (string.IsNullOrEmpty(steamId))
+            {
+                object playerAvatar = ReadMember(playerController, "playerAvatarScript");
+                steamId = ReadMember(playerAvatar, "steamID") as string;
+            }
+
+            object value = !string.IsNullOrEmpty(steamId) && strengths.Contains(steamId) ? strengths[steamId] : null;
+            if (value == null && strengths.Count == 1)
+            {
+                foreach (DictionaryEntry entry in strengths)
+                {
+                    value = entry.Value;
+                    break;
+                }
+            }
+
+            if (value == null) return null;
+            try
+            {
+                return Math.Max(0, Convert.ToInt32(value));
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        private static Camera FindBestCamera()
+        {
+            if (Camera.main != null) return Camera.main;
+
+            Camera[] cameras = Camera.allCameras;
+            Camera best = null;
+            float bestDepth = float.MinValue;
+            foreach (Camera camera in cameras)
+            {
+                if (camera == null || !camera.isActiveAndEnabled) continue;
+                if (camera.depth >= bestDepth)
+                {
+                    best = camera;
+                    bestDepth = camera.depth;
+                }
+            }
+
+            return best;
+        }
+
+        private List<EnemyCandidate> FindEnemyCandidates()
+        {
+            var result = new List<EnemyCandidate>();
+            var seenRoots = new HashSet<int>();
+
+            foreach (Component component in GetKnownEnemyParentsSnapshot())
+            {
+                AddEnemyCandidate(result, seenRoots, component);
+            }
+
+            foreach (Component component in FindSpawnedEnemiesFromDirector())
+            {
+                AddEnemyCandidate(result, seenRoots, component);
+            }
+
+            if (result.Count == 0)
+            {
+                foreach (Component component in FindComponentsByTypeName("EnemyParent"))
+                {
+                    AddEnemyCandidate(result, seenRoots, component);
+                }
+            }
+
+            if (result.Count == 0)
+            {
+                foreach (Component component in FindComponentsByTypeName("Enemy"))
+                {
+                    AddEnemyCandidate(result, seenRoots, component);
+                }
+            }
+
+            return result;
+        }
+
+        private static void RegisterEnemyParent(Component component)
+        {
+            if (component == null) return;
+            lock (enemyLock)
+            {
+                knownEnemyParents.RemoveAll((enemy) => enemy == null);
+                if (!knownEnemyParents.Contains(component))
+                {
+                    knownEnemyParents.Add(component);
+                    Plugin.instance?.Logger.LogInfo("Registered spawned enemy parent: " + component.name + ".");
+                }
+            }
+        }
+
+        private static List<Component> GetKnownEnemyParentsSnapshot()
+        {
+            lock (enemyLock)
+            {
+                knownEnemyParents.RemoveAll((enemy) => enemy == null);
+                return new List<Component>(knownEnemyParents);
+            }
+        }
+
+        private static IEnumerable<Component> FindSpawnedEnemiesFromDirector()
+        {
+            Type directorType = Type.GetType("EnemyDirector, Assembly-CSharp");
+            if (directorType == null) yield break;
+
+            UnityEngine.Object[] directors = Resources.FindObjectsOfTypeAll(directorType);
+            foreach (UnityEngine.Object director in directors)
+            {
+                object spawned = ReadMember(director, "enemiesSpawned");
+                if (!(spawned is IEnumerable enumerable)) continue;
+
+                foreach (object item in enumerable)
+                {
+                    if (item is Component component)
+                    {
+                        yield return component;
+                    }
+                }
+            }
+        }
+
+        private static IEnumerable<Component> FindComponentsByTypeName(string typeName)
+        {
+            Type type = Type.GetType(typeName + ", Assembly-CSharp");
+            if (type == null || !typeof(Component).IsAssignableFrom(type))
+            {
+                yield break;
+            }
+
+            UnityEngine.Object[] objects = Resources.FindObjectsOfTypeAll(type);
+            foreach (UnityEngine.Object obj in objects)
+            {
+                if (obj is Component component)
+                {
+                    yield return component;
+                }
+            }
+        }
+
+        private static void AddEnemyCandidate(List<EnemyCandidate> result, HashSet<int> seenRoots, Component component)
+        {
+            if (component == null) return;
+
+            GameObject root = GetEnemyRoot(component);
+            if (root == null || !root.activeInHierarchy) return;
+
+            int id = root.GetInstanceID();
+            if (!seenRoots.Add(id)) return;
+
+            result.Add(new EnemyCandidate
+            {
+                Component = component,
+                Root = root,
+                Center = GetObjectCenter(root)
+            });
+        }
+
+        private static bool LooksLikeEnemyComponent(Component component)
+        {
+            string typeName = component.GetType().Name;
+            if (typeName == "EnemyParent" || typeName == "Enemy" || typeName == "EnemyAvatar") return true;
+            if (typeName.StartsWith("Enemy", StringComparison.OrdinalIgnoreCase)) return true;
+
+            return FindKnownMonster(component.gameObject.name) != null;
+        }
+
+        private static GameObject GetEnemyRoot(Component component)
+        {
+            if (component.GetType().Name == "Enemy")
+            {
+                return component.gameObject;
+            }
+
+            if (component.GetType().Name == "EnemyParent")
+            {
+                object linkedEnemy = ReadMember(component, "Enemy");
+                return linkedEnemy is Component enemyComponent ? enemyComponent.gameObject : null;
+            }
+
+            return component.gameObject;
+        }
+
+        private static Vector3 GetObjectCenter(GameObject root)
+        {
+            Component enemy = root.GetComponent("Enemy");
+            if (enemy != null)
+            {
+                object centerTransform = ReadMember(enemy, "CenterTransform");
+                if (centerTransform is Transform transform)
+                {
+                    return transform.position;
+                }
+            }
+
+            Renderer renderer = root.GetComponentInChildren<Renderer>();
+            if (renderer != null) return renderer.bounds.center;
+
+            Collider collider = root.GetComponentInChildren<Collider>();
+            if (collider != null) return collider.bounds.center;
+
+            return root.transform.position + Vector3.up;
+        }
+
+        private string ResolveMonsterName(Component component)
+        {
+            Component enemyParent = null;
+            if (component.GetType().Name == "EnemyParent")
+            {
+                enemyParent = component;
+            }
+            else
+            {
+                enemyParent = ReadMember(component, "EnemyParent") as Component;
+            }
+
+            if (enemyParent == null) return null;
+            string enemyName = ReadMember(enemyParent, "enemyName") as string;
+            return FindKnownMonster(enemyName);
+        }
+
+        private bool IsVisibleEncounter(Camera camera, EnemyCandidate candidate, string monsterName, bool refreshGameVisibility)
+        {
+            if (camera == null) return false;
+
+            Transform root = candidate.Root.transform;
+            Vector3 center = candidate.Center;
+            float distance = Vector3.Distance(camera.transform.position, center);
+            if (distance > maxDistance.Value) return false;
+
+            if (preferGameOnScreen.Value)
+            {
+                if (IsGameOnScreen(candidate, refreshGameVisibility)) return true;
+                return IsSmallMonsterFallbackVisible(camera, candidate, monsterName);
+            }
+
+            Vector3 viewport = camera.WorldToViewportPoint(center);
+            float pad = viewportPadding.Value;
+            if (viewport.z <= 0f) return false;
+            return viewport.x >= -pad && viewport.x <= 1f + pad && viewport.y >= -pad && viewport.y <= 1f + pad;
+        }
+
+        private bool IsSmallMonsterFallbackVisible(Camera camera, EnemyCandidate candidate, string monsterName)
+        {
+            if (monsterName != "Peeper" && monsterName != "Headgrab" && monsterName != "Spewer"
+                && monsterName != "Gnomes" && monsterName != "Tick" && monsterName != "Banger") return false;
+
+            float fallbackDistance = Math.Min(maxDistance.Value, 8f);
+            if (Vector3.Distance(camera.transform.position, candidate.Center) > fallbackDistance) return false;
+
+            Component enemy = candidate.Root.GetComponent("Enemy") ?? candidate.Component;
+            object enemyParent = ReadMember(enemy, "EnemyParent");
+            object playerVeryClose = ReadMember(enemyParent, "playerVeryClose");
+            if (playerVeryClose is bool isVeryClose && isVeryClose) return true;
+
+            if (IsPointInViewport(camera, candidate.Center)) return true;
+            Collider collider = candidate.Root.GetComponentInChildren<Collider>();
+            if (collider != null && IsPointInViewport(camera, collider.bounds.center)) return true;
+            Renderer renderer = candidate.Root.GetComponentInChildren<Renderer>();
+            return renderer != null && IsPointInViewport(camera, renderer.bounds.center);
+        }
+
+        private bool IsPointInViewport(Camera camera, Vector3 point)
+        {
+            Vector3 viewport = camera.WorldToViewportPoint(point);
+            float pad = viewportPadding.Value;
+            if (viewport.z <= 0f) return false;
+            return viewport.x >= -pad && viewport.x <= 1f + pad && viewport.y >= -pad && viewport.y <= 1f + pad;
+        }
+
+        private static bool IsGameOnScreen(EnemyCandidate candidate, bool refresh)
+        {
+            Component enemy = candidate.Root.GetComponent("Enemy");
+            if (enemy == null && candidate.Component.GetType().Name == "Enemy")
+            {
+                enemy = candidate.Component;
+            }
+            if (enemy == null) return false;
+
+            object onScreen = ReadMember(enemy, "OnScreen");
+            if (onScreen == null) return false;
+
+            object onScreenLocal = ReadMember(onScreen, "OnScreenLocal");
+            if (onScreenLocal is bool value && value) return true;
+
+            object onScreenLocalPrevious = ReadMember(onScreen, "OnScreenLocalPrevious");
+            if (onScreenLocalPrevious is bool previousValue && previousValue) return true;
+            if (!refresh) return false;
+
+            Type playerControllerType = AccessTools.TypeByName("PlayerController");
+            object playerController = ReadMember(playerControllerType, "instance");
+            object playerAvatar = ReadMember(playerController, "playerAvatarScript");
+            if (playerAvatar == null) return false;
+
+            MethodInfo getOnScreen = onScreen.GetType().GetMethod("GetOnScreen", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+            if (getOnScreen == null) return false;
+            try
+            {
+                object result = getOnScreen.Invoke(onScreen, new[] { playerAvatar });
+                return result is bool refreshedValue && refreshedValue;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        private static object ReadMember(object source, string memberName)
+        {
+            if (source == null) return null;
+
+            Type type = source as Type ?? source.GetType();
+            const BindingFlags flags = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static;
+
+            FieldInfo field = type.GetField(memberName, flags);
+            if (field != null)
+            {
+                if (!field.IsStatic && source is Type) return null;
+                return field.GetValue(field.IsStatic ? null : source);
+            }
+
+            PropertyInfo property = type.GetProperty(memberName, flags);
+            if (property != null && property.GetIndexParameters().Length == 0)
+            {
+                try
+                {
+                    MethodInfo getter = property.GetGetMethod(true);
+                    if (getter == null || (!getter.IsStatic && source is Type)) return null;
+                    return property.GetValue(getter.IsStatic ? null : source, null);
+                }
+                catch
+                {
+                    return null;
+                }
+            }
+
+            return null;
+        }
+
+        private IEnumerator PostSeenMonster(string monsterName, int instanceId)
+        {
+            string json = "{\"name\":\"" + EscapeJson(monsterName) + "\",\"id\":" + instanceId + "}";
+
+            string result = SendHttpPost(endpoint.Value, json);
+            if (result.StartsWith("ERROR:", StringComparison.Ordinal))
+            {
+                Logger.LogWarning("Failed to send monster " + monsterName + " to " + endpoint.Value + ": " + result.Substring(6));
+            }
+            else if (debugLogging.Value)
+            {
+                Logger.LogInfo("Sent seen monster " + monsterName + ": " + result);
+            }
+
+            yield break;
+        }
+
+        private IEnumerator PostMonsterRoster(string json)
+        {
+            string rosterEndpoint = BuildSiblingEndpoint(levelEndpoint.Value, "/api/roster");
+            string result = SendHttpPost(rosterEndpoint, json);
+            if (!IsHttpSuccess(result))
+            {
+                Logger.LogWarning("Failed to sync monster roster: " + TrimHttpResult(result));
+            }
+            else if (debugLogging.Value)
+            {
+                Logger.LogInfo("Synced monster roster.");
+            }
+
+            yield break;
+        }
+
+        private IEnumerator PostLevel(int level)
+        {
+            string json = "{\"level\":" + level + "}";
+
+            string result = SendHttpPost(levelEndpoint.Value, json);
+            if (IsHttpSuccess(result))
+            {
+                if (debugLogging.Value)
+                {
+                    Logger.LogInfo("Synced level " + level + " to overlay: " + result);
+                }
+            }
+            else
+            {
+                Logger.LogWarning("Failed to sync level " + level + " to " + levelEndpoint.Value + ": " + TrimHttpResult(result) + ". Trying /api/state fallback.");
+                string fallbackResult = SendStateLevelFallback(level);
+                if (IsHttpSuccess(fallbackResult))
+                {
+                    Logger.LogInfo("Synced level " + level + " through /api/state fallback: " + fallbackResult);
+                }
+                else
+                {
+                    Logger.LogWarning("Failed to sync level " + level + " through /api/state fallback: " + TrimHttpResult(fallbackResult));
+                }
+            }
+
+            yield break;
+        }
+
+        private IEnumerator PostVisibility(bool visible)
+        {
+            string visibilityEndpoint = BuildSiblingEndpoint(levelEndpoint.Value, "/api/visibility");
+            string result = SendHttpPost(visibilityEndpoint, "{\"visible\":" + (visible ? "true" : "false") + "}");
+            if (!IsHttpSuccess(result))
+            {
+                Logger.LogWarning("Failed to sync overlay visibility: " + TrimHttpResult(result));
+            }
+            else if (debugLogging.Value)
+            {
+                Logger.LogInfo("Synced overlay visibility " + (visible ? "on" : "off") + ": " + result);
+            }
+
+            yield break;
+        }
+
+        private IEnumerator PostStrength(int strength)
+        {
+            string strengthEndpoint = BuildSiblingEndpoint(levelEndpoint.Value, "/api/strength");
+            string result = SendHttpPost(strengthEndpoint, "{\"strength\":" + strength + "}");
+            if (!IsHttpSuccess(result))
+            {
+                Logger.LogWarning("Failed to sync player strength: " + TrimHttpResult(result));
+            }
+            else if (debugLogging.Value)
+            {
+                Logger.LogInfo("Synced player strength " + strength + ": " + result);
+            }
+
+            yield break;
+        }
+
+        private string SendStateLevelFallback(int level)
+        {
+            string stateEndpoint = BuildSiblingEndpoint(levelEndpoint.Value, "/api/state");
+            string stateJson = BuildFallbackStateJson(level, SendHttpGet(stateEndpoint));
+            return SendHttpPost(stateEndpoint, "{\"state\":" + stateJson + "}");
+        }
+
+        private static string BuildSiblingEndpoint(string endpointUrl, string path)
+        {
+            try
+            {
+                var uri = new Uri(endpointUrl);
+                return uri.Scheme + "://" + uri.Host + (uri.IsDefaultPort ? "" : ":" + uri.Port) + path;
+            }
+            catch
+            {
+                return endpointUrl.Replace("/api/level", path).Replace("/api/monster-seen", path);
+            }
+        }
+
+        private static string BuildFallbackStateJson(int level, string getStateResult)
+        {
+            string body = ExtractHttpBody(getStateResult);
+            string stateObject = ExtractJsonObjectProperty(body, "state");
+            if (string.IsNullOrWhiteSpace(stateObject))
+            {
+                stateObject = "{}";
+            }
+
+            stateObject = SetJsonNumberProperty(stateObject, "level", level);
+            stateObject = SetJsonBooleanProperty(stateObject, "gameplayVisible", true);
+            stateObject = SetJsonNumberProperty(stateObject, "seconds", 0);
+            stateObject = SetJsonBooleanProperty(stateObject, "running", false);
+            stateObject = SetJsonRawProperty(stateObject, "startedAt", "null");
+            stateObject = SetJsonRawProperty(stateObject, "monsters", "[]");
+            stateObject = SetJsonNumberProperty(stateObject, "columnsCount", GetRecommendedColumns(level));
+            return stateObject;
+        }
+
+        private static int GetRecommendedColumns(int level)
+        {
+            if (level >= 20) return 7;
+            if (level >= 6) return 6;
+            return 4;
+        }
+
+        private static string SetJsonNumberProperty(string json, string name, int value)
+        {
+            return SetJsonRawProperty(json, name, value.ToString());
+        }
+
+        private static string SetJsonBooleanProperty(string json, string name, bool value)
+        {
+            return SetJsonRawProperty(json, name, value ? "true" : "false");
+        }
+
+        private static string SetJsonRawProperty(string json, string name, string value)
+        {
+            string pattern = "(\"" + Regex.Escape(name) + "\"\\s*:\\s*)(null|true|false|-?\\d+(?:\\.\\d+)?|\"(?:\\\\.|[^\"])*\"|\\[[\\s\\S]*?\\]|\\{[\\s\\S]*?\\})";
+            var regex = new Regex(pattern);
+            if (regex.IsMatch(json))
+            {
+                return regex.Replace(json, "$1" + value, 1);
+            }
+
+            string trimmed = string.IsNullOrWhiteSpace(json) ? "{}" : json.Trim();
+            if (trimmed == "{}") return "{\"" + name + "\":" + value + "}";
+            return trimmed.Substring(0, trimmed.Length - 1) + ",\"" + name + "\":" + value + "}";
+        }
+
+        private static string ExtractJsonObjectProperty(string json, string name)
+        {
+            if (string.IsNullOrWhiteSpace(json)) return null;
+
+            string marker = "\"" + name + "\"";
+            int markerIndex = json.IndexOf(marker, StringComparison.Ordinal);
+            if (markerIndex < 0) return null;
+            int colonIndex = json.IndexOf(':', markerIndex + marker.Length);
+            if (colonIndex < 0) return null;
+            int start = json.IndexOf('{', colonIndex + 1);
+            if (start < 0) return null;
+
+            int depth = 0;
+            bool inString = false;
+            bool escaped = false;
+            for (int index = start; index < json.Length; index++)
+            {
+                char ch = json[index];
+                if (escaped)
+                {
+                    escaped = false;
+                    continue;
+                }
+                if (ch == '\\' && inString)
+                {
+                    escaped = true;
+                    continue;
+                }
+                if (ch == '"')
+                {
+                    inString = !inString;
+                    continue;
+                }
+                if (inString) continue;
+                if (ch == '{') depth++;
+                else if (ch == '}')
+                {
+                    depth--;
+                    if (depth == 0) return json.Substring(start, index - start + 1);
+                }
+            }
+
+            return null;
+        }
+
+        private static bool IsHttpSuccess(string result)
+        {
+            return result != null && (result.StartsWith("HTTP/1.1 2", StringComparison.Ordinal) || result.StartsWith("HTTP/1.0 2", StringComparison.Ordinal));
+        }
+
+        private static string TrimHttpResult(string result)
+        {
+            if (string.IsNullOrEmpty(result)) return "empty response";
+            int lineEnd = result.IndexOf('\n');
+            string firstLine = lineEnd >= 0 ? result.Substring(0, lineEnd) : result;
+            if (firstLine.StartsWith("ERROR:", StringComparison.Ordinal)) return firstLine.Substring(6);
+            return firstLine.Trim();
+        }
+
+        private static string SendHttpPost(string endpointUrl, string json)
+        {
+            try
+            {
+                var uri = new Uri(endpointUrl);
+                if (!string.Equals(uri.Scheme, "http", StringComparison.OrdinalIgnoreCase))
+                {
+                    return "ERROR:Only http:// endpoints are supported by the raw bridge client.";
+                }
+
+                int port = uri.IsDefaultPort ? 80 : uri.Port;
+                byte[] body = Encoding.UTF8.GetBytes(json);
+                string path = string.IsNullOrEmpty(uri.PathAndQuery) ? "/" : uri.PathAndQuery;
+
+                using (var client = new TcpClient())
+                {
+                    IAsyncResult connect = client.BeginConnect(uri.Host, port, null, null);
+                    if (!connect.AsyncWaitHandle.WaitOne(TimeSpan.FromSeconds(2)))
+                    {
+                        return "ERROR:Connection timed out.";
+                    }
+                    client.EndConnect(connect);
+                    client.ReceiveTimeout = 2000;
+                    client.SendTimeout = 2000;
+
+                    using (NetworkStream stream = client.GetStream())
+                    using (var writer = new StreamWriter(stream, new UTF8Encoding(false), 1024, true))
+                    using (var reader = new StreamReader(stream, Encoding.UTF8, false, 1024, true))
+                    {
+                        writer.NewLine = "\r\n";
+                        writer.WriteLine("POST " + path + " HTTP/1.1");
+                        writer.WriteLine("Host: " + uri.Host + ":" + port);
+                        writer.WriteLine("Content-Type: application/json");
+                        writer.WriteLine("Content-Length: " + body.Length);
+                        writer.WriteLine("Connection: close");
+                        writer.WriteLine();
+                        writer.Flush();
+                        stream.Write(body, 0, body.Length);
+                        stream.Flush();
+
+                        return ReadHttpResponse(reader);
+                    }
+                }
+            }
+            catch (Exception error)
+            {
+                return "ERROR:" + error.GetType().Name + ": " + error.Message;
+            }
+        }
+
+        private static string SendHttpGet(string endpointUrl)
+        {
+            try
+            {
+                var uri = new Uri(endpointUrl);
+                if (!string.Equals(uri.Scheme, "http", StringComparison.OrdinalIgnoreCase))
+                {
+                    return "ERROR:Only http:// endpoints are supported by the raw bridge client.";
+                }
+
+                int port = uri.IsDefaultPort ? 80 : uri.Port;
+                string path = string.IsNullOrEmpty(uri.PathAndQuery) ? "/" : uri.PathAndQuery;
+
+                using (var client = new TcpClient())
+                {
+                    IAsyncResult connect = client.BeginConnect(uri.Host, port, null, null);
+                    if (!connect.AsyncWaitHandle.WaitOne(TimeSpan.FromSeconds(2)))
+                    {
+                        return "ERROR:Connection timed out.";
+                    }
+                    client.EndConnect(connect);
+                    client.ReceiveTimeout = 2000;
+                    client.SendTimeout = 2000;
+
+                    using (NetworkStream stream = client.GetStream())
+                    using (var writer = new StreamWriter(stream, new UTF8Encoding(false), 1024, true))
+                    using (var reader = new StreamReader(stream, Encoding.UTF8, false, 1024, true))
+                    {
+                        writer.NewLine = "\r\n";
+                        writer.WriteLine("GET " + path + " HTTP/1.1");
+                        writer.WriteLine("Host: " + uri.Host + ":" + port);
+                        writer.WriteLine("Connection: close");
+                        writer.WriteLine();
+                        writer.Flush();
+
+                        return ReadHttpResponse(reader);
+                    }
+                }
+            }
+            catch (Exception error)
+            {
+                return "ERROR:" + error.GetType().Name + ": " + error.Message;
+            }
+        }
+
+        private static string ReadHttpResponse(StreamReader reader)
+        {
+            string status = reader.ReadLine();
+            if (string.IsNullOrEmpty(status)) return "ERROR:Empty HTTP response.";
+
+            var builder = new StringBuilder();
+            builder.AppendLine(status);
+            string line;
+            while ((line = reader.ReadLine()) != null)
+            {
+                builder.AppendLine(line);
+            }
+
+            return builder.ToString();
+        }
+
+        private static string ExtractHttpBody(string response)
+        {
+            if (string.IsNullOrEmpty(response)) return "";
+            int split = response.IndexOf("\r\n\r\n", StringComparison.Ordinal);
+            if (split >= 0) return response.Substring(split + 4);
+            split = response.IndexOf("\n\n", StringComparison.Ordinal);
+            return split >= 0 ? response.Substring(split + 2) : "";
+        }
+
+        private static string FindKnownMonster(string raw)
+        {
+            string key = Normalize(raw);
+            foreach (KeyValuePair<string, string> pair in KnownMonsters)
+            {
+                if (key.Contains(pair.Key)) return pair.Value;
+            }
+
+            return null;
+        }
+
+        private static string Normalize(string value)
+        {
+            if (string.IsNullOrWhiteSpace(value)) return "";
+
+            var builder = new StringBuilder(value.Length);
+            foreach (char ch in value.ToLowerInvariant())
+            {
+                if ((ch >= 'a' && ch <= 'z') || (ch >= '0' && ch <= '9'))
+                {
+                    builder.Append(ch);
+                }
+            }
+
+            return builder.ToString();
+        }
+
+        private static string EscapeJson(string value)
+        {
+            return value.Replace("\\", "\\\\").Replace("\"", "\\\"");
+        }
+
+        private struct EnemyCandidate
+        {
+            public Component Component;
+            public GameObject Root;
+            public Vector3 Center;
+        }
+
+        private struct ResolvedEnemyCandidate
+        {
+            public EnemyCandidate Candidate;
+            public string MonsterName;
+        }
+
+    }
+}

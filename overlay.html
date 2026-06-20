@@ -36,6 +36,8 @@
         let renderedSquareCount = 0;
 
         function clearSquare(square) {
+            square.dataset.monsterKey = "";
+            square.classList.remove("is-revealing");
             const img = square.querySelector("img");
             if (!img.src.includes("monsters/unknown.webp")) {
                 img.src = "monsters/unknown.webp";
@@ -47,7 +49,8 @@
         }
 
         function updateMonsterSquare(square, level, monster, currentStrength) {
-            square.className = `monster-square level-${level}`;
+            square.classList.remove("level-1", "level-2", "level-3");
+            square.classList.add(`level-${level}`);
 
             if (!monster) {
                 clearSquare(square);
@@ -55,6 +58,9 @@
             }
 
             const img = square.querySelector("img");
+            const monsterKey = String(monster.id || monster.name);
+            const shouldReveal = square.dataset.monsterKey !== monsterKey;
+            square.dataset.monsterKey = monsterKey;
             if (!img.src.includes(monster.image)) {
                 img.src = monster.image;
             }
@@ -93,12 +99,18 @@
                 required.textContent = `💪${monster.strength}`;
                 required.style.color = currentStrength >= monster.strength ? "#4CAF50" : "#ff4444";
             }
+
+            if (shouldReveal) {
+                square.classList.remove("is-revealing");
+                void square.offsetWidth;
+                square.classList.add("is-revealing");
+            }
         }
 
         function ensureMonsterSquares(totalCount) {
             while (renderedSquareCount < totalCount) {
                 const square = document.createElement("div");
-                square.className = "monster-square level-1";
+                square.className = "monster-square level-1 is-slot-entering";
 
                 const img = document.createElement("img");
                 img.src = "monsters/unknown.webp";
@@ -129,6 +141,7 @@
             overlayContainer.className = "overlay-container";
             overlayContainer.classList.add(`style-${state.style}`);
             if (state.bgEnabled) overlayContainer.classList.add("with-bg");
+            if (state.gameplayVisible && !state.rosterPending) overlayContainer.classList.add("is-visible");
 
             levelNumber.textContent = state.level;
             strength.textContent = `СИЛА ${state.strength}`;
@@ -136,16 +149,32 @@
             respawnInfo.style.display = state.timerVisible ? "" : "none";
             renderTimer(state);
 
-            const counts = OverlayApp.getCountsForLevel(state.level);
-            const totalCount = counts.level1 + counts.level2 + counts.level3;
-            ensureMonsterSquares(totalCount);
+            const roster = Array.isArray(state.roster) ? [...state.roster] : [];
+            if (state.rosterPending) {
+                ensureMonsterSquares(0);
+            } else if (roster.length > 0) {
+                roster.sort((left, right) => left.level - right.level || String(left.id).localeCompare(String(right.id)));
+                const revealedBySource = new Map(
+                    state.monsters
+                        .filter((monster) => monster.sourceId != null)
+                        .map((monster) => [String(monster.sourceId), monster])
+                );
+                ensureMonsterSquares(roster.length);
+                roster.forEach((slot, index) => {
+                    updateMonsterSquare(monstersSquares.children[index], slot.level, revealedBySource.get(String(slot.id)), state.strength);
+                });
+            } else {
+                const counts = OverlayApp.getCountsForLevel(state.level);
+                const totalCount = counts.level1 + counts.level2 + counts.level3;
+                ensureMonsterSquares(totalCount);
 
-            let squareIndex = 0;
-            for (let level = 1; level <= 3; level++) {
-                const selected = state.monsters.filter((monster) => monster.level === level);
-                for (let index = 0; index < counts[`level${level}`]; index++) {
-                    updateMonsterSquare(monstersSquares.children[squareIndex], level, selected[index], state.strength);
-                    squareIndex++;
+                let squareIndex = 0;
+                for (let level = 1; level <= 3; level++) {
+                    const selected = state.monsters.filter((monster) => monster.level === level);
+                    for (let index = 0; index < counts[`level${level}`]; index++) {
+                        updateMonsterSquare(monstersSquares.children[squareIndex], level, selected[index], state.strength);
+                        squareIndex++;
+                    }
                 }
             }
         }

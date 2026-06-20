@@ -42,6 +42,19 @@ body {
     padding: 14px;
     border-radius: 8px;
     filter: drop-shadow(0 10px 24px rgba(0, 0, 0, 0.42));
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(18px) scale(0.98);
+    transform-origin: left bottom;
+    transition: opacity 0.28s ease, transform 0.28s ease, visibility 0s linear 0.28s;
+    will-change: opacity, transform;
+}
+
+.overlay-container.is-visible {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0) scale(1);
+    transition-delay: 0s;
 }
 
 .style-1.with-bg {
@@ -106,30 +119,30 @@ body {
     display: inline-flex;
     align-items: baseline;
     gap: 8px;
-    min-height: 56px;
-    padding: 5px 15px 4px;
+    min-height: 48px;
+    padding: 4px 13px 3px;
     border-radius: 6px;
     white-space: nowrap;
 }
 
 .level-text {
-    font-size: 34px;
+    font-size: 28px;
     line-height: 1;
 }
 
 .level-number {
-    font-size: 58px;
+    font-size: 48px;
     line-height: 0.95;
 }
 
 .strength {
     display: inline-flex;
     align-items: center;
-    min-height: 40px;
-    padding: 3px 12px 2px;
+    min-height: 34px;
+    padding: 2px 10px 1px;
     border-radius: 5px;
     background: rgba(255, 178, 0, 0.14);
-    font-size: 32px;
+    font-size: 25px;
     line-height: 1;
     white-space: nowrap;
 }
@@ -143,8 +156,8 @@ body {
 
 .timer {
     display: inline;
-    min-width: 86px;
-    font-size: 38px;
+    min-width: 72px;
+    font-size: 32px;
     line-height: 1;
     text-align: right;
 }
@@ -187,6 +200,86 @@ body {
     border-radius: inherit;
     object-fit: cover;
     filter: drop-shadow(0 0 4px var(--glow-color));
+}
+
+.monster-square.is-slot-entering {
+    animation: monster-slot-enter 0.36s cubic-bezier(0.2, 0.75, 0.25, 1) both;
+}
+
+.monster-square.is-revealing img {
+    animation: monster-image-reveal 0.55s cubic-bezier(0.2, 0.75, 0.25, 1) both;
+}
+
+.monster-square.is-revealing .strength-required {
+    animation: monster-detail-reveal 0.38s ease-out 0.2s both;
+}
+
+.monster-square.is-revealing .monster-count {
+    animation: monster-count-reveal 0.38s ease-out 0.2s both;
+}
+
+@keyframes monster-image-reveal {
+    0% {
+        opacity: 0;
+        clip-path: inset(100% 0 0 0);
+        transform: scale(0.9);
+    }
+    70% {
+        opacity: 1;
+        clip-path: inset(0 0 0 0);
+        transform: scale(1.04);
+    }
+    100% {
+        opacity: 1;
+        clip-path: inset(0 0 0 0);
+        transform: scale(1);
+    }
+}
+
+@keyframes monster-slot-enter {
+    from {
+        opacity: 0;
+        transform: translateY(8px) scale(0.94);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+@keyframes monster-detail-reveal {
+    from {
+        opacity: 0;
+        transform: translateX(-50%) translateY(5px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(-50%) translateY(0);
+    }
+}
+
+@keyframes monster-count-reveal {
+    from {
+        opacity: 0;
+        transform: translateY(5px) scale(0.9);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .overlay-container {
+        transition: none;
+    }
+
+    .monster-square.is-revealing img,
+    .monster-square.is-slot-entering,
+    .monster-square.is-revealing .monster-count,
+    .monster-square.is-revealing .strength-required {
+        animation: none;
+    }
 }
 
 .monster-square.level-1 {

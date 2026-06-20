@@ -1,0 +1,329 @@
+[Message:   BepInEx] BepInEx 5.4.23.5 - REPO (14.06.2026 21:06:06)
+[Info   :   BepInEx] Running under Unity v2022.3.67.7073210
+[Info   :   BepInEx] CLR runtime version: 4.0.30319.42000
+[Info   :   BepInEx] Supports SRE: True
+[Info   :   BepInEx] System platform: Bits64, Windows
+[Message:   BepInEx] Preloader started
+[Info   :   BepInEx] Loaded 1 patcher method from [BepInEx.Preloader 5.4.23.5]
+[Info   :   BepInEx] 1 patcher plugin loaded
+[Info   :   BepInEx] Patching [UnityEngine.CoreModule] with [BepInEx.Chainloader]
+[Message:   BepInEx] Preloader finished
+[Message:   BepInEx] Chainloader ready
+[Message:   BepInEx] Chainloader started
+[Info   :   BepInEx] 5 plugins to load
+[Info   :   BepInEx] Loading [Repo Steam Networking 0.1.2]
+[Info   :   BepInEx] Loading [REPO Monster Bridge 0.2.12]
+[Info   :REPO Monster Bridge] REPO Monster Bridge is running. MonsterEndpoint=http://192.168.1.198:8787/api/monster-seen, LevelEndpoint=http://192.168.1.198:8787/api/level, Logging=True, TestSendOnStart=False, SendToWebOverlay=True
+[Info   :REPO Monster Bridge] Patched EnemyDirector.Update for scan ticks.
+[Info   :REPO Monster Bridge] Patched LevelUI.Update for scan ticks.
+[Info   :REPO Monster Bridge] Patched EnemyParent.SpawnRPC for enemy registration.
+[Info   :REPO Monster Bridge] Patched LevelGenerator.GenerateDone for monster reset.
+[Info   :   BepInEx] Loading [Menu Lib 2.5.4]
+[Debug  :  Menu Lib] Hooking `MenuPageMain.Start`
+[Debug  :  Menu Lib] Hooking `MenuPageSettings.Start`
+[Debug  :  Menu Lib] Hooking `MenuPageColor.Start`
+[Debug  :  Menu Lib] Hooking `MenuPageEsc.Start`
+[Debug  :  Menu Lib] Hooking `MenuPageRegions.Start`
+[Debug  :  Menu Lib] Hooking `MenuPageServerList.Start`
+[Debug  :  Menu Lib] Hooking `MenuPageLobby.Start`
+[Debug  :  Menu Lib] Hooking `SemiFunc.UIMouseHover`
+[Debug  :  Menu Lib] Hooking `MenuPage.StateClosing`
+[Debug  :  Menu Lib] Hooking `ChatManager.StateInactive`
+[Info   :   BepInEx] Loading [REPOConfig 1.2.6]
+[Debug  :REPOConfig] Hooking `MenuPageMain.Start`
+[Info   :   BepInEx] Loading [Timer Plugin 1.2.0]
+[Warning:Timer Plugin] Plugin disabled in config
+[Message:   BepInEx] Chainloader startup complete
+[Info   : Unity Log] Odin Serializer ArchitectureInfo initialization with defaults (all unaligned read/writes disabled).
+[Info   : Unity Log] Odin Serializer detected whitelisted runtime platform WindowsPlayer and memory read test succeeded; enabling all unaligned memory read/writes.
+[Info   : Unity Log] VERSION: v0.4.4.3
+[Info   : Unity Log] Steam - App ID: 3241660
+[Info   : Unity Log] Steam - User ID: 76561198171756643
+[Warning: Unity Log] DontDestroyOnLoad only works for root GameObjects or components on root GameObjects.
+[Info   :Repo Steam Networking] Created RepoSteamNetworkManager
+[Warning: Unity Log] DontDestroyOnLoad only works for root GameObjects or components on root GameObjects.
+[Info   :Repo Steam Networking] Created RepoNetworkingServer
+[Warning: Unity Log] DontDestroyOnLoad only works for root GameObjects or components on root GameObjects.
+[Info   :Repo Steam Networking] Created RepoNetworkingClient
+[Info   : Unity Log] Commands Loaded (Chat): 5
+[Info   : Unity Log] Commands Loaded (Debug): 24
+[Info   : Unity Log] [MetaSave] MetaSave.es3 found
+[Info   :REPO Monster Bridge] Scan summary: camera=Camera Main, candidates=0, resolved=0, visible=0
+[Error  : Unity Log] TargetException: Non-static field requires a target
+Stack trace:
+System.Reflection.RuntimeFieldInfo.GetValue (System.Object obj) (at <ec44db4194e74e18bbf336ba559460da>:0)
+RepoMonsterBridge.Plugin.ReadMember (System.Object source, System.String memberName) (at <3df32752a8844a59905d577207123c64>:0)
+RepoMonsterBridge.Plugin.TryReadLevelMembers (System.Object source, System.String[] memberNames) (at <3df32752a8844a59905d577207123c64>:0)
+RepoMonsterBridge.Plugin.TryReadCurrentLevelFromGame () (at <3df32752a8844a59905d577207123c64>:0)
+RepoMonsterBridge.Plugin.ResolveCurrentLevel () (at <3df32752a8844a59905d577207123c64>:0)
+RepoMonsterBridge.Plugin.HandleLevelGenerated () (at <3df32752a8844a59905d577207123c64>:0)
+RepoMonsterBridge.Plugin.LevelGeneratedPostfix () (at <3df32752a8844a59905d577207123c64>:0)
+(wrapper dynamic-method) LevelGenerator.DMD<LevelGenerator::GenerateDone>(LevelGenerator,Photon.Pun.PhotonMessageInfo)
+LevelGenerator+<Generate>d__95.MoveNext () (at <1c90b0d8158146df9ef59f2001a80ebf>:0)
+UnityEngine.SetupCoroutine.InvokeMoveNext (System.Collections.IEnumerator enumerator, System.IntPtr returnValueAddress) (at <e4fea505ac6a4f7abd6784308d558cd0>:0)
+
+[Info   :REPO Monster Bridge] Scan summary: camera=Camera Main, candidates=0, resolved=0, visible=0
+[Info   :REPO Monster Bridge] Scan summary: camera=Camera Main, candidates=0, resolved=0, visible=0
+[Info   : Unity Log] Leave Photon
+[Info   : Unity Log] Steam: Leaving lobby...
+[Info   : Unity Log] Leave to Main Menu
+[Warning:Repo Steam Networking] RepoSteamNetworkManager already initialized!
+[Warning:Repo Steam Networking] RepoNetworkingServer already initialized!
+[Warning:Repo Steam Networking] RepoNetworkingClient already initialized!
+[Error  : Unity Log] TargetException: Non-static field requires a target
+Stack trace:
+System.Reflection.RuntimeFieldInfo.GetValue (System.Object obj) (at <ec44db4194e74e18bbf336ba559460da>:0)
+RepoMonsterBridge.Plugin.ReadMember (System.Object source, System.String memberName) (at <3df32752a8844a59905d577207123c64>:0)
+RepoMonsterBridge.Plugin.TryReadLevelMembers (System.Object source, System.String[] memberNames) (at <3df32752a8844a59905d577207123c64>:0)
+RepoMonsterBridge.Plugin.TryReadCurrentLevelFromGame () (at <3df32752a8844a59905d577207123c64>:0)
+RepoMonsterBridge.Plugin.ResolveCurrentLevel () (at <3df32752a8844a59905d577207123c64>:0)
+RepoMonsterBridge.Plugin.HandleLevelGenerated () (at <3df32752a8844a59905d577207123c64>:0)
+RepoMonsterBridge.Plugin.LevelGeneratedPostfix () (at <3df32752a8844a59905d577207123c64>:0)
+(wrapper dynamic-method) LevelGenerator.DMD<LevelGenerator::GenerateDone>(LevelGenerator,Photon.Pun.PhotonMessageInfo)
+LevelGenerator+<Generate>d__95.MoveNext () (at <1c90b0d8158146df9ef59f2001a80ebf>:0)
+UnityEngine.SetupCoroutine.InvokeMoveNext (System.Collections.IEnumerator enumerator, System.IntPtr returnValueAddress) (at <e4fea505ac6a4f7abd6784308d558cd0>:0)
+
+[Info   :REPO Monster Bridge] Scan summary: camera=Camera Main, candidates=0, resolved=0, visible=0
+[Info   :REPO Monster Bridge] Scan summary: camera=Camera Main, candidates=0, resolved=0, visible=0
+[Info   :REPO Monster Bridge] Scan summary: camera=Camera Main, candidates=0, resolved=0, visible=0
+[Info   : Unity Log] Log: Error - [2026-06-19 00:58:25.414] [23276] (http_client_llhttp.cpp:33): HTTP request timed out
+
+[Info   : Unity Log] Log: Error - [2026-06-19 00:58:25.414] [23276] (http_client_llhttp.cpp:456): HTTP request failed: Request timed out
+
+[Info   : Unity Log] Log: Error - [2026-06-19 00:58:25.414] [23276] (analytics.cpp:137): Fetching fingerprint failed with error: Request timed out
+
+[Info   :REPO Monster Bridge] Scan summary: camera=Camera Main, candidates=0, resolved=0, visible=0
+[Info   :REPO Monster Bridge] Scan summary: camera=Camera Main, candidates=0, resolved=0, visible=0
+[Info   :REPO Monster Bridge] Scan summary: camera=Camera Main, candidates=0, resolved=0, visible=0
+[Info   : Unity Log] Loading save
+[Info   : Unity Log] Changed level to: Level - Arctic
+[Warning:Repo Steam Networking] RepoSteamNetworkManager already initialized!
+[Warning:Repo Steam Networking] RepoNetworkingServer already initialized!
+[Warning:Repo Steam Networking] RepoNetworkingClient already initialized!
+[Info   :REPO Monster Bridge] Scan summary: camera=Camera Main, candidates=0, resolved=0, visible=0
+[Info   :REPO Monster Bridge] Resolved game level from game state: 99.
+[Info   :REPO Monster Bridge] Cleared seen monsters: new level generated.
+[Info   :REPO Monster Bridge] Synced level 99 to overlay: HTTP/1.1 405 Method Not Allowed
+[Info   :REPO Monster Bridge] In-game overlay marked monster: Peeper from Enemy / Enemy - Ceiling Eye(Clone)
+[Info   :REPO Monster Bridge] Encountered visible monster: Peeper from Enemy / Enemy - Ceiling Eye(Clone)
+[Info   :REPO Monster Bridge] Sent seen monster Peeper: HTTP/1.1 200 OK
+[Info   :REPO Monster Bridge] In-game overlay marked monster: Rugrat from Enemy / Enemy - Duck(Clone)
+[Info   :REPO Monster Bridge] Encountered visible monster: Rugrat from Enemy / Enemy - Duck(Clone)
+[Info   :REPO Monster Bridge] Sent seen monster Rugrat: HTTP/1.1 200 OK
+[Info   :REPO Monster Bridge] In-game overlay marked monster: Animal from Enemy / Enemy - Animal(Clone)
+[Info   :REPO Monster Bridge] Encountered visible monster: Animal from Enemy / Enemy - Animal(Clone)
+[Info   :REPO Monster Bridge] Sent seen monster Animal: HTTP/1.1 200 OK
+[Info   :REPO Monster Bridge] In-game overlay marked monster: Banger from Enemy / Enemy - Bang(Clone)
+[Info   :REPO Monster Bridge] Encountered visible monster: Banger from Enemy / Enemy - Bang(Clone)
+[Info   :REPO Monster Bridge] Sent seen monster Banger: HTTP/1.1 200 OK
+[Info   :REPO Monster Bridge] Unresolved enemy candidate: Enemy / Enemy - Bomb Thrower(Clone)
+[Info   :REPO Monster Bridge] Unresolved enemy candidate: Enemy / Enemy - Bomb Thrower(Clone)
+[Info   :REPO Monster Bridge] In-game overlay marked monster: Huntsman from Enemy / Enemy - Hunter(Clone)
+[Info   :REPO Monster Bridge] Encountered visible monster: Huntsman from Enemy / Enemy - Hunter(Clone)
+[Info   :REPO Monster Bridge] Sent seen monster Huntsman: HTTP/1.1 200 OK
+[Info   :REPO Monster Bridge] Unresolved enemy candidate: Enemy / Enemy - Head(Clone)
+[Info   :REPO Monster Bridge] Scan summary: camera=Camera Main, candidates=13, resolved=10, visible=7
+[Info   :REPO Monster Bridge] Registered spawned enemy parent: Enemy - Bomb Thrower(Clone).
+[Info   :REPO Monster Bridge] Registered spawned enemy parent: Enemy - Hidden(Clone).
+[Info   :REPO Monster Bridge] Registered spawned enemy parent: Enemy - Bang(Clone).
+[Info   :REPO Monster Bridge] Registered spawned enemy parent: Enemy - Bang(Clone).
+[Info   :REPO Monster Bridge] Registered spawned enemy parent: Enemy - Bang(Clone).
+[Info   :REPO Monster Bridge] Registered spawned enemy parent: Enemy - Birthday boy(Clone).
+[Info   :REPO Monster Bridge] Registered spawned enemy parent: Enemy - Bomb Thrower(Clone).
+[Info   :REPO Monster Bridge] Registered spawned enemy parent: Enemy - Animal(Clone).
+[Info   :REPO Monster Bridge] Registered spawned enemy parent: Enemy - Duck(Clone).
+[Info   :REPO Monster Bridge] Registered spawned enemy parent: Enemy - Hunter(Clone).
+[Info   :REPO Monster Bridge] Registered spawned enemy parent: Enemy - Head(Clone).
+[Info   :REPO Monster Bridge] Registered spawned enemy parent: Enemy - Head Grabber(Clone).
+[Info   :REPO Monster Bridge] Registered spawned enemy parent: Enemy - Ceiling Eye(Clone).
+[Info   :REPO Monster Bridge] Scan summary: camera=Camera Main, candidates=13, resolved=13, visible=0
+[Info   :REPO Monster Bridge] Scan summary: camera=Camera Main, candidates=13, resolved=13, visible=0
+[Info   :REPO Monster Bridge] Scan summary: camera=Camera Main, candidates=13, resolved=13, visible=0
+[Info   :REPO Monster Bridge] Scan summary: camera=Camera Main, candidates=13, resolved=13, visible=0
+[Info   :REPO Monster Bridge] Scan summary: camera=Camera Main, candidates=13, resolved=13, visible=0
+[Info   :REPO Monster Bridge] Scan summary: camera=Camera Main, candidates=13, resolved=13, visible=0
+[Info   :REPO Monster Bridge] Scan summary: camera=Camera Main, candidates=13, resolved=13, visible=0
+[Info   :REPO Monster Bridge] Scan summary: camera=Camera Main, candidates=13, resolved=13, visible=0
+[Info   :REPO Monster Bridge] In-game overlay marked monster: Headman from EnemyParent / Controller
+[Info   :REPO Monster Bridge] Encountered visible monster: Headman from EnemyParent / Controller
+[Info   :REPO Monster Bridge] Sent seen monster Headman: HTTP/1.1 200 OK
+[Info   :REPO Monster Bridge] In-game overlay marked monster: Peeper from EnemyParent / Controller
+[Info   :REPO Monster Bridge] Encountered visible monster: Peeper from EnemyParent / Controller
+[Info   :REPO Monster Bridge] Sent seen monster Peeper: HTTP/1.1 200 OK
+[Info   :REPO Monster Bridge] In-game overlay marked monster: Hidden from EnemyParent / Controller
+[Info   :REPO Monster Bridge] Encountered visible monster: Hidden from EnemyParent / Controller
+[Info   :REPO Monster Bridge] Sent seen monster Hidden: HTTP/1.1 200 OK
+[Info   :REPO Monster Bridge] In-game overlay marked monster: Banger from EnemyParent / Controller
+[Info   :REPO Monster Bridge] Encountered visible monster: Banger from EnemyParent / Controller
+[Info   :REPO Monster Bridge] Sent seen monster Banger: HTTP/1.1 200 OK
+[Info   :REPO Monster Bridge] Scan summary: camera=Camera Main, candidates=13, resolved=13, visible=4
+[Info   :REPO Monster Bridge] In-game overlay marked monster: Cleanup Crew from EnemyParent / Controller
+[Info   :REPO Monster Bridge] Encountered visible monster: Cleanup Crew from EnemyParent / Controller
+[Info   :REPO Monster Bridge] Sent seen monster Cleanup Crew: HTTP/1.1 200 OK
+[Info   :REPO Monster Bridge] In-game overlay marked monster: Apex Predator from EnemyParent / Controller
+[Info   :REPO Monster Bridge] Encountered visible monster: Apex Predator from EnemyParent / Controller
+[Info   :REPO Monster Bridge] Sent seen monster Apex Predator: HTTP/1.1 200 OK
+[Info   :REPO Monster Bridge] In-game overlay marked monster: Birthday Boy from EnemyParent / Controller
+[Info   :REPO Monster Bridge] Encountered visible monster: Birthday Boy from EnemyParent / Controller
+[Info   :REPO Monster Bridge] Sent seen monster Birthday Boy: HTTP/1.1 200 OK
+[Info   :REPO Monster Bridge] In-game overlay marked monster: Huntsman from EnemyParent / Controller
+[Info   :REPO Monster Bridge] Encountered visible monster: Huntsman from EnemyParent / Controller
+[Info   :REPO Monster Bridge] Sent seen monster Huntsman: HTTP/1.1 200 OK
+[Info   :REPO Monster Bridge] In-game overlay marked monster: Animal from EnemyParent / Controller
+[Info   :REPO Monster Bridge] Encountered visible monster: Animal from EnemyParent / Controller
+[Info   :REPO Monster Bridge] Sent seen monster Animal: HTTP/1.1 200 OK
+[Info   :REPO Monster Bridge] Scan summary: camera=Camera Main, candidates=13, resolved=13, visible=3
+[Info   :REPO Monster Bridge] In-game overlay marked monster: Headgrab from EnemyParent / Controller
+[Info   :REPO Monster Bridge] Encountered visible monster: Headgrab from EnemyParent / Controller
+[Info   :REPO Monster Bridge] Sent seen monster Headgrab: HTTP/1.1 200 OK
+[Info   :REPO Monster Bridge] Scan summary: camera=Camera Main, candidates=13, resolved=13, visible=12
+[Info   :REPO Monster Bridge] Scan summary: camera=Camera Main, candidates=13, resolved=13, visible=1
+[Info   :REPO Monster Bridge] Encountered visible monster: Headman from EnemyParent / Controller
+[Info   :REPO Monster Bridge] Sent seen monster Headman: HTTP/1.1 200 OK
+[Info   :REPO Monster Bridge] Encountered visible monster: Hidden from EnemyParent / Controller
+[Info   :REPO Monster Bridge] Sent seen monster Hidden: HTTP/1.1 200 OK
+[Info   :REPO Monster Bridge] Encountered visible monster: Banger from EnemyParent / Controller
+[Info   :REPO Monster Bridge] Sent seen monster Banger: HTTP/1.1 200 OK
+[Info   :REPO Monster Bridge] Scan summary: camera=Camera Main, candidates=13, resolved=13, visible=1
+[Info   :REPO Monster Bridge] Encountered visible monster: Peeper from EnemyParent / Controller
+[Info   :REPO Monster Bridge] Sent seen monster Peeper: HTTP/1.1 200 OK
+[Info   :REPO Monster Bridge] Encountered visible monster: Cleanup Crew from EnemyParent / Controller
+[Info   :REPO Monster Bridge] Sent seen monster Cleanup Crew: HTTP/1.1 200 OK
+[Info   :REPO Monster Bridge] In-game overlay marked monster: Headman from EnemyParent / Controller
+[Info   :REPO Monster Bridge] Scan summary: camera=Camera Main, candidates=13, resolved=13, visible=3
+[Info   :REPO Monster Bridge] In-game overlay marked monster: Peeper from EnemyParent / Controller
+[Info   :REPO Monster Bridge] Encountered visible monster: Huntsman from EnemyParent / Controller
+[Info   :REPO Monster Bridge] Sent seen monster Huntsman: HTTP/1.1 200 OK
+[Info   :REPO Monster Bridge] Scan summary: camera=Camera Main, candidates=13, resolved=13, visible=3
+[Info   :REPO Monster Bridge] In-game overlay marked monster: Cleanup Crew from EnemyParent / Controller
+[Info   :REPO Monster Bridge] In-game overlay marked monster: Huntsman from EnemyParent / Controller
+[Info   :REPO Monster Bridge] In-game overlay marked monster: Apex Predator from EnemyParent / Controller
+[Info   :REPO Monster Bridge] Encountered visible monster: Apex Predator from EnemyParent / Controller
+[Info   :REPO Monster Bridge] Sent seen monster Apex Predator: HTTP/1.1 200 OK
+[Info   :REPO Monster Bridge] Encountered visible monster: Headman from EnemyParent / Controller
+[Info   :REPO Monster Bridge] Sent seen monster Headman: HTTP/1.1 200 OK
+[Info   :REPO Monster Bridge] Scan summary: camera=Camera Main, candidates=13, resolved=13, visible=4
+[Info   :REPO Monster Bridge] In-game overlay marked monster: Banger from EnemyParent / Controller
+[Info   :REPO Monster Bridge] In-game overlay marked monster: Birthday Boy from EnemyParent / Controller
+[Info   :REPO Monster Bridge] Encountered visible monster: Birthday Boy from EnemyParent / Controller
+[Info   :REPO Monster Bridge] Sent seen monster Birthday Boy: HTTP/1.1 200 OK
+[Info   :REPO Monster Bridge] Encountered visible monster: Banger from EnemyParent / Controller
+[Info   :REPO Monster Bridge] Sent seen monster Banger: HTTP/1.1 200 OK
+[Info   :REPO Monster Bridge] Scan summary: camera=Camera Main, candidates=13, resolved=13, visible=3
+[Info   :REPO Monster Bridge] Encountered visible monster: Cleanup Crew from EnemyParent / Controller
+[Info   :REPO Monster Bridge] Sent seen monster Cleanup Crew: HTTP/1.1 200 OK
+[Info   :REPO Monster Bridge] Encountered visible monster: Peeper from EnemyParent / Controller
+[Info   :REPO Monster Bridge] Sent seen monster Peeper: HTTP/1.1 200 OK
+[Info   :REPO Monster Bridge] Scan summary: camera=Camera Main, candidates=13, resolved=13, visible=4
+[Info   :REPO Monster Bridge] Scan summary: camera=Camera Main, candidates=13, resolved=13, visible=2
+[Info   :REPO Monster Bridge] In-game overlay marked monster: Headman from EnemyParent / Controller
+[Info   :REPO Monster Bridge] Encountered visible monster: Headman from EnemyParent / Controller
+[Info   :REPO Monster Bridge] Sent seen monster Headman: HTTP/1.1 200 OK
+[Info   :REPO Monster Bridge] Scan summary: camera=Camera Main, candidates=13, resolved=13, visible=2
+[Info   :REPO Monster Bridge] In-game overlay marked monster: Peeper from EnemyParent / Controller
+[Info   :REPO Monster Bridge] Encountered visible monster: Apex Predator from EnemyParent / Controller
+[Info   :REPO Monster Bridge] Sent seen monster Apex Predator: HTTP/1.1 200 OK
+[Info   :REPO Monster Bridge] Encountered visible monster: Huntsman from EnemyParent / Controller
+[Info   :REPO Monster Bridge] Sent seen monster Huntsman: HTTP/1.1 200 OK
+[Info   :REPO Monster Bridge] In-game overlay marked monster: Headgrab from EnemyParent / Controller
+[Info   :REPO Monster Bridge] Encountered visible monster: Headgrab from EnemyParent / Controller
+[Info   :REPO Monster Bridge] Sent seen monster Headgrab: HTTP/1.1 200 OK
+[Info   :REPO Monster Bridge] Scan summary: camera=Camera Main, candidates=13, resolved=13, visible=2
+[Info   :REPO Monster Bridge] In-game overlay marked monster: Cleanup Crew from EnemyParent / Controller
+[Info   :REPO Monster Bridge] Encountered visible monster: Cleanup Crew from EnemyParent / Controller
+[Info   :REPO Monster Bridge] Sent seen monster Cleanup Crew: HTTP/1.1 200 OK
+[Info   :REPO Monster Bridge] Scan summary: camera=Camera Main, candidates=13, resolved=13, visible=2
+[Info   :REPO Monster Bridge] Encountered visible monster: Peeper from EnemyParent / Controller
+[Info   :REPO Monster Bridge] Sent seen monster Peeper: HTTP/1.1 200 OK
+[Info   :REPO Monster Bridge] In-game overlay marked monster: Banger from EnemyParent / Controller
+[Info   :REPO Monster Bridge] Encountered visible monster: Banger from EnemyParent / Controller
+[Info   :REPO Monster Bridge] Sent seen monster Banger: HTTP/1.1 200 OK
+[Info   :REPO Monster Bridge] In-game overlay marked monster: Apex Predator from EnemyParent / Controller
+[Info   :REPO Monster Bridge] In-game overlay marked monster: Huntsman from EnemyParent / Controller
+[Info   :REPO Monster Bridge] Scan summary: camera=Camera Main, candidates=13, resolved=13, visible=3
+[Info   : Unity Log] Leave Photon
+[Info   : Unity Log] Steam: Leaving lobby...
+[Info   : Unity Log] Leave to Main Menu
+[Warning:Repo Steam Networking] RepoSteamNetworkManager already initialized!
+[Warning:Repo Steam Networking] RepoNetworkingServer already initialized!
+[Warning:Repo Steam Networking] RepoNetworkingClient already initialized!
+[Info   :REPO Monster Bridge] Resolved game level from game state: 99.
+[Info   :REPO Monster Bridge] Cleared seen monsters: new level generated.
+[Info   :REPO Monster Bridge] Scan summary: camera=Camera Main, candidates=0, resolved=0, visible=0
+[Info   : Unity Log] Changed level to: Level - Tutorial
+[Info   :REPO Monster Bridge] Scan summary: camera=Camera Main, candidates=0, resolved=0, visible=0
+[Warning:Repo Steam Networking] RepoSteamNetworkManager already initialized!
+[Warning:Repo Steam Networking] RepoNetworkingServer already initialized!
+[Warning:Repo Steam Networking] RepoNetworkingClient already initialized!
+[Error  : Unity Log] TargetException: Non-static field requires a target
+Stack trace:
+System.Reflection.RuntimeFieldInfo.GetValue (System.Object obj) (at <ec44db4194e74e18bbf336ba559460da>:0)
+RepoMonsterBridge.Plugin.ReadMember (System.Object source, System.String memberName) (at <3df32752a8844a59905d577207123c64>:0)
+RepoMonsterBridge.Plugin.TryReadLevelMembers (System.Object source, System.String[] memberNames) (at <3df32752a8844a59905d577207123c64>:0)
+RepoMonsterBridge.Plugin.TryReadCurrentLevelFromGame () (at <3df32752a8844a59905d577207123c64>:0)
+RepoMonsterBridge.Plugin.ResolveCurrentLevel () (at <3df32752a8844a59905d577207123c64>:0)
+RepoMonsterBridge.Plugin.HandleLevelGenerated () (at <3df32752a8844a59905d577207123c64>:0)
+RepoMonsterBridge.Plugin.LevelGeneratedPostfix () (at <3df32752a8844a59905d577207123c64>:0)
+(wrapper dynamic-method) LevelGenerator.DMD<LevelGenerator::GenerateDone>(LevelGenerator,Photon.Pun.PhotonMessageInfo)
+LevelGenerator+<Generate>d__95.MoveNext () (at <1c90b0d8158146df9ef59f2001a80ebf>:0)
+UnityEngine.SetupCoroutine.InvokeMoveNext (System.Collections.IEnumerator enumerator, System.IntPtr returnValueAddress) (at <e4fea505ac6a4f7abd6784308d558cd0>:0)
+
+[Info   :REPO Monster Bridge] Scan summary: camera=Camera Main, candidates=0, resolved=0, visible=0
+[Info   : Unity Log] Leave Photon
+[Info   : Unity Log] Steam: Leaving lobby...
+[Info   : Unity Log] Leave to Main Menu
+[Warning:Repo Steam Networking] RepoSteamNetworkManager already initialized!
+[Warning:Repo Steam Networking] RepoNetworkingServer already initialized!
+[Warning:Repo Steam Networking] RepoNetworkingClient already initialized!
+[Error  : Unity Log] TargetException: Non-static field requires a target
+Stack trace:
+System.Reflection.RuntimeFieldInfo.GetValue (System.Object obj) (at <ec44db4194e74e18bbf336ba559460da>:0)
+RepoMonsterBridge.Plugin.ReadMember (System.Object source, System.String memberName) (at <3df32752a8844a59905d577207123c64>:0)
+RepoMonsterBridge.Plugin.TryReadLevelMembers (System.Object source, System.String[] memberNames) (at <3df32752a8844a59905d577207123c64>:0)
+RepoMonsterBridge.Plugin.TryReadCurrentLevelFromGame () (at <3df32752a8844a59905d577207123c64>:0)
+RepoMonsterBridge.Plugin.ResolveCurrentLevel () (at <3df32752a8844a59905d577207123c64>:0)
+RepoMonsterBridge.Plugin.HandleLevelGenerated () (at <3df32752a8844a59905d577207123c64>:0)
+RepoMonsterBridge.Plugin.LevelGeneratedPostfix () (at <3df32752a8844a59905d577207123c64>:0)
+(wrapper dynamic-method) LevelGenerator.DMD<LevelGenerator::GenerateDone>(LevelGenerator,Photon.Pun.PhotonMessageInfo)
+LevelGenerator+<Generate>d__95.MoveNext () (at <1c90b0d8158146df9ef59f2001a80ebf>:0)
+UnityEngine.SetupCoroutine.InvokeMoveNext (System.Collections.IEnumerator enumerator, System.IntPtr returnValueAddress) (at <e4fea505ac6a4f7abd6784308d558cd0>:0)
+
+[Info   :REPO Monster Bridge] Scan summary: camera=Camera Main, candidates=0, resolved=0, visible=0
+[Info   :REPO Monster Bridge] Scan summary: camera=Camera Main, candidates=0, resolved=0, visible=0
+[Info   : Unity Log] Changed level to: Level - Wizard
+[Warning:Repo Steam Networking] RepoSteamNetworkManager already initialized!
+[Warning:Repo Steam Networking] RepoNetworkingServer already initialized!
+[Warning:Repo Steam Networking] RepoNetworkingClient already initialized!
+[Error  : Unity Log] TargetException: Non-static field requires a target
+Stack trace:
+System.Reflection.RuntimeFieldInfo.GetValue (System.Object obj) (at <ec44db4194e74e18bbf336ba559460da>:0)
+RepoMonsterBridge.Plugin.ReadMember (System.Object source, System.String memberName) (at <3df32752a8844a59905d577207123c64>:0)
+RepoMonsterBridge.Plugin.TryReadLevelMembers (System.Object source, System.String[] memberNames) (at <3df32752a8844a59905d577207123c64>:0)
+RepoMonsterBridge.Plugin.TryReadCurrentLevelFromGame () (at <3df32752a8844a59905d577207123c64>:0)
+RepoMonsterBridge.Plugin.ResolveCurrentLevel () (at <3df32752a8844a59905d577207123c64>:0)
+RepoMonsterBridge.Plugin.HandleLevelGenerated () (at <3df32752a8844a59905d577207123c64>:0)
+RepoMonsterBridge.Plugin.LevelGeneratedPostfix () (at <3df32752a8844a59905d577207123c64>:0)
+(wrapper dynamic-method) LevelGenerator.DMD<LevelGenerator::GenerateDone>(LevelGenerator,Photon.Pun.PhotonMessageInfo)
+LevelGenerator+<Generate>d__95.MoveNext () (at <1c90b0d8158146df9ef59f2001a80ebf>:0)
+UnityEngine.SetupCoroutine.InvokeMoveNext (System.Collections.IEnumerator enumerator, System.IntPtr returnValueAddress) (at <e4fea505ac6a4f7abd6784308d558cd0>:0)
+
+[Info   :REPO Monster Bridge] In-game overlay marked monster: Tick from Enemy / Enemy - Tick(Clone)
+[Info   :REPO Monster Bridge] Encountered visible monster: Tick from Enemy / Enemy - Tick(Clone)
+[Info   :REPO Monster Bridge] Sent seen monster Tick: HTTP/1.1 200 OK
+[Info   :REPO Monster Bridge] Scan summary: camera=Camera Main, candidates=4, resolved=4, visible=1
+[Info   :REPO Monster Bridge] Registered spawned enemy parent: Enemy - Head Grabber(Clone).
+[Info   :REPO Monster Bridge] Registered spawned enemy parent: Enemy - Tick(Clone).
+[Info   :REPO Monster Bridge] Registered spawned enemy parent: Enemy - Head Grabber(Clone).
+[Info   :REPO Monster Bridge] Registered spawned enemy parent: Enemy - Head Grabber(Clone).
+[Info   :REPO Monster Bridge] Scan summary: camera=Camera Main, candidates=4, resolved=4, visible=0
+[Info   :REPO Monster Bridge] Scan summary: camera=Camera Main, candidates=4, resolved=4, visible=0
+[Info   :REPO Monster Bridge] In-game overlay marked monster: Headgrab from EnemyParent / Controller
+[Info   :REPO Monster Bridge] Encountered visible monster: Headgrab from EnemyParent / Controller
+[Info   :REPO Monster Bridge] Sent seen monster Headgrab: HTTP/1.1 200 OK
+[Info   :REPO Monster Bridge] Scan summary: camera=Camera Main, candidates=4, resolved=4, visible=4
+[Info   :REPO Monster Bridge] Encountered visible monster: Tick from EnemyParent / Controller
+[Info   :REPO Monster Bridge] Sent seen monster Tick: HTTP/1.1 200 OK
+[Info   :REPO Monster Bridge] Scan summary: camera=Camera Main, candidates=4, resolved=4, visible=4
+[Info   :REPO Monster Bridge] Scan summary: camera=Camera Main, candidates=4, resolved=4, visible=0
+[Warning: Unity Log] Save folder not found: C:/Users/Egr/AppData/LocalLow/semiwork/REPO/saves/REPO_SAVE_2026_06_19_01_01_13
+[Warning:Timer Plugin] Plugin DESTROYED нахуй
