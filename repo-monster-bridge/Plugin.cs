@@ -15,7 +15,7 @@ using UnityEngine;
 
 namespace RepoMonsterBridge
 {
-    [BepInPlugin("local.overlay.repo_monster_bridge", "REPO Monster Bridge", "0.2.37")]
+    [BepInPlugin("local.overlay.repo_monster_bridge", "REPO Monster Bridge", "0.2.38")]
     public sealed class Plugin : BaseUnityPlugin
     {
         private static Plugin instance;
@@ -1031,15 +1031,7 @@ namespace RepoMonsterBridge
             stateObject = SetJsonBooleanProperty(stateObject, "running", false);
             stateObject = SetJsonRawProperty(stateObject, "startedAt", "null");
             stateObject = SetJsonRawProperty(stateObject, "monsters", "[]");
-            stateObject = SetJsonNumberProperty(stateObject, "columnsCount", GetRecommendedColumns(level));
             return stateObject;
-        }
-
-        private static int GetRecommendedColumns(int level)
-        {
-            if (level >= 20) return 7;
-            if (level >= 6) return 6;
-            return 4;
         }
 
         private static string SetJsonNumberProperty(string json, string name, int value)

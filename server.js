@@ -109,7 +109,8 @@ const defaultOverlayState = {
     timerVisible: false,
     squareSize: 64,
     overlayScaleVersion: 2,
-    columnsCount: 4,
+    columnsCount: 7,
+    columnsLayoutVersion: 1,
     seconds: 0,
     running: false,
     startedAt: null,
@@ -174,14 +175,6 @@ function getCountsForLevel(level) {
     if (level === 9) return levelMonsterCounts["9"];
     if (level <= 19) return levelMonsterCounts["10-19"];
     return levelMonsterCounts["20+"];
-}
-
-function getRecommendedColumns(level) {
-    const counts = getCountsForLevel(level);
-    const totalMonsters = counts.level1 + counts.level2 + counts.level3;
-    if (level >= 20) return 7;
-    if (level >= 6) return Math.min(totalMonsters, 8);
-    return 4;
 }
 
 function normalizeLevel(value) {
@@ -358,8 +351,7 @@ function setGameLevel(rawLevel) {
         startedAt: null,
         monsters: [],
         roster: [],
-        rosterPending: true,
-        columnsCount: getRecommendedColumns(level)
+        rosterPending: true
     };
 
     return { ok: true, statusCode: 200, payload: { ok: true, level } };

@@ -1,6 +1,6 @@
 {
   "name": "RepoMonsterBridge",
-  "version_number": "0.2.37",
+  "version_number": "0.2.38",
   "website_url": "",
   "description": "Sends encountered R.E.P.O. monsters and level changes to the stream overlay server.",
   "dependencies": []

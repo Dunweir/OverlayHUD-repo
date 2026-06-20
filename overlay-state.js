@@ -68,7 +68,8 @@ const OverlayApp = (() => {
         timerVisible: false,
         squareSize: 64,
         overlayScaleVersion: 2,
-        columnsCount: 4,
+        columnsCount: 7,
+        columnsLayoutVersion: 1,
         seconds: 0,
         running: false,
         startedAt: null,
@@ -94,11 +95,14 @@ const OverlayApp = (() => {
     function normalizeState(nextState) {
         const source = nextState || defaultState;
         const squareSize = source.overlayScaleVersion === 2 || source.squareSize !== 50 ? source.squareSize : defaultState.squareSize;
+        const columnsCount = source.columnsLayoutVersion === 1 ? source.columnsCount : defaultState.columnsCount;
         return {
             ...defaultState,
             ...source,
             overlayScaleVersion: defaultState.overlayScaleVersion,
+            columnsLayoutVersion: defaultState.columnsLayoutVersion,
             squareSize,
+            columnsCount,
             monsters: Array.isArray(source.monsters) ? source.monsters : [],
             roster: Array.isArray(source.roster) ? source.roster : []
         };
@@ -209,14 +213,6 @@ const OverlayApp = (() => {
         return levelMonsterCounts["20+"];
     }
 
-    function getRecommendedColumns(level) {
-        const counts = getCountsForLevel(level);
-        const totalMonsters = counts.level1 + counts.level2 + counts.level3;
-        if (level >= 20) return 7;
-        if (level >= 6) return Math.min(totalMonsters, 8);
-        return 4;
-    }
-
     function getTimerSeconds(currentState) {
         if (!currentState.running || !currentState.startedAt) {
             return currentState.seconds;
@@ -325,8 +321,7 @@ const OverlayApp = (() => {
                 startedAt: null,
                 monsters: [],
                 roster: [],
-                rosterPending: false,
-                columnsCount: getRecommendedColumns(level)
+                rosterPending: false
             };
             return nextState;
         });
