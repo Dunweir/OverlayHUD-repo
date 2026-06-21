@@ -4,6 +4,7 @@ using HarmonyLib;
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Net.Sockets;
 using System.Reflection;
@@ -15,7 +16,7 @@ using UnityEngine;
 
 namespace RepoMonsterBridge
 {
-    [BepInPlugin("local.overlay.repo_monster_bridge", "REPO Monster Bridge", "0.2.39")]
+    [BepInPlugin("local.overlay.repo_monster_bridge", "REPO Monster Bridge", "0.2.41")]
     public sealed class Plugin : BaseUnityPlugin
     {
         private static Plugin instance;
@@ -82,6 +83,8 @@ namespace RepoMonsterBridge
 
         private readonly Dictionary<string, float> lastSeenLoggedAt = new Dictionary<string, float>();
         private readonly Dictionary<int, string> resolvedMonsterNames = new Dictionary<int, string>();
+        private readonly Dictionary<int, int> sourceIdsByEnemyParent = new Dictionary<int, int>();
+        private readonly Dictionary<int, bool> lastAliveBySourceId = new Dictionary<int, bool>();
         private float nextScanAt;
         private float nextStrengthCheckAt;
         private float nextDebugSummaryAt;
@@ -90,6 +93,7 @@ namespace RepoMonsterBridge
         private int lastSyncedLevel;
         private int lastSyncedStrength = -1;
         private string lastRosterFingerprint = "";
+        private string lastStatusFingerprint = "";
         private string pendingRosterFingerprint = "";
         private int rosterStableScans;
         private bool rosterPublished;
@@ -276,7 +280,10 @@ namespace RepoMonsterBridge
             }
             lastSeenLoggedAt.Clear();
             resolvedMonsterNames.Clear();
+            sourceIdsByEnemyParent.Clear();
+            lastAliveBySourceId.Clear();
             lastRosterFingerprint = "";
+            lastStatusFingerprint = "";
             pendingRosterFingerprint = "";
             rosterStableScans = 0;
             rosterPublished = false;
@@ -326,6 +333,7 @@ namespace RepoMonsterBridge
                 }
                 return;
             }
+            SyncMonsterStatuses(resolvedEnemies);
             var pendingEnemies = new List<ResolvedEnemyCandidate>();
             foreach (ResolvedEnemyCandidate resolvedEnemy in resolvedEnemies)
             {
@@ -354,7 +362,6 @@ namespace RepoMonsterBridge
                 }
             }
             if (pendingEnemies.Count > 0) visibilityProbeIndex = (probeIndex + 1) % pendingEnemies.Count;
-            else nextScanAt = Time.realtimeSinceStartup + 5f;
 
             if (debugLogging.Value && Time.realtimeSinceStartup >= nextDebugSummaryAt)
             {
@@ -405,6 +412,145 @@ namespace RepoMonsterBridge
                 StartCoroutine(PostMonsterRoster(json.ToString()));
             }
             return true;
+        }
+
+        private void SyncMonsterStatuses(List<ResolvedEnemyCandidate> enemies)
+        {
+            var json = new StringBuilder("{\"statuses\":[");
+            var fingerprint = new StringBuilder();
+            int statusCount = 0;
+            var statusCandidates = new Dictionary<int, EnemyCandidate>();
+
+            for (int index = 0; index < enemies.Count; index++)
+            {
+                ResolvedEnemyCandidate enemy = enemies[index];
+                int sourceId = enemy.Candidate.Root.GetInstanceID();
+                statusCandidates[sourceId] = enemy.Candidate;
+                Component enemyParent = GetEnemyParent(enemy.Candidate);
+                if (enemyParent != null) sourceIdsByEnemyParent[enemyParent.GetInstanceID()] = sourceId;
+            }
+
+            foreach (Component enemyParent in GetKnownEnemyParentsSnapshot())
+            {
+                if (enemyParent == null) continue;
+                GameObject root = GetEnemyRoot(enemyParent);
+                int parentId = enemyParent.GetInstanceID();
+                int sourceId;
+                if (root != null)
+                {
+                    sourceId = root.GetInstanceID();
+                    sourceIdsByEnemyParent[parentId] = sourceId;
+                }
+                else if (!sourceIdsByEnemyParent.TryGetValue(parentId, out sourceId))
+                {
+                    continue;
+                }
+
+                statusCandidates[sourceId] = new EnemyCandidate
+                {
+                    Component = enemyParent,
+                    Root = root,
+                    Center = Vector3.zero
+                };
+            }
+
+            var sourceIds = new List<int>(statusCandidates.Keys);
+            sourceIds.Sort();
+            for (int index = 0; index < sourceIds.Count; index++)
+            {
+                int instanceId = sourceIds[index];
+                EnemyCandidate candidate = statusCandidates[instanceId];
+                if (!TryGetEnemyRespawnStatus(candidate, out bool alive, out float remaining)) continue;
+
+                if (!lastAliveBySourceId.TryGetValue(instanceId, out bool previousAlive) || previousAlive != alive)
+                {
+                    lastAliveBySourceId[instanceId] = alive;
+                    if (debugLogging.Value)
+                    {
+                        Logger.LogInfo("Monster respawn state " + instanceId + ": " + (alive ? "alive" : "cooldown")
+                            + ", remaining=" + remaining.ToString("0.0", CultureInfo.InvariantCulture) + "s.");
+                    }
+                }
+
+                float roundedRemaining = alive ? 0f : (float)Math.Ceiling(Math.Max(0f, remaining) * 10f) / 10f;
+                string remainingText = roundedRemaining.ToString("0.0", CultureInfo.InvariantCulture);
+                fingerprint.Append(instanceId).Append(':').Append(alive ? '1' : '0').Append(':').Append(remainingText).Append(';');
+
+                if (statusCount++ > 0) json.Append(',');
+                json.Append("{\"id\":").Append(instanceId)
+                    .Append(",\"alive\":").Append(alive ? "true" : "false")
+                    .Append(",\"respawnRemaining\":").Append(remainingText)
+                    .Append('}');
+            }
+
+            if (statusCount == 0) return;
+            string nextFingerprint = fingerprint.ToString();
+            if (nextFingerprint == lastStatusFingerprint) return;
+            lastStatusFingerprint = nextFingerprint;
+            json.Append("]}");
+            StartCoroutine(PostMonsterStatuses(json.ToString()));
+        }
+
+        private static bool TryGetEnemyRespawnStatus(EnemyCandidate candidate, out bool alive, out float remaining)
+        {
+            alive = true;
+            remaining = 0f;
+            Component enemyParent = GetEnemyParent(candidate);
+            if (enemyParent == null) return false;
+
+            object timerValue = ReadMember(enemyParent, "DespawnedTimer");
+            if (!TryConvertFloat(timerValue, out remaining)) return false;
+
+            Component photonView = enemyParent.GetComponent("PhotonView")
+                ?? (candidate.Root == null ? null : candidate.Root.GetComponent("PhotonView"));
+            object viewIdValue = ReadMember(photonView, "ViewID") ?? ReadMember(photonView, "viewID");
+            if (viewIdValue != null)
+            {
+                try
+                {
+                    int viewId = Convert.ToInt32(viewIdValue);
+                    Type timerUiType = Type.GetType("TimerPlugin.EnemyListUI, TimerPlugin");
+                    object syncedTimers = ReadMember(timerUiType, "_enemies");
+                    if (syncedTimers is IDictionary dictionary && dictionary.Contains(viewId)
+                        && TryConvertFloat(dictionary[viewId], out float syncedRemaining))
+                    {
+                        remaining = syncedRemaining;
+                    }
+                }
+                catch
+                {
+                    // Local DespawnedTimer remains the fallback when TimerMod data is unavailable.
+                }
+            }
+
+            remaining = Math.Max(0f, remaining);
+            alive = remaining <= 0.000001f;
+            return true;
+        }
+
+        private static Component GetEnemyParent(EnemyCandidate candidate)
+        {
+            if (candidate.Component != null && candidate.Component.GetType().Name == "EnemyParent")
+            {
+                return candidate.Component;
+            }
+
+            Component enemy = candidate.Root == null ? null : candidate.Root.GetComponent("Enemy");
+            return ReadMember(enemy ?? candidate.Component, "EnemyParent") as Component;
+        }
+
+        private static bool TryConvertFloat(object value, out float result)
+        {
+            try
+            {
+                result = Convert.ToSingle(value, CultureInfo.InvariantCulture);
+                return true;
+            }
+            catch
+            {
+                result = 0f;
+                return false;
+            }
         }
 
         private static bool TryMarkEnemySent(int instanceId)
@@ -932,6 +1078,20 @@ namespace RepoMonsterBridge
             else if (debugLogging.Value)
             {
                 Logger.LogInfo("Synced monster roster.");
+            }
+
+            yield break;
+        }
+
+        private IEnumerator PostMonsterStatuses(string json)
+        {
+            string statusEndpoint = BuildSiblingEndpoint(levelEndpoint.Value, "/api/monster-status");
+            Task<string> request = QueueNetworkRequest(() => SendHttpPost(statusEndpoint, json));
+            while (!request.IsCompleted) yield return null;
+            string result = request.IsFaulted ? "ERROR:" + request.Exception.GetBaseException().Message : request.Result;
+            if (!IsHttpSuccess(result))
+            {
+                Logger.LogWarning("Failed to sync monster respawn status: " + TrimHttpResult(result));
             }
 
             yield break;

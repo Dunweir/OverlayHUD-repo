@@ -107,6 +107,8 @@ const defaultOverlayState = {
     style: 1,
     bgEnabled: false,
     timerVisible: false,
+    respawnTimerVisible: true,
+    respawnIndicatorVisible: true,
     squareSize: 64,
     overlayScaleVersion: 2,
     columnsCount: 7,
@@ -334,6 +336,65 @@ function updateMonsterRoster(rawMonsters) {
     return { ok: true, statusCode: 200, payload: { ok: true, slots: roster.length } };
 }
 
+function updateMonsterStatuses(rawStatuses) {
+    if (!Array.isArray(rawStatuses)) {
+        return { ok: false, statusCode: 422, payload: { error: "Invalid monster statuses" } };
+    }
+
+    const state = {
+        ...defaultOverlayState,
+        ...(overlayState || {}),
+        monsters: Array.isArray(overlayState?.monsters) ? overlayState.monsters : [],
+        roster: Array.isArray(overlayState?.roster) ? overlayState.roster : []
+    };
+    const statuses = new Map();
+    for (const rawStatus of rawStatuses) {
+        if (rawStatus?.id == null || typeof rawStatus.alive !== "boolean") continue;
+        const remaining = Number(rawStatus.respawnRemaining);
+        statuses.set(String(rawStatus.id), {
+            alive: rawStatus.alive,
+            respawnRemaining: Number.isFinite(remaining) ? Math.max(0, remaining) : 0
+        });
+    }
+
+    const now = Date.now();
+    let updatedSlots = 0;
+    const roster = state.roster.map((slot) => {
+        const sourceIds = Array.isArray(slot.sourceIds) ? slot.sourceIds.map(String) : [];
+        const sourceStatuses = sourceIds.map((id) => statuses.get(id)).filter(Boolean);
+        if (sourceStatuses.length === 0 || sourceStatuses.length !== sourceIds.length) return slot;
+
+        updatedSlots++;
+        if (sourceStatuses.some((status) => status.alive)) {
+            return { ...slot, alive: true, respawnEndsAt: null, respawnDuration: null };
+        }
+
+        const remainingValues = sourceStatuses
+            .map((status) => status.respawnRemaining)
+            .filter((remaining) => remaining > 0);
+        if (remainingValues.length === 0) {
+            return { ...slot, alive: false, respawnEndsAt: null, respawnDuration: null };
+        }
+
+        const remaining = Math.min(...remainingValues);
+        const existingEnd = Number(slot.respawnEndsAt);
+        const projectedRemaining = Number.isFinite(existingEnd) ? Math.max(0, (existingEnd - now) / 1000) : null;
+        const keepExistingEnd = slot.alive === false
+            && projectedRemaining != null
+            && Math.abs(projectedRemaining - remaining) < 1.5;
+        const respawnEndsAt = keepExistingEnd ? existingEnd : now + remaining * 1000;
+        const previousDuration = Number(slot.respawnDuration);
+        const respawnDuration = slot.alive === false && Number.isFinite(previousDuration)
+            ? Math.max(previousDuration, remaining)
+            : remaining;
+
+        return { ...slot, alive: false, respawnEndsAt, respawnDuration };
+    });
+
+    overlayState = { ...state, roster };
+    return { ok: true, statusCode: 200, payload: { ok: true, updatedSlots } };
+}
+
 function setGameLevel(rawLevel) {
     const level = normalizeLevel(rawLevel);
     if (level == null) {
@@ -446,6 +507,15 @@ const server = http.createServer(async (request, response) => {
             const result = updateMonsterRoster(payload.monsters);
             sendJson(response, result.statusCode, result.payload);
             if (result.ok) broadcastState();
+            return;
+        }
+
+        if (request.method === "POST" && request.url === "/api/monster-status") {
+            const body = await readBody(request);
+            const payload = JSON.parse(body || "{}");
+            const result = updateMonsterStatuses(payload.statuses);
+            sendJson(response, result.statusCode, result.payload);
+            if (result.ok && result.payload.updatedSlots > 0) broadcastState();
             return;
         }
 

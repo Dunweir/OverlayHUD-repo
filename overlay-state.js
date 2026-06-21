@@ -66,6 +66,8 @@ const OverlayApp = (() => {
         style: 1,
         bgEnabled: false,
         timerVisible: false,
+        respawnTimerVisible: true,
+        respawnIndicatorVisible: true,
         squareSize: 64,
         overlayScaleVersion: 2,
         columnsCount: 7,
@@ -390,6 +392,14 @@ const OverlayApp = (() => {
         updateState((currentState) => ({ ...currentState, timerVisible }));
     }
 
+    function setRespawnTimerVisible(respawnTimerVisible) {
+        updateState((currentState) => ({ ...currentState, respawnTimerVisible }));
+    }
+
+    function setRespawnIndicatorVisible(respawnIndicatorVisible) {
+        updateState((currentState) => ({ ...currentState, respawnIndicatorVisible }));
+    }
+
     function setSquareSize(squareSize) {
         updateState((currentState) => ({ ...currentState, squareSize }));
     }
@@ -418,6 +428,8 @@ const OverlayApp = (() => {
         setStrength,
         setStyle,
         setTimerVisible,
+        setRespawnTimerVisible,
+        setRespawnIndicatorVisible,
         startTimer,
         stopTimer,
         subscribe
