@@ -19,7 +19,6 @@
                     <span class="strength" id="strength">СИЛА 0</span>
                 </div>
             </div>
-            <div class="respawn-info" id="respawnInfo">🔄 4-5 МИНУТ <span class="no-despawn">(БЕЗ ДЕСПАВНА)</span></div>
             <div class="monsters-squares" id="monstersSquares"></div>
         </div>
     </div>
@@ -30,12 +29,10 @@
         const levelNumber = document.getElementById("levelNumber");
         const strength = document.getElementById("strength");
         const timer = document.getElementById("timer");
-        const respawnInfo = document.getElementById("respawnInfo");
         const monstersSquares = document.getElementById("monstersSquares");
         let latestState = null;
         let renderedSquareCount = 0;
         let lastTimerText = "";
-        let lastRespawnHtml = "";
         const monsterImageLoads = new Map();
 
         function preloadMonsterImage(src) {
@@ -240,14 +237,9 @@
         function renderTimer(state) {
             const seconds = OverlayApp.getTimerSeconds(state);
             const timerText = OverlayApp.formatTime(seconds);
-            const respawnHtml = OverlayApp.getRespawnHtml(seconds);
             if (timerText !== lastTimerText) {
                 timer.textContent = timerText;
                 lastTimerText = timerText;
-            }
-            if (respawnHtml !== lastRespawnHtml) {
-                respawnInfo.innerHTML = respawnHtml;
-                lastRespawnHtml = respawnHtml;
             }
         }
 
@@ -267,7 +259,6 @@
             levelNumber.textContent = state.level;
             strength.textContent = `СИЛА ${state.strength}`;
             timer.style.display = state.timerVisible ? "" : "none";
-            respawnInfo.style.display = state.timerVisible ? "" : "none";
             renderTimer(state);
 
             const roster = Array.isArray(state.roster) ? [...state.roster] : [];

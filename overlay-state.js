@@ -228,21 +228,6 @@ const OverlayApp = (() => {
         return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
     }
 
-    function getRespawnHtml(seconds) {
-        const minutes = Math.floor(seconds / 60);
-        let respawnText;
-
-        if (minutes < 10) respawnText = "4-5 МИНУТ";
-        else if (minutes < 20) respawnText = "3.2-4 МИНУТЫ";
-        else if (minutes < 30) respawnText = "2.4-3 МИНУТЫ";
-        else if (minutes < 40) respawnText = "1.6-2 МИНУТЫ";
-        else if (minutes < 50) respawnText = "0.8-1 МИНУТА";
-        else respawnText = "1 СЕКУНДА";
-
-        const noDespawnText = seconds <= 240 ? ' <span class="no-despawn">(БЕЗ ДЕСПАВНА)</span>' : "";
-        return `🔄 ${respawnText}${noDespawnText}`;
-    }
-
     function getMonsterFileName(monsterName) {
         const replacements = {
             peeper: "eye_monster",
@@ -416,7 +401,6 @@ const OverlayApp = (() => {
         getCountsForLevel,
         getMonsterCount,
         getMonsterImage,
-        getRespawnHtml,
         getState,
         getTimerSeconds,
         removeMonster,

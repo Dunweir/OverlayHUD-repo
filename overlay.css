@@ -84,8 +84,7 @@ body {
     color: #ffd884;
 }
 
-.style-1 .timer,
-.style-1 .respawn-info {
+.style-1 .timer {
     color: #f7fbff;
 }
 
@@ -98,13 +97,8 @@ body {
     color: #6f4b00;
 }
 
-.style-2 .timer,
-.style-2 .respawn-info {
+.style-2 .timer {
     color: #111820;
-}
-
-.respawn-info .no-despawn {
-    color: #ff4444;
 }
 
 .overlay-header {
@@ -160,17 +154,6 @@ body {
     font-size: 32px;
     line-height: 1;
     text-align: right;
-}
-
-.respawn-info {
-    width: max-content;
-    max-width: 100%;
-    margin: -2px 0 11px;
-    padding: 4px 10px 3px;
-    border-radius: 5px;
-    background: rgba(0, 0, 0, 0.18);
-    font-size: 23px;
-    line-height: 1.05;
 }
 
 .monsters-squares {

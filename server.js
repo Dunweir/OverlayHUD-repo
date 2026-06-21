@@ -408,8 +408,8 @@ function setGameLevel(rawLevel) {
         gameplayVisible: true,
         strength: 0,
         seconds: 0,
-        running: false,
-        startedAt: null,
+        running: true,
+        startedAt: Date.now(),
         monsters: [],
         roster: [],
         rosterPending: true
