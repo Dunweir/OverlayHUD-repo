@@ -16,7 +16,7 @@ using UnityEngine;
 
 namespace RepoMonsterBridge
 {
-    [BepInPlugin("local.overlay.repo_monster_bridge", "REPO Monster Bridge", "0.2.45")]
+    [BepInPlugin("local.overlay.repo_monster_bridge", "REPO Monster Bridge", "0.2.46")]
     public sealed class Plugin : BaseUnityPlugin
     {
         private static Plugin instance;
@@ -94,6 +94,19 @@ namespace RepoMonsterBridge
             new KeyValuePair<string, string>("tumbleClimb", "playerUpgradeTumbleClimb")
         };
 
+        private static readonly Dictionary<string, string> UpgradeStateKeyByItemType = new Dictionary<string, string>
+        {
+            { "ItemUpgradePlayerGrabStrength", "strength" },
+            { "ItemUpgradePlayerTumbleLaunch", "tumbleLaunch" },
+            { "ItemUpgradePlayerGrabRange", "range" },
+            { "ItemUpgradePlayerSprintSpeed", "sprintSpeed" },
+            { "ItemUpgradeMapPlayerCount", "mapPlayerCount" },
+            { "ItemUpgradePlayerTumbleWings", "tumbleWings" },
+            { "ItemUpgradePlayerCrouchRest", "crouchRest" },
+            { "ItemUpgradePlayerExtraJump", "extraJump" },
+            { "ItemUpgradePlayerTumbleClimb", "tumbleClimb" }
+        };
+
         private readonly Dictionary<string, float> lastSeenLoggedAt = new Dictionary<string, float>();
         private readonly Dictionary<int, string> resolvedMonsterNames = new Dictionary<int, string>();
         private readonly Dictionary<int, int> sourceIdsByEnemyParent = new Dictionary<int, int>();
@@ -106,6 +119,7 @@ namespace RepoMonsterBridge
         private int fallbackLevel = 1;
         private int lastSyncedLevel;
         private readonly Dictionary<string, int> lastSyncedUpgrades = new Dictionary<string, int>();
+        private readonly HashSet<string> pendingUpgradeKeys = new HashSet<string>();
         private string lastRosterFingerprint = "";
         private string lastStatusFingerprint = "";
         private string pendingRosterFingerprint = "";
@@ -113,7 +127,6 @@ namespace RepoMonsterBridge
         private bool rosterPublished;
         private int visibilityProbeIndex;
         private bool gameplayActive;
-        private bool playerUpgradesDirty;
         private bool? lastTabHeld;
 
         private ConfigEntry<string> endpoint;
@@ -181,7 +194,6 @@ namespace RepoMonsterBridge
                 MethodInfo enemyParentSpawnRpc = AccessTools.Method("EnemyParent:SpawnRPC");
                 MethodInfo levelGeneratorGenerateDone = AccessTools.Method("LevelGenerator:GenerateDone");
                 MethodInfo runManagerChangeLevel = AccessTools.Method("RunManager:ChangeLevel");
-                MethodInfo itemUpgradePlayerUpgrade = AccessTools.Method("ItemUpgrade:PlayerUpgrade");
                 HarmonyMethod levelGeneratedPostfix = new HarmonyMethod(typeof(Plugin).GetMethod(nameof(LevelGeneratedPostfix), BindingFlags.NonPublic | BindingFlags.Static));
                 HarmonyMethod enemySpawnedPostfix = new HarmonyMethod(typeof(Plugin).GetMethod(nameof(EnemyParentSpawnedPostfix), BindingFlags.NonPublic | BindingFlags.Static));
                 HarmonyMethod levelChangingPrefix = new HarmonyMethod(typeof(Plugin).GetMethod(nameof(LevelChangingPrefix), BindingFlags.NonPublic | BindingFlags.Static));
@@ -205,11 +217,15 @@ namespace RepoMonsterBridge
                     Logger.LogInfo("Patched RunManager.ChangeLevel for overlay visibility.");
                 }
 
-                if (itemUpgradePlayerUpgrade != null)
+                int patchedUpgradeTypes = 0;
+                foreach (string itemTypeName in UpgradeStateKeyByItemType.Keys)
                 {
-                    harmony.Patch(itemUpgradePlayerUpgrade, postfix: playerUpgradeConsumedPostfix);
-                    Logger.LogInfo("Patched ItemUpgrade.PlayerUpgrade for event-driven upgrade sync.");
+                    MethodInfo upgradeMethod = AccessTools.Method(itemTypeName + ":Upgrade");
+                    if (upgradeMethod == null) continue;
+                    harmony.Patch(upgradeMethod, postfix: playerUpgradeConsumedPostfix);
+                    patchedUpgradeTypes++;
                 }
+                Logger.LogInfo("Patched " + patchedUpgradeTypes + " item upgrade methods for targeted sync.");
 
             }
             catch (Exception error)
@@ -234,9 +250,13 @@ namespace RepoMonsterBridge
             instance?.HandleLevelChanging();
         }
 
-        private static void PlayerUpgradeConsumedPostfix()
+        private static void PlayerUpgradeConsumedPostfix(MethodBase __originalMethod)
         {
-            instance?.MarkPlayerUpgradesDirty();
+            string itemTypeName = __originalMethod?.DeclaringType?.Name;
+            if (itemTypeName != null && UpgradeStateKeyByItemType.TryGetValue(itemTypeName, out string stateKey))
+            {
+                instance?.MarkPlayerUpgradeDirty(stateKey);
+            }
         }
 
         private static void EnemyParentSpawnedPostfix(object __instance)
@@ -253,10 +273,11 @@ namespace RepoMonsterBridge
             float now = Time.realtimeSinceStartup;
             if (now < scanPausedUntil) return;
 
-            if (playerUpgradesDirty && now >= nextUpgradeSyncAt)
+            if (pendingUpgradeKeys.Count > 0 && now >= nextUpgradeSyncAt)
             {
-                playerUpgradesDirty = false;
-                SyncPlayerUpgradesIfChanged();
+                var keys = new HashSet<string>(pendingUpgradeKeys);
+                pendingUpgradeKeys.Clear();
+                SyncPlayerUpgradesIfChanged(keys);
             }
 
             if (rosterPublished && now >= nextStatusSyncAt)
@@ -674,13 +695,13 @@ namespace RepoMonsterBridge
             lastSyncedLevel = level;
             StartCoroutine(PostLevel(level));
             lastSyncedUpgrades.Clear();
-            playerUpgradesDirty = false;
+            pendingUpgradeKeys.Clear();
             SyncPlayerUpgradesIfChanged();
         }
 
-        private void MarkPlayerUpgradesDirty()
+        private void MarkPlayerUpgradeDirty(string stateKey)
         {
-            playerUpgradesDirty = true;
+            pendingUpgradeKeys.Add(stateKey);
             nextUpgradeSyncAt = Time.realtimeSinceStartup + 0.1f;
         }
 
@@ -692,13 +713,14 @@ namespace RepoMonsterBridge
             if (sendToWebOverlay.Value) StartCoroutine(PostTabHidden(tabHeld));
         }
 
-        private void SyncPlayerUpgradesIfChanged()
+        private void SyncPlayerUpgradesIfChanged(HashSet<string> onlyKeys = null)
         {
             var json = new StringBuilder("{\"upgrades\":{");
             int changedCount = 0;
             for (int index = 0; index < TrackedPlayerUpgrades.Length; index++)
             {
                 KeyValuePair<string, string> binding = TrackedPlayerUpgrades[index];
+                if (onlyKeys != null && !onlyKeys.Contains(binding.Key)) continue;
                 int? value = ResolveLocalPlayerUpgrade(binding.Value);
                 if (!value.HasValue) continue;
                 if (lastSyncedUpgrades.TryGetValue(binding.Key, out int previousValue) && previousValue == value.Value) continue;

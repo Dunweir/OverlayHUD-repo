@@ -120,6 +120,7 @@ const defaultOverlayState = {
     style: 1,
     bgEnabled: false,
     timerVisible: false,
+    upgradesVisible: true,
     respawnTimerVisible: true,
     respawnIndicatorVisible: true,
     squareSize: 64,

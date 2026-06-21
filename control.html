@@ -13,8 +13,6 @@
                 <h1>Управление оверлеем</h1>
                 <div class="status-strip">
                     <span>Уровень <strong id="levelStatus">1</strong></span>
-                    <span>Сила <strong id="strengthStatus">0</strong></span>
-                    <span>Tumble Launch <strong id="tumbleLaunchStatus">0</strong></span>
                     <span id="timerStatus">Таймер остановлен</span>
                 </div>
             </div>
@@ -84,6 +82,14 @@
                         </label>
 
                         <label class="toggle-row">
+                            <span>Апгрейды на оверлее</span>
+                            <span class="toggle-switch">
+                                <input type="checkbox" id="upgradesToggle" checked>
+                                <span></span>
+                            </span>
+                        </label>
+
+                        <label class="toggle-row">
                             <span>Время респавна</span>
                             <span class="toggle-switch">
                                 <input type="checkbox" id="respawnTimerToggle" checked>
@@ -134,11 +140,10 @@
         const columnsValue = document.getElementById("columnsValue");
         const bgToggle = document.getElementById("bgToggle");
         const timerToggle = document.getElementById("timerToggle");
+        const upgradesToggle = document.getElementById("upgradesToggle");
         const respawnTimerToggle = document.getElementById("respawnTimerToggle");
         const respawnIndicatorToggle = document.getElementById("respawnIndicatorToggle");
         const levelStatus = document.getElementById("levelStatus");
-        const strengthStatus = document.getElementById("strengthStatus");
-        const tumbleLaunchStatus = document.getElementById("tumbleLaunchStatus");
         const timerStatus = document.getElementById("timerStatus");
         const monsterCounter = document.getElementById("monsterCounter");
         const style1Btn = document.getElementById("style1Btn");
@@ -202,12 +207,11 @@
             columnsValue.textContent = state.columnsCount;
             bgToggle.checked = state.bgEnabled;
             timerToggle.checked = state.timerVisible;
+            upgradesToggle.checked = state.upgradesVisible;
             respawnTimerToggle.checked = state.respawnTimerVisible;
             respawnIndicatorToggle.checked = state.respawnIndicatorVisible;
 
             levelStatus.textContent = state.level;
-            strengthStatus.textContent = state.strength;
-            tumbleLaunchStatus.textContent = state.tumbleLaunch;
             timerStatus.textContent = state.running ? "Таймер идет" : "Таймер остановлен";
             const counts = OverlayApp.getCountsForLevel(state.level);
             const monsterLimit = counts.level1 + counts.level2 + counts.level3;
@@ -247,6 +251,7 @@
         });
         bgToggle.addEventListener("change", () => OverlayApp.setBgEnabled(bgToggle.checked));
         timerToggle.addEventListener("change", () => OverlayApp.setTimerVisible(timerToggle.checked));
+        upgradesToggle.addEventListener("change", () => OverlayApp.setUpgradesVisible(upgradesToggle.checked));
         respawnTimerToggle.addEventListener("change", () => OverlayApp.setRespawnTimerVisible(respawnTimerToggle.checked));
         respawnIndicatorToggle.addEventListener("change", () => OverlayApp.setRespawnIndicatorVisible(respawnIndicatorToggle.checked));
         sizeSlider.addEventListener("input", () => OverlayApp.setSquareSize(parseInt(sizeSlider.value, 10)));

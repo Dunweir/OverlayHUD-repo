@@ -40,13 +40,16 @@ body {
     width: max-content;
     max-width: min(860px, calc(100vw - 40px));
     padding: 14px;
+    border: 1px solid transparent;
     border-radius: 8px;
+    background-color: transparent;
     filter: drop-shadow(0 10px 24px rgba(0, 0, 0, 0.42));
     opacity: 0;
     visibility: hidden;
     transform: translateY(18px) scale(0.98);
     transform-origin: left bottom;
-    transition: opacity 0.28s ease, transform 0.28s ease, visibility 0s linear 0.28s;
+    transition: opacity 0.28s ease, transform 0.28s ease, visibility 0s linear 0.28s,
+        background-color 0.24s ease, border-color 0.24s ease;
     will-change: opacity, transform;
 }
 
@@ -96,8 +99,8 @@ body {
 .overlay-header {
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    gap: 14px;
+    justify-content: flex-start;
+    gap: 0;
     margin-bottom: 6px;
 }
 
@@ -155,12 +158,30 @@ body {
     display: flex;
     align-items: center;
     width: max-content;
-    max-width: 100%;
+    max-width: 700px;
+    max-height: 34px;
     gap: 6px;
     margin-bottom: 10px;
+    overflow: hidden;
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0) scale(1);
+    transform-origin: left top;
+    transition: opacity 0.22s ease, transform 0.22s ease, max-height 0.22s ease,
+        max-width 0.22s ease, margin-bottom 0.22s ease, visibility 0s linear 0s;
 }
 
 .upgrade-row.is-empty,
+.overlay-container.hide-upgrades .upgrade-row {
+    max-width: 0;
+    max-height: 0;
+    margin-bottom: 0;
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(-6px) scale(0.98);
+    transition-delay: 0s, 0s, 0s, 0s, 0s, 0.22s;
+}
+
 .upgrade-stat.is-zero {
     display: none;
 }
@@ -168,16 +189,32 @@ body {
 .overlay-meta {
     display: flex;
     align-items: center;
-    justify-content: flex-end;
-    gap: 10px;
+    justify-content: flex-start;
+    width: 72px;
+    margin-left: 14px;
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0) scale(1);
+    transform-origin: left top;
+    transition: opacity 0.22s ease, transform 0.22s ease, visibility 0s linear 0s;
 }
 
 .timer {
-    display: inline;
-    min-width: 72px;
+    display: inline-block;
+    flex: 0 0 72px;
+    width: 72px;
+    min-width: 0;
     font-size: 32px;
     line-height: 1;
-    text-align: right;
+    text-align: left;
+    white-space: nowrap;
+}
+
+.overlay-container.hide-level-timer .overlay-meta {
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(6px) scale(0.98);
+    transition-delay: 0s, 0s, 0.22s;
 }
 
 .monsters-squares {
@@ -223,11 +260,19 @@ body {
     position: absolute;
     inset: 0;
     z-index: 2;
-    display: none;
+    display: grid;
     align-items: start;
     justify-items: center;
     padding-top: calc(var(--square-size) * 0.07);
     overflow: hidden;
+    border-radius: inherit;
+    pointer-events: none;
+}
+
+.monster-cooldown::before {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
     border-radius: inherit;
     background: conic-gradient(
         from 0deg,
@@ -236,24 +281,26 @@ body {
         rgba(0, 0, 0, 0.78) var(--cooldown-angle),
         rgba(0, 0, 0, 0.78) 360deg
     );
-    pointer-events: none;
+    content: "";
+    opacity: 0;
+    transform: scale(0.96);
+    transition: opacity 0.22s ease, transform 0.22s ease;
 }
 
-.monster-square.is-on-cooldown .monster-cooldown {
-    display: grid;
+.monster-square.is-on-cooldown .monster-cooldown::before {
+    opacity: 1;
+    transform: scale(1);
 }
 
-.overlay-container.hide-respawn-indicator .monster-cooldown {
-    background: transparent;
-}
-
-.overlay-container.hide-respawn-timer .monster-cooldown-time,
-.overlay-container.hide-respawn-status .monster-cooldown {
-    display: none;
+.overlay-container.hide-respawn-indicator .monster-cooldown::before {
+    opacity: 0;
+    transform: scale(0.96);
 }
 
 .monster-cooldown-time {
     display: block;
+    position: relative;
+    z-index: 1;
     min-width: 0;
     min-height: 0;
     padding: 2px 5px;
@@ -265,6 +312,19 @@ body {
     font-weight: 800;
     line-height: 1;
     text-shadow: 0 1px 3px #000;
+    opacity: 0;
+    transform: translateY(-3px) scale(0.9);
+    transition: opacity 0.18s ease, transform 0.18s ease;
+}
+
+.monster-square.is-on-cooldown .monster-cooldown-time {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+}
+
+.overlay-container.hide-respawn-timer .monster-cooldown-time {
+    opacity: 0;
+    transform: translateY(-3px) scale(0.9);
 }
 
 .monster-square.is-revealing > .monster-base-image {
@@ -336,6 +396,14 @@ body {
 
 @media (prefers-reduced-motion: reduce) {
     .overlay-container {
+        transition: none;
+    }
+
+    .timer,
+    .overlay-meta,
+    .upgrade-row,
+    .monster-cooldown::before,
+    .monster-cooldown-time {
         transition: none;
     }
 

@@ -284,6 +284,8 @@
             overlayContainer.className = "overlay-container";
             overlayContainer.classList.add(`style-${state.style}`);
             if (state.bgEnabled) overlayContainer.classList.add("with-bg");
+            if (!state.timerVisible) overlayContainer.classList.add("hide-level-timer");
+            if (!state.upgradesVisible) overlayContainer.classList.add("hide-upgrades");
             if (!state.respawnTimerVisible) overlayContainer.classList.add("hide-respawn-timer");
             if (!state.respawnIndicatorVisible) overlayContainer.classList.add("hide-respawn-indicator");
             if (!state.respawnTimerVisible && !state.respawnIndicatorVisible) overlayContainer.classList.add("hide-respawn-status");
@@ -300,7 +302,6 @@
                 if (value > 0) visibleUpgradeCount++;
             }
             upgradeRow.classList.toggle("is-empty", visibleUpgradeCount === 0);
-            timer.style.display = state.timerVisible ? "" : "none";
             renderTimer(state);
 
             const roster = Array.isArray(state.roster) ? [...state.roster] : [];

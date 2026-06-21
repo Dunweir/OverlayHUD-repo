@@ -75,6 +75,7 @@ const OverlayApp = (() => {
         style: 1,
         bgEnabled: false,
         timerVisible: false,
+        upgradesVisible: true,
         respawnTimerVisible: true,
         respawnIndicatorVisible: true,
         squareSize: 64,
@@ -390,6 +391,10 @@ const OverlayApp = (() => {
         updateState((currentState) => ({ ...currentState, timerVisible }));
     }
 
+    function setUpgradesVisible(upgradesVisible) {
+        updateState((currentState) => ({ ...currentState, upgradesVisible }));
+    }
+
     function setRespawnTimerVisible(respawnTimerVisible) {
         updateState((currentState) => ({ ...currentState, respawnTimerVisible }));
     }
@@ -426,6 +431,7 @@ const OverlayApp = (() => {
         setTumbleLaunch,
         setStyle,
         setTimerVisible,
+        setUpgradesVisible,
         setRespawnTimerVisible,
         setRespawnIndicatorVisible,
         startTimer,

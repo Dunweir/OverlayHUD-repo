@@ -21,7 +21,7 @@ The bridge also posts per-enemy alive/dead state and `DespawnedTimer` values to 
 
 The bridge synchronizes local Strength, Tumble Launch, Range, Sprint Speed, Map Player Count, Tumble Wings, Crouch Rest, Extra Jump, and Tumble Climb upgrades from `StatsManager`.
 
-Upgrade synchronization is event-driven through `ItemUpgrade.PlayerUpgrade`, avoiding a recurring full upgrade poll. Holding Tab is sent to the overlay as a temporary hide state.
+Upgrade synchronization patches each concrete item `Upgrade()` method and reads only the changed value, avoiding both recurring polls and a full nine-upgrade scan on consumption. Holding Tab is sent to the overlay as a temporary hide state.
 
 ## Build Notes
 
