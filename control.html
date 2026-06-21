@@ -14,6 +14,7 @@
                 <div class="status-strip">
                     <span>Уровень <strong id="levelStatus">1</strong></span>
                     <span>Сила <strong id="strengthStatus">0</strong></span>
+                    <span>Tumble Launch <strong id="tumbleLaunchStatus">0</strong></span>
                     <span id="timerStatus">Таймер остановлен</span>
                 </div>
             </div>
@@ -41,12 +42,6 @@
                         </div>
                         <div id="levelError" class="error"></div>
 
-                        <label for="strengthInput">Сила</label>
-                        <div class="input-action">
-                            <input type="number" id="strengthInput" min="0" step="1" value="0">
-                            <button id="setStrengthBtn">ОК</button>
-                        </div>
-                        <div id="strengthError" class="error"></div>
                     </div>
                 </div>
 
@@ -132,9 +127,7 @@
     <script src="overlay-state.js"></script>
     <script>
         const levelInput = document.getElementById("levelInput");
-        const strengthInput = document.getElementById("strengthInput");
         const levelError = document.getElementById("levelError");
-        const strengthError = document.getElementById("strengthError");
         const sizeSlider = document.getElementById("sizeSlider");
         const sizeValue = document.getElementById("sizeValue");
         const columnsSlider = document.getElementById("columnsSlider");
@@ -145,6 +138,7 @@
         const respawnIndicatorToggle = document.getElementById("respawnIndicatorToggle");
         const levelStatus = document.getElementById("levelStatus");
         const strengthStatus = document.getElementById("strengthStatus");
+        const tumbleLaunchStatus = document.getElementById("tumbleLaunchStatus");
         const timerStatus = document.getElementById("timerStatus");
         const monsterCounter = document.getElementById("monsterCounter");
         const style1Btn = document.getElementById("style1Btn");
@@ -202,7 +196,6 @@
 
         function renderControlState(state) {
             levelInput.value = state.level;
-            strengthInput.value = state.strength;
             sizeSlider.value = state.squareSize;
             sizeValue.textContent = `${state.squareSize}px`;
             columnsSlider.value = state.columnsCount;
@@ -214,6 +207,7 @@
 
             levelStatus.textContent = state.level;
             strengthStatus.textContent = state.strength;
+            tumbleLaunchStatus.textContent = state.tumbleLaunch;
             timerStatus.textContent = state.running ? "Таймер идет" : "Таймер остановлен";
             const counts = OverlayApp.getCountsForLevel(state.level);
             const monsterLimit = counts.level1 + counts.level2 + counts.level3;
@@ -240,30 +234,16 @@
             OverlayApp.setLevel(level);
         }
 
-        function applyStrength() {
-            const strength = parseInt(strengthInput.value, 10);
-            if (Number.isNaN(strength) || strength < 0) {
-                strengthError.textContent = "Введите неотрицательное число";
-                return;
-            }
-            strengthError.textContent = "";
-            OverlayApp.setStrength(strength);
-        }
-
         document.getElementById("startBtn").addEventListener("click", OverlayApp.startTimer);
         document.getElementById("stopBtn").addEventListener("click", OverlayApp.stopTimer);
         document.getElementById("resetBtn").addEventListener("click", OverlayApp.resetTimer);
         document.getElementById("setLevelBtn").addEventListener("click", applyLevel);
-        document.getElementById("setStrengthBtn").addEventListener("click", applyStrength);
         document.getElementById("style1Btn").addEventListener("click", () => OverlayApp.setStyle(1));
         document.getElementById("style2Btn").addEventListener("click", () => OverlayApp.setStyle(2));
         document.getElementById("clearMonstersBtn").addEventListener("click", OverlayApp.clearMonsters);
 
         levelInput.addEventListener("keydown", (event) => {
             if (event.key === "Enter") applyLevel();
-        });
-        strengthInput.addEventListener("keydown", (event) => {
-            if (event.key === "Enter") applyStrength();
         });
         bgToggle.addEventListener("change", () => OverlayApp.setBgEnabled(bgToggle.checked));
         timerToggle.addEventListener("change", () => OverlayApp.setTimerVisible(timerToggle.checked));

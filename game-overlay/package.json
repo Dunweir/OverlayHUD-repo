@@ -7,7 +7,7 @@
   "scripts": {
     "start": "electron .",
     "check": "node --check main.js",
-    "package": "electron-packager . REPOGameOverlay --platform=win32 --arch=x64 --out=dist --overwrite --prune=true --ignore=^/dist --ignore=^/.electron-cache --electron-zip-dir=.electron-cache --extra-resource=../server.js --extra-resource=../overlay.html --extra-resource=../overlay-state.js --extra-resource=../overlay.css --extra-resource=../control.html --extra-resource=../Teko.ttf --extra-resource=../monsters"
+    "package": "electron-packager . REPOGameOverlay --platform=win32 --arch=x64 --out=dist --overwrite --prune=true --ignore=^/dist --ignore=^/.electron-cache --electron-zip-dir=.electron-cache --extra-resource=../server.js --extra-resource=../overlay.html --extra-resource=../overlay-state.js --extra-resource=../overlay.css --extra-resource=../control.html --extra-resource=../Teko.ttf --extra-resource=../monsters --extra-resource=../upgrades"
   },
   "devDependencies": {
     "@electron/packager": "20.0.1",

@@ -16,9 +16,9 @@
                 </div>
                 <div class="overlay-meta">
                     <span class="timer" id="timer">00:00</span>
-                    <span class="strength" id="strength">СИЛА 0</span>
                 </div>
             </div>
+            <div class="upgrade-row" id="upgradeRow" aria-label="Player upgrades"></div>
             <div class="monsters-squares" id="monstersSquares"></div>
         </div>
     </div>
@@ -27,13 +27,46 @@
     <script>
         const overlayContainer = document.getElementById("overlayContainer");
         const levelNumber = document.getElementById("levelNumber");
-        const strength = document.getElementById("strength");
         const timer = document.getElementById("timer");
+        const upgradeRow = document.getElementById("upgradeRow");
         const monstersSquares = document.getElementById("monstersSquares");
         let latestState = null;
         let renderedSquareCount = 0;
         let lastTimerText = "";
         const monsterImageLoads = new Map();
+        const upgradeElements = new Map();
+        const upgradeDefinitions = [
+            { key: "strength", name: "Strength", image: "upgrades/Strength_Upgrade.webp", color: "#ff9a3d", background: "rgba(255, 106, 22, 0.2)" },
+            { key: "tumbleLaunch", name: "Tumble Launch", image: "upgrades/Tumble_Launch_Upgrade.webp", color: "#58bdff", background: "rgba(32, 151, 235, 0.2)" },
+            { key: "range", name: "Range", image: "upgrades/Range_Upgrade.webp", color: "#ff9a3d", background: "rgba(255, 106, 22, 0.2)" },
+            { key: "sprintSpeed", name: "Sprint Speed", image: "upgrades/Sprint_Speed_Upgrade.webp", color: "#ffe05a", background: "rgba(229, 179, 16, 0.2)" },
+            { key: "mapPlayerCount", name: "Map Player Count", image: "upgrades/Upgrade_Map-Player-Count_Albedo.webp", color: "#65e887", background: "rgba(29, 165, 73, 0.2)" },
+            { key: "tumbleWings", name: "Tumble Wings", image: "upgrades/Tumble_Wings_Upgrade.webp", color: "#58bdff", background: "rgba(32, 151, 235, 0.2)" },
+            { key: "crouchRest", name: "Crouch Rest", image: "upgrades/Crouch_Rest_Upgrade.webp", color: "#ffe05a", background: "rgba(229, 179, 16, 0.2)" },
+            { key: "extraJump", name: "Extra Jump", image: "upgrades/Extra_Jump_Upgrade.webp", color: "#58bdff", background: "rgba(32, 151, 235, 0.2)" },
+            { key: "tumbleClimb", name: "Tumble Climb", image: "upgrades/Tumble_Climb_Upgrade.webp", color: "#58bdff", background: "rgba(32, 151, 235, 0.2)" }
+        ];
+
+        function buildUpgradeRow() {
+            for (const upgrade of upgradeDefinitions) {
+                const badge = document.createElement("div");
+                badge.className = "upgrade-stat";
+                badge.title = upgrade.name;
+                badge.style.setProperty("--upgrade-color", upgrade.color);
+                badge.style.setProperty("--upgrade-background", upgrade.background);
+
+                const img = document.createElement("img");
+                img.src = upgrade.image;
+                img.alt = upgrade.name;
+                badge.appendChild(img);
+
+                const value = document.createElement("span");
+                value.textContent = "0";
+                badge.appendChild(value);
+                upgradeElements.set(upgrade.key, { badge, value });
+                upgradeRow.appendChild(badge);
+            }
+        }
 
         function preloadMonsterImage(src) {
             if (!monsterImageLoads.has(src)) {
@@ -254,10 +287,19 @@
             if (!state.respawnTimerVisible) overlayContainer.classList.add("hide-respawn-timer");
             if (!state.respawnIndicatorVisible) overlayContainer.classList.add("hide-respawn-indicator");
             if (!state.respawnTimerVisible && !state.respawnIndicatorVisible) overlayContainer.classList.add("hide-respawn-status");
+            if (state.tabHidden) overlayContainer.classList.add("is-tab-hidden");
             if (state.gameplayVisible && !state.rosterPending) overlayContainer.classList.add("is-visible");
 
             levelNumber.textContent = state.level;
-            strength.textContent = `СИЛА ${state.strength}`;
+            let visibleUpgradeCount = 0;
+            for (const upgrade of upgradeDefinitions) {
+                const element = upgradeElements.get(upgrade.key);
+                const value = Number(state[upgrade.key]) || 0;
+                element.value.textContent = value;
+                element.badge.classList.toggle("is-zero", value <= 0);
+                if (value > 0) visibleUpgradeCount++;
+            }
+            upgradeRow.classList.toggle("is-empty", visibleUpgradeCount === 0);
             timer.style.display = state.timerVisible ? "" : "none";
             renderTimer(state);
 
@@ -291,6 +333,7 @@
             }
         }
 
+        buildUpgradeRow();
         OverlayApp.subscribe(render);
         setInterval(() => {
             if (latestState && latestState.running && latestState.timerVisible) {

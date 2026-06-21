@@ -62,7 +62,16 @@ const OverlayApp = (() => {
     const defaultState = {
         level: 1,
         gameplayVisible: false,
+        tabHidden: false,
         strength: 0,
+        tumbleLaunch: 0,
+        range: 0,
+        sprintSpeed: 0,
+        mapPlayerCount: 0,
+        tumbleWings: 0,
+        crouchRest: 0,
+        extraJump: 0,
+        tumbleClimb: 0,
         style: 1,
         bgEnabled: false,
         timerVisible: false,
@@ -318,6 +327,10 @@ const OverlayApp = (() => {
         updateState((currentState) => ({ ...currentState, strength }));
     }
 
+    function setTumbleLaunch(tumbleLaunch) {
+        updateState((currentState) => ({ ...currentState, tumbleLaunch }));
+    }
+
     function startTimer() {
         updateState((currentState) => {
             if (currentState.running) return currentState;
@@ -410,6 +423,7 @@ const OverlayApp = (() => {
         setLevel,
         setSquareSize,
         setStrength,
+        setTumbleLaunch,
         setStyle,
         setTimerVisible,
         setRespawnTimerVisible,

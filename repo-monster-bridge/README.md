@@ -19,6 +19,10 @@ The server normalizes the name, applies the current level slot limits, skips alr
 
 The bridge also posts per-enemy alive/dead state and `DespawnedTimer` values to `/api/monster-status`. If TimerMod is installed, its synchronized multiplayer timer dictionary is preferred; otherwise the bridge uses the local game timer.
 
+The bridge synchronizes local Strength, Tumble Launch, Range, Sprint Speed, Map Player Count, Tumble Wings, Crouch Rest, Extra Jump, and Tumble Climb upgrades from `StatsManager`.
+
+Upgrade synchronization is event-driven through `ItemUpgrade.PlayerUpgrade`, avoiding a recurring full upgrade poll. Holding Tab is sent to the overlay as a temporary hide state.
+
 ## Build Notes
 
 1. Install BepInEx for R.E.P.O. through r2modman/Thunderstore or manually.

@@ -16,7 +16,7 @@ using UnityEngine;
 
 namespace RepoMonsterBridge
 {
-    [BepInPlugin("local.overlay.repo_monster_bridge", "REPO Monster Bridge", "0.2.41")]
+    [BepInPlugin("local.overlay.repo_monster_bridge", "REPO Monster Bridge", "0.2.45")]
     public sealed class Plugin : BaseUnityPlugin
     {
         private static Plugin instance;
@@ -81,17 +81,31 @@ namespace RepoMonsterBridge
             { "upscream", "Upscream" }
         };
 
+        private static readonly KeyValuePair<string, string>[] TrackedPlayerUpgrades =
+        {
+            new KeyValuePair<string, string>("strength", "playerUpgradeStrength"),
+            new KeyValuePair<string, string>("tumbleLaunch", "playerUpgradeLaunch"),
+            new KeyValuePair<string, string>("range", "playerUpgradeRange"),
+            new KeyValuePair<string, string>("sprintSpeed", "playerUpgradeSpeed"),
+            new KeyValuePair<string, string>("mapPlayerCount", "playerUpgradeMapPlayerCount"),
+            new KeyValuePair<string, string>("tumbleWings", "playerUpgradeTumbleWings"),
+            new KeyValuePair<string, string>("crouchRest", "playerUpgradeCrouchRest"),
+            new KeyValuePair<string, string>("extraJump", "playerUpgradeExtraJump"),
+            new KeyValuePair<string, string>("tumbleClimb", "playerUpgradeTumbleClimb")
+        };
+
         private readonly Dictionary<string, float> lastSeenLoggedAt = new Dictionary<string, float>();
         private readonly Dictionary<int, string> resolvedMonsterNames = new Dictionary<int, string>();
         private readonly Dictionary<int, int> sourceIdsByEnemyParent = new Dictionary<int, int>();
         private readonly Dictionary<int, bool> lastAliveBySourceId = new Dictionary<int, bool>();
         private float nextScanAt;
-        private float nextStrengthCheckAt;
+        private float nextStatusSyncAt;
+        private float nextUpgradeSyncAt;
         private float nextDebugSummaryAt;
         private float scanPausedUntil;
         private int fallbackLevel = 1;
         private int lastSyncedLevel;
-        private int lastSyncedStrength = -1;
+        private readonly Dictionary<string, int> lastSyncedUpgrades = new Dictionary<string, int>();
         private string lastRosterFingerprint = "";
         private string lastStatusFingerprint = "";
         private string pendingRosterFingerprint = "";
@@ -99,6 +113,8 @@ namespace RepoMonsterBridge
         private bool rosterPublished;
         private int visibilityProbeIndex;
         private bool gameplayActive;
+        private bool playerUpgradesDirty;
+        private bool? lastTabHeld;
 
         private ConfigEntry<string> endpoint;
         private ConfigEntry<string> levelEndpoint;
@@ -153,6 +169,7 @@ namespace RepoMonsterBridge
             if (sendToWebOverlay.Value)
             {
                 StartCoroutine(PostVisibility(false));
+                StartCoroutine(PostTabHidden(false));
             }
         }
 
@@ -164,9 +181,11 @@ namespace RepoMonsterBridge
                 MethodInfo enemyParentSpawnRpc = AccessTools.Method("EnemyParent:SpawnRPC");
                 MethodInfo levelGeneratorGenerateDone = AccessTools.Method("LevelGenerator:GenerateDone");
                 MethodInfo runManagerChangeLevel = AccessTools.Method("RunManager:ChangeLevel");
+                MethodInfo itemUpgradePlayerUpgrade = AccessTools.Method("ItemUpgrade:PlayerUpgrade");
                 HarmonyMethod levelGeneratedPostfix = new HarmonyMethod(typeof(Plugin).GetMethod(nameof(LevelGeneratedPostfix), BindingFlags.NonPublic | BindingFlags.Static));
                 HarmonyMethod enemySpawnedPostfix = new HarmonyMethod(typeof(Plugin).GetMethod(nameof(EnemyParentSpawnedPostfix), BindingFlags.NonPublic | BindingFlags.Static));
                 HarmonyMethod levelChangingPrefix = new HarmonyMethod(typeof(Plugin).GetMethod(nameof(LevelChangingPrefix), BindingFlags.NonPublic | BindingFlags.Static));
+                HarmonyMethod playerUpgradeConsumedPostfix = new HarmonyMethod(typeof(Plugin).GetMethod(nameof(PlayerUpgradeConsumedPostfix), BindingFlags.NonPublic | BindingFlags.Static));
 
                 if (enemyParentSpawnRpc != null)
                 {
@@ -186,6 +205,12 @@ namespace RepoMonsterBridge
                     Logger.LogInfo("Patched RunManager.ChangeLevel for overlay visibility.");
                 }
 
+                if (itemUpgradePlayerUpgrade != null)
+                {
+                    harmony.Patch(itemUpgradePlayerUpgrade, postfix: playerUpgradeConsumedPostfix);
+                    Logger.LogInfo("Patched ItemUpgrade.PlayerUpgrade for event-driven upgrade sync.");
+                }
+
             }
             catch (Exception error)
             {
@@ -195,6 +220,7 @@ namespace RepoMonsterBridge
 
         private void Update()
         {
+            SyncTabStateIfChanged();
             TickScan();
         }
 
@@ -206,6 +232,11 @@ namespace RepoMonsterBridge
         private static void LevelChangingPrefix()
         {
             instance?.HandleLevelChanging();
+        }
+
+        private static void PlayerUpgradeConsumedPostfix()
+        {
+            instance?.MarkPlayerUpgradesDirty();
         }
 
         private static void EnemyParentSpawnedPostfix(object __instance)
@@ -222,10 +253,16 @@ namespace RepoMonsterBridge
             float now = Time.realtimeSinceStartup;
             if (now < scanPausedUntil) return;
 
-            if (now >= nextStrengthCheckAt)
+            if (playerUpgradesDirty && now >= nextUpgradeSyncAt)
             {
-                nextStrengthCheckAt = now + 1f;
-                SyncStrengthIfChanged();
+                playerUpgradesDirty = false;
+                SyncPlayerUpgradesIfChanged();
+            }
+
+            if (rosterPublished && now >= nextStatusSyncAt)
+            {
+                nextStatusSyncAt = now + 0.5f;
+                SyncMonsterStatuses(new List<ResolvedEnemyCandidate>());
             }
 
             if (now < nextScanAt) return;
@@ -290,7 +327,8 @@ namespace RepoMonsterBridge
             visibilityProbeIndex = 0;
             scanPausedUntil = Time.realtimeSinceStartup + 2f;
             nextScanAt = scanPausedUntil;
-            nextStrengthCheckAt = scanPausedUntil;
+            nextStatusSyncAt = scanPausedUntil;
+            nextUpgradeSyncAt = scanPausedUntil;
             nextDebugSummaryAt = 0f;
             Logger.LogInfo("Cleared seen monsters: " + reason + ".");
         }
@@ -362,6 +400,7 @@ namespace RepoMonsterBridge
                 }
             }
             if (pendingEnemies.Count > 0) visibilityProbeIndex = (probeIndex + 1) % pendingEnemies.Count;
+            else nextScanAt = Time.realtimeSinceStartup + 5f;
 
             if (debugLogging.Value && Time.realtimeSinceStartup >= nextDebugSummaryAt)
             {
@@ -632,31 +671,54 @@ namespace RepoMonsterBridge
 
         private void SyncLevelToOverlay(int level)
         {
-            bool startingNewRun = level == 1 && lastSyncedLevel > 1;
             lastSyncedLevel = level;
             StartCoroutine(PostLevel(level));
-            if (!startingNewRun)
-            {
-                lastSyncedStrength = -1;
-                SyncStrengthIfChanged();
-            }
+            lastSyncedUpgrades.Clear();
+            playerUpgradesDirty = false;
+            SyncPlayerUpgradesIfChanged();
         }
 
-        private void SyncStrengthIfChanged()
+        private void MarkPlayerUpgradesDirty()
         {
-            int? strength = ResolveLocalPlayerStrength();
-            if (!strength.HasValue || strength.Value == lastSyncedStrength) return;
-
-            lastSyncedStrength = strength.Value;
-            if (sendToWebOverlay.Value) StartCoroutine(PostStrength(strength.Value));
+            playerUpgradesDirty = true;
+            nextUpgradeSyncAt = Time.realtimeSinceStartup + 0.1f;
         }
 
-        private static int? ResolveLocalPlayerStrength()
+        private void SyncTabStateIfChanged()
+        {
+            bool tabHeld = Input.GetKey(KeyCode.Tab);
+            if (lastTabHeld.HasValue && lastTabHeld.Value == tabHeld) return;
+            lastTabHeld = tabHeld;
+            if (sendToWebOverlay.Value) StartCoroutine(PostTabHidden(tabHeld));
+        }
+
+        private void SyncPlayerUpgradesIfChanged()
+        {
+            var json = new StringBuilder("{\"upgrades\":{");
+            int changedCount = 0;
+            for (int index = 0; index < TrackedPlayerUpgrades.Length; index++)
+            {
+                KeyValuePair<string, string> binding = TrackedPlayerUpgrades[index];
+                int? value = ResolveLocalPlayerUpgrade(binding.Value);
+                if (!value.HasValue) continue;
+                if (lastSyncedUpgrades.TryGetValue(binding.Key, out int previousValue) && previousValue == value.Value) continue;
+
+                lastSyncedUpgrades[binding.Key] = value.Value;
+                if (changedCount++ > 0) json.Append(',');
+                json.Append('\"').Append(binding.Key).Append("\":").Append(value.Value);
+            }
+
+            if (changedCount == 0 || !sendToWebOverlay.Value) return;
+            json.Append("}}");
+            StartCoroutine(PostPlayerUpgrades(json.ToString(), changedCount));
+        }
+
+        private static int? ResolveLocalPlayerUpgrade(string memberName)
         {
             Type statsManagerType = AccessTools.TypeByName("StatsManager");
             object statsManager = ReadMember(statsManagerType, "instance");
-            object strengthsValue = ReadMember(statsManager, "playerUpgradeStrength");
-            if (!(strengthsValue is IDictionary strengths)) return null;
+            object upgradesValue = ReadMember(statsManager, memberName);
+            if (!(upgradesValue is IDictionary upgrades)) return null;
 
             Type playerControllerType = AccessTools.TypeByName("PlayerController");
             object playerController = ReadMember(playerControllerType, "instance");
@@ -667,10 +729,10 @@ namespace RepoMonsterBridge
                 steamId = ReadMember(playerAvatar, "steamID") as string;
             }
 
-            object value = !string.IsNullOrEmpty(steamId) && strengths.Contains(steamId) ? strengths[steamId] : null;
-            if (value == null && strengths.Count == 1)
+            object value = !string.IsNullOrEmpty(steamId) && upgrades.Contains(steamId) ? upgrades[steamId] : null;
+            if (value == null && upgrades.Count == 1)
             {
-                foreach (DictionaryEntry entry in strengths)
+                foreach (DictionaryEntry entry in upgrades)
                 {
                     value = entry.Value;
                     break;
@@ -1149,20 +1211,34 @@ namespace RepoMonsterBridge
             yield break;
         }
 
-        private IEnumerator PostStrength(int strength)
+        private IEnumerator PostTabHidden(bool hidden)
         {
-            string strengthEndpoint = BuildSiblingEndpoint(levelEndpoint.Value, "/api/strength");
-            string json = "{\"strength\":" + strength + "}";
-            Task<string> request = QueueNetworkRequest(() => SendHttpPost(strengthEndpoint, json));
+            string tabEndpoint = BuildSiblingEndpoint(levelEndpoint.Value, "/api/tab-hidden");
+            string json = "{\"hidden\":" + (hidden ? "true" : "false") + "}";
+            Task<string> request = QueueNetworkRequest(() => SendHttpPost(tabEndpoint, json));
+            while (!request.IsCompleted) yield return null;
+            string result = request.IsFaulted ? "ERROR:" + request.Exception.GetBaseException().Message : request.Result;
+            if (!IsHttpSuccess(result) && debugLogging.Value)
+            {
+                Logger.LogWarning("Failed to sync Tab visibility: " + TrimHttpResult(result));
+            }
+
+            yield break;
+        }
+
+        private IEnumerator PostPlayerUpgrades(string json, int changedCount)
+        {
+            string upgradesEndpoint = BuildSiblingEndpoint(levelEndpoint.Value, "/api/upgrades");
+            Task<string> request = QueueNetworkRequest(() => SendHttpPost(upgradesEndpoint, json));
             while (!request.IsCompleted) yield return null;
             string result = request.IsFaulted ? "ERROR:" + request.Exception.GetBaseException().Message : request.Result;
             if (!IsHttpSuccess(result))
             {
-                Logger.LogWarning("Failed to sync player strength: " + TrimHttpResult(result));
+                Logger.LogWarning("Failed to sync player upgrades: " + TrimHttpResult(result));
             }
             else if (debugLogging.Value)
             {
-                Logger.LogInfo("Synced player strength " + strength + ": " + result);
+                Logger.LogInfo("Synced " + changedCount + " player upgrade value(s): " + result);
             }
 
             yield break;
@@ -1200,8 +1276,18 @@ namespace RepoMonsterBridge
             stateObject = SetJsonNumberProperty(stateObject, "level", level);
             stateObject = SetJsonBooleanProperty(stateObject, "gameplayVisible", true);
             stateObject = SetJsonNumberProperty(stateObject, "seconds", 0);
-            stateObject = SetJsonBooleanProperty(stateObject, "running", false);
-            stateObject = SetJsonRawProperty(stateObject, "startedAt", "null");
+            stateObject = SetJsonBooleanProperty(stateObject, "running", true);
+            long startedAt = (long)(DateTime.UtcNow - new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc)).TotalMilliseconds;
+            stateObject = SetJsonRawProperty(stateObject, "startedAt", startedAt.ToString(CultureInfo.InvariantCulture));
+            stateObject = SetJsonNumberProperty(stateObject, "strength", 0);
+            stateObject = SetJsonNumberProperty(stateObject, "tumbleLaunch", 0);
+            stateObject = SetJsonNumberProperty(stateObject, "range", 0);
+            stateObject = SetJsonNumberProperty(stateObject, "sprintSpeed", 0);
+            stateObject = SetJsonNumberProperty(stateObject, "mapPlayerCount", 0);
+            stateObject = SetJsonNumberProperty(stateObject, "tumbleWings", 0);
+            stateObject = SetJsonNumberProperty(stateObject, "crouchRest", 0);
+            stateObject = SetJsonNumberProperty(stateObject, "extraJump", 0);
+            stateObject = SetJsonNumberProperty(stateObject, "tumbleClimb", 0);
             stateObject = SetJsonRawProperty(stateObject, "monsters", "[]");
             return stateObject;
         }

@@ -14,6 +14,10 @@ let overlayWindow = null;
 let tray = null;
 let clickThrough = true;
 let retryTimer = null;
+let hoverTimer = null;
+let overlayContentBounds = null;
+let hoverDimmed = false;
+let hoverTick = 0;
 let quitting = false;
 let localServerModule = null;
 
@@ -81,6 +85,59 @@ function reloadOverlay() {
     overlayWindow.loadURL(readConfig().overlayUrl);
 }
 
+function setHoverDimmed(dimmed) {
+    if (!overlayWindow || overlayWindow.isDestroyed() || hoverDimmed === dimmed) return;
+    hoverDimmed = dimmed;
+    overlayWindow.setOpacity(dimmed ? 0.5 : 1);
+}
+
+async function refreshOverlayContentBounds() {
+    if (!overlayWindow || overlayWindow.isDestroyed() || overlayWindow.webContents.isLoading()) return;
+    try {
+        const rect = await overlayWindow.webContents.executeJavaScript(`(() => {
+            const element = document.getElementById("overlayContainer");
+            if (!element || !element.classList.contains("is-visible") || element.classList.contains("is-tab-hidden")) return null;
+            const bounds = element.getBoundingClientRect();
+            return { left: bounds.left, top: bounds.top, right: bounds.right, bottom: bounds.bottom };
+        })()`);
+        if (!rect) {
+            overlayContentBounds = null;
+            setHoverDimmed(false);
+            return;
+        }
+
+        const windowBounds = overlayWindow.getBounds();
+        const zoom = overlayWindow.webContents.getZoomFactor();
+        overlayContentBounds = {
+            left: windowBounds.x + rect.left * zoom,
+            top: windowBounds.y + rect.top * zoom,
+            right: windowBounds.x + rect.right * zoom,
+            bottom: windowBounds.y + rect.bottom * zoom
+        };
+    } catch {
+        overlayContentBounds = null;
+        setHoverDimmed(false);
+    }
+}
+
+function startHoverTracking() {
+    clearInterval(hoverTimer);
+    hoverTick = 0;
+    refreshOverlayContentBounds();
+    hoverTimer = setInterval(() => {
+        if (++hoverTick % 6 === 0) refreshOverlayContentBounds();
+        if (!overlayContentBounds) {
+            setHoverDimmed(false);
+            return;
+        }
+        const cursor = screen.getCursorScreenPoint();
+        setHoverDimmed(cursor.x >= overlayContentBounds.left
+            && cursor.x <= overlayContentBounds.right
+            && cursor.y >= overlayContentBounds.top
+            && cursor.y <= overlayContentBounds.bottom);
+    }, 100);
+}
+
 function rebuildTrayMenu() {
     if (!tray) return;
     const visible = overlayWindow && !overlayWindow.isDestroyed() && overlayWindow.isVisible();
@@ -144,6 +201,7 @@ function createOverlayWindow() {
     overlayWindow.webContents.on("did-finish-load", () => {
         clearTimeout(retryTimer);
         overlayWindow.showInactive();
+        startHoverTracking();
         rebuildTrayMenu();
     });
     overlayWindow.webContents.on("did-fail-load", (_event, errorCode, errorDescription) => {
@@ -152,6 +210,10 @@ function createOverlayWindow() {
         scheduleRetry();
     });
     overlayWindow.on("closed", () => {
+        clearInterval(hoverTimer);
+        hoverTimer = null;
+        overlayContentBounds = null;
+        hoverDimmed = false;
         overlayWindow = null;
         if (!quitting) app.quit();
     });
@@ -200,6 +262,7 @@ if (!app.requestSingleInstanceLock()) {
 app.on("before-quit", () => {
     quitting = true;
     clearTimeout(retryTimer);
+    clearInterval(hoverTimer);
     if (localServerModule) localServerModule.stopOverlayServer();
 });
 

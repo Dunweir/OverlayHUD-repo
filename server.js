@@ -100,10 +100,23 @@ const levelMonsterCounts = {
     "20+": { level1: 3, level2: 4, level3: 4 }
 };
 
+const defaultPlayerUpgrades = {
+    strength: 0,
+    tumbleLaunch: 0,
+    range: 0,
+    sprintSpeed: 0,
+    mapPlayerCount: 0,
+    tumbleWings: 0,
+    crouchRest: 0,
+    extraJump: 0,
+    tumbleClimb: 0
+};
+
 const defaultOverlayState = {
     level: 1,
     gameplayVisible: false,
-    strength: 0,
+    tabHidden: false,
+    ...defaultPlayerUpgrades,
     style: 1,
     bgEnabled: false,
     timerVisible: false,
@@ -406,7 +419,7 @@ function setGameLevel(rawLevel) {
         ...(overlayState || {}),
         level,
         gameplayVisible: true,
-        strength: 0,
+        ...defaultPlayerUpgrades,
         seconds: 0,
         running: true,
         startedAt: Date.now(),
@@ -445,6 +458,61 @@ function setPlayerStrength(rawStrength) {
     };
 
     return { ok: true, statusCode: 200, payload: { ok: true, strength: overlayState.strength } };
+}
+
+function setTabHidden(rawHidden) {
+    if (typeof rawHidden !== "boolean") {
+        return { ok: false, statusCode: 422, payload: { error: "Invalid Tab visibility", received: rawHidden } };
+    }
+
+    overlayState = {
+        ...defaultOverlayState,
+        ...(overlayState || {}),
+        tabHidden: rawHidden
+    };
+    return { ok: true, statusCode: 200, payload: { ok: true, tabHidden: rawHidden } };
+}
+
+function setTumbleLaunch(rawTumbleLaunch) {
+    const tumbleLaunch = Number(rawTumbleLaunch);
+    if (!Number.isFinite(tumbleLaunch) || tumbleLaunch < 0) {
+        return { ok: false, statusCode: 422, payload: { error: "Invalid Tumble Launch", received: rawTumbleLaunch } };
+    }
+
+    overlayState = {
+        ...defaultOverlayState,
+        ...(overlayState || {}),
+        tumbleLaunch: Math.floor(tumbleLaunch)
+    };
+
+    return { ok: true, statusCode: 200, payload: { ok: true, tumbleLaunch: overlayState.tumbleLaunch } };
+}
+
+function setPlayerUpgrades(rawUpgrades) {
+    if (!rawUpgrades || typeof rawUpgrades !== "object" || Array.isArray(rawUpgrades)) {
+        return { ok: false, statusCode: 422, payload: { error: "Invalid player upgrades" } };
+    }
+
+    const updates = {};
+    for (const key of Object.keys(defaultPlayerUpgrades)) {
+        if (!(key in rawUpgrades)) continue;
+        const value = Number(rawUpgrades[key]);
+        if (!Number.isFinite(value) || value < 0) {
+            return { ok: false, statusCode: 422, payload: { error: `Invalid upgrade: ${key}`, received: rawUpgrades[key] } };
+        }
+        updates[key] = Math.floor(value);
+    }
+
+    if (Object.keys(updates).length === 0) {
+        return { ok: false, statusCode: 422, payload: { error: "No known player upgrades received" } };
+    }
+
+    overlayState = {
+        ...defaultOverlayState,
+        ...(overlayState || {}),
+        ...updates
+    };
+    return { ok: true, statusCode: 200, payload: { ok: true, upgrades: updates } };
 }
 
 function serveFile(request, response) {
@@ -545,6 +613,39 @@ const server = http.createServer(async (request, response) => {
             const body = await readBody(request);
             const payload = JSON.parse(body || "{}");
             const result = setPlayerStrength(payload.strength);
+            sendJson(response, result.statusCode, result.payload);
+            if (result.ok) {
+                broadcastState();
+            }
+            return;
+        }
+
+        if (request.method === "POST" && request.url === "/api/tab-hidden") {
+            const body = await readBody(request);
+            const payload = JSON.parse(body || "{}");
+            const result = setTabHidden(payload.hidden ?? payload.tabHidden);
+            sendJson(response, result.statusCode, result.payload);
+            if (result.ok) {
+                broadcastState();
+            }
+            return;
+        }
+
+        if (request.method === "POST" && request.url === "/api/tumble-launch") {
+            const body = await readBody(request);
+            const payload = JSON.parse(body || "{}");
+            const result = setTumbleLaunch(payload.tumbleLaunch ?? payload.value);
+            sendJson(response, result.statusCode, result.payload);
+            if (result.ok) {
+                broadcastState();
+            }
+            return;
+        }
+
+        if (request.method === "POST" && request.url === "/api/upgrades") {
+            const body = await readBody(request);
+            const payload = JSON.parse(body || "{}");
+            const result = setPlayerUpgrades(payload.upgrades ?? payload);
             sendJson(response, result.statusCode, result.payload);
             if (result.ok) {
                 broadcastState();
