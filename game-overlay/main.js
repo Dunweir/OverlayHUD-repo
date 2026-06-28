@@ -13,9 +13,11 @@ const defaultConfig = {
 let overlayWindow = null;
 let tray = null;
 let clickThrough = true;
+let mousePassthrough = true;
 let retryTimer = null;
 let hoverTimer = null;
 let overlayContentBounds = null;
+let overlayInteractiveBounds = null;
 let hoverDimmed = false;
 let hoverTick = 0;
 let quitting = false;
@@ -67,9 +69,15 @@ function getTargetDisplay(displayIndex) {
 function applyClickThrough(enabled) {
     if (!overlayWindow || overlayWindow.isDestroyed()) return;
     clickThrough = enabled;
+    applyMousePassthrough(enabled);
+    rebuildTrayMenu();
+}
+
+function applyMousePassthrough(enabled) {
+    if (!overlayWindow || overlayWindow.isDestroyed() || mousePassthrough === enabled) return;
+    mousePassthrough = enabled;
     overlayWindow.setIgnoreMouseEvents(enabled, { forward: true });
     overlayWindow.setFocusable(!enabled);
-    rebuildTrayMenu();
 }
 
 function toggleOverlay() {
@@ -94,28 +102,52 @@ function setHoverDimmed(dimmed) {
 async function refreshOverlayContentBounds() {
     if (!overlayWindow || overlayWindow.isDestroyed() || overlayWindow.webContents.isLoading()) return;
     try {
-        const rect = await overlayWindow.webContents.executeJavaScript(`(() => {
-            const element = document.getElementById("overlayContainer");
-            if (!element || !element.classList.contains("is-visible") || element.classList.contains("is-tab-hidden")) return null;
-            const bounds = element.getBoundingClientRect();
-            return { left: bounds.left, top: bounds.top, right: bounds.right, bottom: bounds.bottom };
+        const rects = await overlayWindow.webContents.executeJavaScript(`(() => {
+            const toRect = (element) => {
+                if (!element) return null;
+                const bounds = element.getBoundingClientRect();
+                return { left: bounds.left, top: bounds.top, right: bounds.right, bottom: bounds.bottom };
+            };
+            const overlay = document.getElementById("overlayContainer");
+            const controls = document.getElementById("overlayHoverControls");
+            return {
+                overlay: overlay && overlay.classList.contains("is-visible") && !overlay.classList.contains("is-tab-hidden")
+                    ? toRect(overlay)
+                    : null,
+                controls: controls && controls.classList.contains("is-enabled")
+                    ? toRect(controls)
+                    : null
+            };
         })()`);
-        if (!rect) {
+        if (!rects || !rects.overlay) {
             overlayContentBounds = null;
             setHoverDimmed(false);
-            return;
+        } else {
+            const windowBounds = overlayWindow.getBounds();
+            const zoom = overlayWindow.webContents.getZoomFactor();
+            overlayContentBounds = {
+                left: windowBounds.x + rects.overlay.left * zoom,
+                top: windowBounds.y + rects.overlay.top * zoom,
+                right: windowBounds.x + rects.overlay.right * zoom,
+                bottom: windowBounds.y + rects.overlay.bottom * zoom
+            };
         }
 
-        const windowBounds = overlayWindow.getBounds();
-        const zoom = overlayWindow.webContents.getZoomFactor();
-        overlayContentBounds = {
-            left: windowBounds.x + rect.left * zoom,
-            top: windowBounds.y + rect.top * zoom,
-            right: windowBounds.x + rect.right * zoom,
-            bottom: windowBounds.y + rect.bottom * zoom
-        };
+        if (rects && rects.controls) {
+            const windowBounds = overlayWindow.getBounds();
+            const zoom = overlayWindow.webContents.getZoomFactor();
+            overlayInteractiveBounds = {
+                left: windowBounds.x + rects.controls.left * zoom,
+                top: windowBounds.y + rects.controls.top * zoom,
+                right: windowBounds.x + rects.controls.right * zoom,
+                bottom: windowBounds.y + rects.controls.bottom * zoom
+            };
+        } else {
+            overlayInteractiveBounds = null;
+        }
     } catch {
         overlayContentBounds = null;
+        overlayInteractiveBounds = null;
         setHoverDimmed(false);
     }
 }
@@ -126,11 +158,18 @@ function startHoverTracking() {
     refreshOverlayContentBounds();
     hoverTimer = setInterval(() => {
         if (++hoverTick % 6 === 0) refreshOverlayContentBounds();
+        const cursor = screen.getCursorScreenPoint();
+        const isOverControls = overlayInteractiveBounds
+            && cursor.x >= overlayInteractiveBounds.left
+            && cursor.x <= overlayInteractiveBounds.right
+            && cursor.y >= overlayInteractiveBounds.top
+            && cursor.y <= overlayInteractiveBounds.bottom;
+        applyMousePassthrough(clickThrough && !isOverControls);
+
         if (!overlayContentBounds) {
             setHoverDimmed(false);
             return;
         }
-        const cursor = screen.getCursorScreenPoint();
         setHoverDimmed(cursor.x >= overlayContentBounds.left
             && cursor.x <= overlayContentBounds.right
             && cursor.y >= overlayContentBounds.top
@@ -196,6 +235,7 @@ function createOverlayWindow() {
 
     overlayWindow.setAlwaysOnTop(true, "screen-saver", 1);
     overlayWindow.setIgnoreMouseEvents(true, { forward: true });
+    mousePassthrough = true;
     overlayWindow.webContents.setZoomFactor(Math.max(0.25, Number(config.zoomFactor) || 1));
 
     overlayWindow.webContents.on("did-finish-load", () => {
@@ -213,6 +253,7 @@ function createOverlayWindow() {
         clearInterval(hoverTimer);
         hoverTimer = null;
         overlayContentBounds = null;
+        overlayInteractiveBounds = null;
         hoverDimmed = false;
         overlayWindow = null;
         if (!quitting) app.quit();

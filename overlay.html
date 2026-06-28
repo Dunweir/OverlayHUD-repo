@@ -8,6 +8,66 @@
 </head>
 <body class="overlay-page">
     <div class="overlay">
+        <div class="overlay-hover-controls" id="overlayHoverControls">
+            <div class="overlay-control-panel">
+                <div class="overlay-theme-row">
+                    <button type="button" class="overlay-theme-button" id="overlayStyle1Btn">Темная</button>
+                    <button type="button" class="overlay-theme-button" id="overlayStyle2Btn">Светлая</button>
+                </div>
+                <div class="overlay-slider-row">
+                    <label for="overlaySizeSlider">Размер</label>
+                    <input type="range" id="overlaySizeSlider" min="40" max="86" value="64" step="2">
+                    <span id="overlaySizeValue">64</span>
+                </div>
+                <div class="overlay-slider-row">
+                    <label for="overlayUpgradeSizeSlider">Апгрейды</label>
+                    <input type="range" id="overlayUpgradeSizeSlider" min="24" max="54" value="32" step="2">
+                    <span id="overlayUpgradeSizeValue">32</span>
+                </div>
+                <div class="overlay-slider-row">
+                    <label for="overlayColumnsSlider">Колонки</label>
+                    <input type="range" id="overlayColumnsSlider" min="4" max="12" value="7" step="1">
+                    <span id="overlayColumnsValue">7</span>
+                </div>
+                <div class="overlay-toggle-list">
+                    <label class="overlay-toggle-row">
+                        <span>Подложка</span>
+                        <span class="overlay-toggle-switch">
+                            <input type="checkbox" id="overlayBgToggle">
+                            <span></span>
+                        </span>
+                    </label>
+                    <label class="overlay-toggle-row">
+                        <span>Таймер</span>
+                        <span class="overlay-toggle-switch">
+                            <input type="checkbox" id="overlayTimerToggle">
+                            <span></span>
+                        </span>
+                    </label>
+                    <label class="overlay-toggle-row">
+                        <span>Апгрейды</span>
+                        <span class="overlay-toggle-switch">
+                            <input type="checkbox" id="overlayUpgradesToggle">
+                            <span></span>
+                        </span>
+                    </label>
+                    <label class="overlay-toggle-row">
+                        <span>Время респавна</span>
+                        <span class="overlay-toggle-switch">
+                            <input type="checkbox" id="overlayRespawnTimerToggle">
+                            <span></span>
+                        </span>
+                    </label>
+                    <label class="overlay-toggle-row">
+                        <span>Индикатор КД</span>
+                        <span class="overlay-toggle-switch">
+                            <input type="checkbox" id="overlayRespawnIndicatorToggle">
+                            <span></span>
+                        </span>
+                    </label>
+                </div>
+            </div>
+        </div>
         <div class="overlay-container" id="overlayContainer">
             <div class="overlay-header">
                 <div class="level-badge">
@@ -26,10 +86,24 @@
     <script src="overlay-state.js"></script>
     <script>
         const overlayContainer = document.getElementById("overlayContainer");
+        const overlayHoverControls = document.getElementById("overlayHoverControls");
         const levelNumber = document.getElementById("levelNumber");
         const timer = document.getElementById("timer");
         const upgradeRow = document.getElementById("upgradeRow");
         const monstersSquares = document.getElementById("monstersSquares");
+        const overlaySizeSlider = document.getElementById("overlaySizeSlider");
+        const overlaySizeValue = document.getElementById("overlaySizeValue");
+        const overlayUpgradeSizeSlider = document.getElementById("overlayUpgradeSizeSlider");
+        const overlayUpgradeSizeValue = document.getElementById("overlayUpgradeSizeValue");
+        const overlayColumnsSlider = document.getElementById("overlayColumnsSlider");
+        const overlayColumnsValue = document.getElementById("overlayColumnsValue");
+        const overlayStyle1Btn = document.getElementById("overlayStyle1Btn");
+        const overlayStyle2Btn = document.getElementById("overlayStyle2Btn");
+        const overlayBgToggle = document.getElementById("overlayBgToggle");
+        const overlayTimerToggle = document.getElementById("overlayTimerToggle");
+        const overlayUpgradesToggle = document.getElementById("overlayUpgradesToggle");
+        const overlayRespawnTimerToggle = document.getElementById("overlayRespawnTimerToggle");
+        const overlayRespawnIndicatorToggle = document.getElementById("overlayRespawnIndicatorToggle");
         let latestState = null;
         let renderedSquareCount = 0;
         let lastTimerText = "";
@@ -301,6 +375,21 @@
             document.documentElement.style.setProperty("--square-size", `${state.squareSize}px`);
             document.documentElement.style.setProperty("--upgrade-size", `${state.upgradeSize}px`);
             document.documentElement.style.setProperty("--columns-count", state.columnsCount);
+            overlaySizeSlider.value = state.squareSize;
+            overlaySizeValue.textContent = state.squareSize;
+            overlayUpgradeSizeSlider.value = state.upgradeSize;
+            overlayUpgradeSizeValue.textContent = state.upgradeSize;
+            overlayColumnsSlider.value = state.columnsCount;
+            overlayColumnsValue.textContent = state.columnsCount;
+            overlayStyle1Btn.classList.toggle("is-active", state.style === 1);
+            overlayStyle2Btn.classList.toggle("is-active", state.style === 2);
+            overlayStyle1Btn.setAttribute("aria-pressed", String(state.style === 1));
+            overlayStyle2Btn.setAttribute("aria-pressed", String(state.style === 2));
+            overlayBgToggle.checked = state.bgEnabled;
+            overlayTimerToggle.checked = state.timerVisible;
+            overlayUpgradesToggle.checked = state.upgradesVisible;
+            overlayRespawnTimerToggle.checked = state.respawnTimerVisible;
+            overlayRespawnIndicatorToggle.checked = state.respawnIndicatorVisible;
 
             overlayContainer.className = "overlay-container";
             overlayContainer.classList.add(`style-${state.style}`);
@@ -312,6 +401,7 @@
             if (!state.respawnTimerVisible && !state.respawnIndicatorVisible) overlayContainer.classList.add("hide-respawn-status");
             if (state.tabHidden) overlayContainer.classList.add("is-tab-hidden");
             if (state.gameplayVisible && !state.rosterPending) overlayContainer.classList.add("is-visible");
+            overlayHoverControls.classList.toggle("is-enabled", state.gameplayVisible && !state.rosterPending && !state.tabHidden);
 
             levelNumber.textContent = state.level;
             let visibleUpgradeCount = 0;
@@ -362,6 +452,20 @@
         }
 
         buildUpgradeRow();
+        overlayStyle1Btn.addEventListener("click", () => OverlayApp.setStyle(1));
+        overlayStyle2Btn.addEventListener("click", () => OverlayApp.setStyle(2));
+        overlaySizeSlider.addEventListener("input", () => OverlayApp.setSquareSize(parseInt(overlaySizeSlider.value, 10)));
+        overlayUpgradeSizeSlider.addEventListener("input", () => OverlayApp.setUpgradeSize(parseInt(overlayUpgradeSizeSlider.value, 10)));
+        overlayColumnsSlider.addEventListener("input", () => OverlayApp.setColumnsCount(parseInt(overlayColumnsSlider.value, 10)));
+        overlayBgToggle.addEventListener("change", () => OverlayApp.setBgEnabled(overlayBgToggle.checked));
+        overlayTimerToggle.addEventListener("change", () => OverlayApp.setTimerVisible(overlayTimerToggle.checked));
+        overlayUpgradesToggle.addEventListener("change", () => OverlayApp.setUpgradesVisible(overlayUpgradesToggle.checked));
+        overlayRespawnTimerToggle.addEventListener("change", () => OverlayApp.setRespawnTimerVisible(overlayRespawnTimerToggle.checked));
+        overlayRespawnIndicatorToggle.addEventListener("change", () => OverlayApp.setRespawnIndicatorVisible(overlayRespawnIndicatorToggle.checked));
+        [overlaySizeSlider, overlayUpgradeSizeSlider, overlayColumnsSlider].forEach((slider) => {
+            slider.addEventListener("pointerup", () => slider.blur());
+            slider.addEventListener("change", () => slider.blur());
+        });
         OverlayApp.subscribe(render);
         setInterval(() => {
             if (latestState && latestState.running && latestState.timerVisible) {

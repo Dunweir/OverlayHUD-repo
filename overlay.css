@@ -483,6 +483,199 @@ body {
     white-space: nowrap;
 }
 
+.overlay-hover-controls {
+    position: fixed;
+    left: 0;
+    top: 50%;
+    z-index: 20;
+    width: 500px;
+    padding: 18px 24px 18px 0;
+    opacity: 0;
+    pointer-events: none;
+    transform: translateY(-50%);
+    visibility: hidden;
+    transition: opacity 0.16s ease, visibility 0s linear 0.16s;
+}
+
+.overlay-hover-controls.is-enabled {
+    opacity: 1;
+    pointer-events: auto;
+    visibility: visible;
+    transition-delay: 0s;
+}
+
+.overlay-control-panel {
+    display: grid;
+    gap: 15px;
+    width: 448px;
+    padding: 20px 22px 20px 18px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-left: 0;
+    border-radius: 0 8px 8px 0;
+    background: rgba(12, 17, 23, 0.9);
+    box-shadow: 0 12px 28px rgba(0, 0, 0, 0.34);
+    opacity: 0;
+    pointer-events: none;
+    transform: translateX(-100%);
+    transition: opacity 0.16s ease, transform 0.16s ease;
+}
+
+.overlay-hover-controls:hover .overlay-control-panel {
+    opacity: 1;
+    pointer-events: auto;
+    transform: translateX(0);
+}
+
+.overlay-theme-row {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+}
+
+.overlay-theme-button {
+    min-height: 38px;
+    padding: 8px 12px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 6px;
+    background: #263645;
+    color: #eef4f8;
+    cursor: pointer;
+    font-family: Arial, sans-serif;
+    font-size: 15px;
+    font-weight: 800;
+    line-height: 1;
+}
+
+.overlay-theme-button:hover {
+    background: #314557;
+}
+
+.overlay-theme-button.is-active {
+    border-color: #ffb200;
+    background: rgba(255, 178, 0, 0.18);
+    color: #ffcf62;
+}
+
+.overlay-theme-button:focus-visible {
+    outline: 3px solid rgba(255, 178, 0, 0.18);
+}
+
+.overlay-slider-row {
+    display: grid;
+    grid-template-columns: 112px minmax(0, 1fr) 48px;
+    align-items: center;
+    gap: 14px;
+    color: #eef4f8;
+    font-family: Arial, sans-serif;
+    font-weight: 700;
+}
+
+.overlay-slider-row label {
+    min-width: 0;
+    overflow: hidden;
+    font-size: 17px;
+    line-height: 1;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.overlay-slider-row span {
+    color: #ffcf62;
+    font-size: 17px;
+    line-height: 1;
+    text-align: right;
+}
+
+.overlay-slider-row input[type="range"] {
+    width: 100%;
+    min-width: 0;
+    height: 10px;
+    padding: 0;
+    border: 0;
+    border-radius: 999px;
+    appearance: none;
+    background: #3e5367;
+    outline: none;
+}
+
+.overlay-slider-row input[type="range"]::-webkit-slider-thumb {
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    appearance: none;
+    background: #ffb200;
+    cursor: pointer;
+}
+
+.overlay-slider-row input[type="range"]:focus-visible {
+    outline: 3px solid rgba(255, 178, 0, 0.18);
+}
+
+.overlay-toggle-list {
+    display: grid;
+    gap: 10px;
+    padding-top: 4px;
+}
+
+.overlay-toggle-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    min-height: 36px;
+    gap: 14px;
+    color: #eef4f8;
+    font-family: Arial, sans-serif;
+    font-size: 16px;
+    font-weight: 700;
+}
+
+.overlay-toggle-switch {
+    position: relative;
+    display: inline-block;
+    flex: 0 0 auto;
+    width: 58px;
+    height: 30px;
+}
+
+.overlay-toggle-switch input {
+    width: 0;
+    height: 0;
+    opacity: 0;
+}
+
+.overlay-toggle-switch span {
+    position: absolute;
+    inset: 0;
+    border-radius: 999px;
+    background: #3e5367;
+    cursor: pointer;
+    transition: background-color 0.16s ease;
+}
+
+.overlay-toggle-switch span::before {
+    position: absolute;
+    bottom: 4px;
+    left: 4px;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: #f7fbff;
+    content: "";
+    transition: transform 0.16s ease;
+}
+
+.overlay-toggle-switch input:checked + span {
+    background: #2ca66f;
+}
+
+.overlay-toggle-switch input:checked + span::before {
+    transform: translateX(28px);
+}
+
+.overlay-toggle-switch input:focus-visible + span {
+    outline: 3px solid rgba(255, 178, 0, 0.18);
+}
+
 .control-page {
     min-height: 100vh;
     overflow-y: auto;
