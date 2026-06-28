@@ -124,6 +124,7 @@ const defaultOverlayState = {
     respawnTimerVisible: true,
     respawnIndicatorVisible: true,
     squareSize: 64,
+    upgradeSize: 32,
     overlayScaleVersion: 2,
     columnsCount: 7,
     columnsLayoutVersion: 1,

@@ -79,6 +79,7 @@ const OverlayApp = (() => {
         respawnTimerVisible: true,
         respawnIndicatorVisible: true,
         squareSize: 64,
+        upgradeSize: 32,
         overlayScaleVersion: 2,
         columnsCount: 7,
         columnsLayoutVersion: 1,
@@ -107,6 +108,7 @@ const OverlayApp = (() => {
     function normalizeState(nextState) {
         const source = nextState || defaultState;
         const squareSize = source.overlayScaleVersion === 2 || source.squareSize !== 50 ? source.squareSize : defaultState.squareSize;
+        const upgradeSize = Number.isFinite(Number(source.upgradeSize)) ? Number(source.upgradeSize) : defaultState.upgradeSize;
         const columnsCount = source.columnsLayoutVersion === 1 ? source.columnsCount : defaultState.columnsCount;
         return {
             ...defaultState,
@@ -114,6 +116,7 @@ const OverlayApp = (() => {
             overlayScaleVersion: defaultState.overlayScaleVersion,
             columnsLayoutVersion: defaultState.columnsLayoutVersion,
             squareSize,
+            upgradeSize,
             columnsCount,
             monsters: Array.isArray(source.monsters) ? source.monsters : [],
             roster: Array.isArray(source.roster) ? source.roster : []
@@ -407,6 +410,10 @@ const OverlayApp = (() => {
         updateState((currentState) => ({ ...currentState, squareSize }));
     }
 
+    function setUpgradeSize(upgradeSize) {
+        updateState((currentState) => ({ ...currentState, upgradeSize }));
+    }
+
     function setColumnsCount(columnsCount) {
         updateState((currentState) => ({ ...currentState, columnsCount }));
     }
@@ -431,6 +438,7 @@ const OverlayApp = (() => {
         setTumbleLaunch,
         setStyle,
         setTimerVisible,
+        setUpgradeSize,
         setUpgradesVisible,
         setRespawnTimerVisible,
         setRespawnIndicatorVisible,

@@ -35,6 +35,13 @@
         let lastTimerText = "";
         const monsterImageLoads = new Map();
         const upgradeElements = new Map();
+        const viewportScale = {
+            baseWidth: 1920,
+            baseHeight: 1080,
+            min: 0.85,
+            max: 1.5,
+            edgeOffset: 20
+        };
         const upgradeDefinitions = [
             { key: "strength", name: "Strength", image: "upgrades/Strength_Upgrade.webp", color: "#ff9a3d", background: "rgba(255, 106, 22, 0.2)" },
             { key: "tumbleLaunch", name: "Tumble Launch", image: "upgrades/Tumble_Launch_Upgrade.webp", color: "#58bdff", background: "rgba(32, 151, 235, 0.2)" },
@@ -46,6 +53,19 @@
             { key: "extraJump", name: "Extra Jump", image: "upgrades/Extra_Jump_Upgrade.webp", color: "#58bdff", background: "rgba(32, 151, 235, 0.2)" },
             { key: "tumbleClimb", name: "Tumble Climb", image: "upgrades/Tumble_Climb_Upgrade.webp", color: "#58bdff", background: "rgba(32, 151, 235, 0.2)" }
         ];
+
+        function applyViewportScale() {
+            const scale = Math.min(
+                window.innerWidth / viewportScale.baseWidth,
+                window.innerHeight / viewportScale.baseHeight
+            );
+            const clampedScale = Math.min(viewportScale.max, Math.max(viewportScale.min, scale));
+            const availableWidth = Math.max(240, (window.innerWidth - viewportScale.edgeOffset * 2) / clampedScale);
+
+            document.documentElement.style.setProperty("--viewport-scale", clampedScale.toFixed(4));
+            document.documentElement.style.setProperty("--overlay-edge-offset", `${viewportScale.edgeOffset}px`);
+            document.documentElement.style.setProperty("--overlay-available-width", `${availableWidth}px`);
+        }
 
         function buildUpgradeRow() {
             for (const upgrade of upgradeDefinitions) {
@@ -279,6 +299,7 @@
         function render(state) {
             latestState = state;
             document.documentElement.style.setProperty("--square-size", `${state.squareSize}px`);
+            document.documentElement.style.setProperty("--upgrade-size", `${state.upgradeSize}px`);
             document.documentElement.style.setProperty("--columns-count", state.columnsCount);
 
             overlayContainer.className = "overlay-container";
@@ -332,6 +353,12 @@
                     }
                 }
             }
+        }
+
+        applyViewportScale();
+        window.addEventListener("resize", applyViewportScale);
+        if (window.visualViewport) {
+            window.visualViewport.addEventListener("resize", applyViewportScale);
         }
 
         buildUpgradeRow();

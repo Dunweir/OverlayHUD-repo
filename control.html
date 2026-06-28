@@ -57,6 +57,12 @@
                             <span class="value-readout" id="sizeValue">64px</span>
                         </div>
 
+                        <label for="upgradeSizeSlider">Размер апгрейдов</label>
+                        <div class="slider-row">
+                            <input type="range" id="upgradeSizeSlider" min="24" max="54" value="32" step="2">
+                            <span class="value-readout" id="upgradeSizeValue">32px</span>
+                        </div>
+
                         <label for="columnsSlider">Монстров в ряд</label>
                         <div class="slider-row">
                             <input type="range" id="columnsSlider" min="4" max="12" value="7" step="1">
@@ -136,6 +142,8 @@
         const levelError = document.getElementById("levelError");
         const sizeSlider = document.getElementById("sizeSlider");
         const sizeValue = document.getElementById("sizeValue");
+        const upgradeSizeSlider = document.getElementById("upgradeSizeSlider");
+        const upgradeSizeValue = document.getElementById("upgradeSizeValue");
         const columnsSlider = document.getElementById("columnsSlider");
         const columnsValue = document.getElementById("columnsValue");
         const bgToggle = document.getElementById("bgToggle");
@@ -203,6 +211,8 @@
             levelInput.value = state.level;
             sizeSlider.value = state.squareSize;
             sizeValue.textContent = `${state.squareSize}px`;
+            upgradeSizeSlider.value = state.upgradeSize;
+            upgradeSizeValue.textContent = `${state.upgradeSize}px`;
             columnsSlider.value = state.columnsCount;
             columnsValue.textContent = state.columnsCount;
             bgToggle.checked = state.bgEnabled;
@@ -255,6 +265,7 @@
         respawnTimerToggle.addEventListener("change", () => OverlayApp.setRespawnTimerVisible(respawnTimerToggle.checked));
         respawnIndicatorToggle.addEventListener("change", () => OverlayApp.setRespawnIndicatorVisible(respawnIndicatorToggle.checked));
         sizeSlider.addEventListener("input", () => OverlayApp.setSquareSize(parseInt(sizeSlider.value, 10)));
+        upgradeSizeSlider.addEventListener("input", () => OverlayApp.setUpgradeSize(parseInt(upgradeSizeSlider.value, 10)));
         columnsSlider.addEventListener("input", () => OverlayApp.setColumnsCount(parseInt(columnsSlider.value, 10)));
 
         buildMonsterGrid();
