@@ -267,6 +267,21 @@ body {
     box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08), 0 5px 14px rgba(0, 0, 0, 0.28);
 }
 
+.monster-square::after {
+    position: absolute;
+    inset: 0;
+    z-index: 3;
+    border-radius: inherit;
+    background: rgba(255, 38, 38, 0.46);
+    content: "";
+    opacity: 0;
+    pointer-events: none;
+}
+
+.monster-square.is-damaged::after {
+    animation: monster-damage-flash 1s ease-out both;
+}
+
 .monster-square:hover {
     z-index: 6;
 }
@@ -365,23 +380,27 @@ body {
 .monster-health-bar {
     --monster-health-ratio: 100%;
     position: absolute;
-    right: calc(var(--square-size) * 0.07);
-    bottom: calc(var(--square-size) * 0.07);
-    left: calc(var(--square-size) * 0.07);
+    right: auto;
+    bottom: -14px;
+    left: 50%;
     z-index: 4;
-    height: max(8px, calc(var(--square-size) * 0.12));
+    width: min(calc(var(--square-size) + 12px), 72px);
+    height: max(10px, calc(var(--square-size) * 0.145));
     overflow: hidden;
-    border: 2px solid rgba(0, 0, 0, 0.86);
+    border: 2px solid rgba(0, 0, 0, 0.78);
     border-radius: 999px;
-    background: rgba(0, 0, 0, 0.82);
-    box-shadow: 0 2px 7px rgba(0, 0, 0, 0.72), 0 0 0 1px rgba(255, 255, 255, 0.16);
+    background: rgba(0, 0, 0, 0.76);
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.62);
     opacity: 1;
     pointer-events: none;
-    transition: opacity 0.14s ease;
+    transform: translateX(-50%) translateY(0) scaleY(1);
+    transform-origin: center bottom;
+    transition: opacity 0.18s ease, transform 0.18s ease;
 }
 
 .monster-health-bar.is-hidden {
     opacity: 0;
+    transform: translateX(-50%) translateY(-4px) scaleY(0.55);
 }
 
 .monster-health-fill {
@@ -389,23 +408,50 @@ body {
     width: var(--monster-health-ratio);
     height: 100%;
     border-radius: inherit;
-    background: linear-gradient(180deg, #b8ff8d 0%, #32d862 48%, #10913d 100%);
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.44), 0 0 10px rgba(53, 214, 111, 0.58);
+    background: #33d463;
+    box-shadow: none;
     transition: width 0.16s ease, background 0.16s ease, box-shadow 0.16s ease;
 }
 
-.monster-health-bar.is-low .monster-health-fill {
-    background: linear-gradient(180deg, #fff176 0%, #ffc333 50%, #d56b00 100%);
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.38), 0 0 10px rgba(255, 191, 61, 0.58);
+.monster-health-bar.is-warning .monster-health-fill {
+    background: #f1d33b;
+    box-shadow: none;
 }
 
+.monster-health-bar.is-low .monster-health-fill {
+    background: #ffbd35;
+    box-shadow: none;
+}
+
+.monster-health-bar.is-critical .monster-health-fill,
 .monster-health-bar.is-empty .monster-health-fill {
-    background: linear-gradient(180deg, #ff8a80 0%, #ff3f35 52%, #9d1515 100%);
+    background: #ff3f35;
     box-shadow: none;
 }
 
 .overlay-container.hide-monster-health-bars .monster-health-bar {
-    display: none;
+    opacity: 0;
+    transform: translateX(-50%) translateY(-4px) scaleY(0.55);
+    visibility: hidden;
+}
+
+.monster-damage-pop {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    z-index: 7;
+    padding: 5px 9px 4px;
+    border-radius: 999px;
+    background: rgba(0, 0, 0, 0.86);
+    color: #ffdedb;
+    font-family: Arial, sans-serif;
+    font-size: clamp(14px, calc(var(--square-size) * 0.26), 20px);
+    font-weight: 800;
+    line-height: 1;
+    pointer-events: none;
+    text-shadow: 0 1px 0 #000, 0 0 5px rgba(255, 38, 38, 0.92);
+    white-space: nowrap;
+    animation: monster-damage-pop 1s ease-out both;
 }
 
 .monster-tooltip {
@@ -538,6 +584,40 @@ body {
     }
 }
 
+@keyframes monster-damage-flash {
+    0% {
+        opacity: 0;
+    }
+    10% {
+        opacity: 1;
+    }
+    48% {
+        opacity: 0.72;
+    }
+    100% {
+        opacity: 0;
+    }
+}
+
+@keyframes monster-damage-pop {
+    0% {
+        opacity: 0;
+        transform: translate(-50%, -50%) scale(0.82);
+    }
+    12% {
+        opacity: 1;
+        transform: translate(-50%, -58%) scale(1);
+    }
+    58% {
+        opacity: 1;
+        transform: translate(-50%, -68%) scale(1.02);
+    }
+    100% {
+        opacity: 0;
+        transform: translate(-50%, -98%) scale(1.04);
+    }
+}
+
 @media (prefers-reduced-motion: reduce) {
     .overlay-container {
         transition: none;
@@ -546,6 +626,9 @@ body {
     .timer,
     .overlay-meta,
     .upgrade-row,
+    .monster-health-bar,
+    .monster-health-fill,
+    .strength-required,
     .monster-cooldown::before,
     .monster-cooldown-time {
         transition: none;
@@ -555,7 +638,9 @@ body {
     .monster-square.is-revealing > .monster-base-image,
     .monster-square.is-slot-entering,
     .monster-square.is-revealing .monster-count,
-    .monster-square.is-revealing .strength-required {
+    .monster-square.is-revealing .strength-required,
+    .monster-square.is-damaged::after,
+    .monster-damage-pop {
         animation: none;
     }
 
@@ -604,16 +689,16 @@ body {
 
 .strength-required {
     position: absolute;
-    bottom: -21px;
+    bottom: calc(var(--square-size) * 0.065);
     left: 50%;
-    z-index: 2;
+    z-index: 5;
     min-width: 40px;
     max-width: calc(var(--square-size) + 12px);
     padding: 4px 8px 3px;
-    transform: translateX(-50%);
+    transform: translateX(-50%) translateY(0) scale(1);
     overflow: visible;
     border-radius: 999px;
-    background: rgba(0, 0, 0, 0.84);
+    background: rgba(0, 0, 0, 0.78);
     color: #ffb200;
     font-family: Arial, sans-serif;
     font-size: 16px;
@@ -621,10 +706,15 @@ body {
     line-height: 1;
     text-align: center;
     white-space: nowrap;
+    opacity: 1;
+    transition: opacity 0.18s ease, transform 0.18s ease, visibility 0s linear 0s;
 }
 
 .overlay-container.hide-monster-strength .strength-required {
-    display: none;
+    opacity: 0;
+    transform: translateX(-50%) translateY(-4px) scale(0.88);
+    visibility: hidden;
+    transition-delay: 0s, 0s, 0.18s;
 }
 
 .overlay-hover-controls {

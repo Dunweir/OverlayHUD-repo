@@ -227,9 +227,12 @@
         function clearSquare(square) {
             square.dataset.monsterKey = "";
             square.dataset.imagePending = "";
+            square.dataset.monsterHealthKey = "";
+            square.dataset.monsterHealthValue = "";
             square.classList.remove("is-revealing");
+            square.classList.remove("is-damaged");
             clearMonsterCooldown(square);
-            square.querySelectorAll(".monster-reveal-image").forEach((element) => element.remove());
+            square.querySelectorAll(".monster-reveal-image, .monster-damage-pop").forEach((element) => element.remove());
             const img = square.firstElementChild;
             if (!img.src.includes("monsters/unknown.webp")) {
                 img.src = "monsters/unknown.webp";
@@ -272,8 +275,40 @@
 
             const ratio = Math.min(1, Math.max(0, health / maxHealth));
             bar.style.setProperty("--monster-health-ratio", `${Math.round(ratio * 1000) / 10}%`);
-            bar.classList.toggle("is-low", ratio > 0 && ratio <= 0.3);
+            bar.classList.toggle("is-warning", ratio > 0.3 && ratio <= 0.6);
+            bar.classList.toggle("is-low", ratio > 0.1 && ratio <= 0.3);
+            bar.classList.toggle("is-critical", ratio > 0 && ratio <= 0.1);
             bar.classList.toggle("is-empty", ratio <= 0);
+        }
+
+        function updateMonsterDamageFeedback(square, status, monsterKey) {
+            const health = Number(status?.health);
+            if (!Number.isFinite(health)) {
+                square.dataset.monsterHealthKey = monsterKey;
+                square.dataset.monsterHealthValue = "";
+                return;
+            }
+
+            const previousKey = square.dataset.monsterHealthKey;
+            const previousHealth = Number(square.dataset.monsterHealthValue);
+            square.dataset.monsterHealthKey = monsterKey;
+            square.dataset.monsterHealthValue = String(health);
+
+            if (previousKey !== monsterKey || !Number.isFinite(previousHealth) || health >= previousHealth) return;
+
+            const damage = Math.max(1, Math.ceil(previousHealth - health));
+            square.classList.remove("is-damaged");
+            void square.offsetWidth;
+            square.classList.add("is-damaged");
+            setTimeout(() => {
+                if (square.dataset.monsterHealthKey === monsterKey) square.classList.remove("is-damaged");
+            }, 1020);
+
+            const damagePop = document.createElement("div");
+            damagePop.className = "monster-damage-pop";
+            damagePop.textContent = `-${damage} HP`;
+            square.appendChild(damagePop);
+            setTimeout(() => damagePop.remove(), 1120);
         }
 
         function updateMonsterTooltip(square, monster, status) {
@@ -387,6 +422,7 @@
 
             updateMonsterTooltip(square, monster, status);
             updateMonsterHealthBar(square, status);
+            updateMonsterDamageFeedback(square, status, monsterKey);
 
             if (shouldReveal) {
                 preloadMonsterImage(monster.image).then(() => {
