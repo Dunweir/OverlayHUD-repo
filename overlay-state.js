@@ -83,6 +83,7 @@ const OverlayApp = (() => {
         overlayScaleVersion: 3,
         columnsCount: 7,
         columnsLayoutVersion: 1,
+        hoverOpacity: 50,
         seconds: 0,
         running: false,
         startedAt: null,
@@ -117,6 +118,9 @@ const OverlayApp = (() => {
             ? (shouldMigrateDefaultSizes && sourceUpgradeSize === 32 ? defaultState.upgradeSize : sourceUpgradeSize)
             : defaultState.upgradeSize;
         const columnsCount = source.columnsLayoutVersion === 1 ? source.columnsCount : defaultState.columnsCount;
+        const hoverOpacity = Number.isFinite(Number(source.hoverOpacity))
+            ? Math.min(100, Math.max(20, Number(source.hoverOpacity)))
+            : defaultState.hoverOpacity;
         return {
             ...defaultState,
             ...source,
@@ -126,6 +130,7 @@ const OverlayApp = (() => {
             squareSize,
             upgradeSize,
             columnsCount,
+            hoverOpacity,
             monsters: Array.isArray(source.monsters) ? source.monsters : [],
             roster: Array.isArray(source.roster) ? source.roster : []
         };
@@ -422,6 +427,10 @@ const OverlayApp = (() => {
         updateState((currentState) => ({ ...currentState, columnsCount }));
     }
 
+    function setHoverOpacity(hoverOpacity) {
+        updateState((currentState) => ({ ...currentState, hoverOpacity }));
+    }
+
     return {
         monsterConfig,
         addMonster,
@@ -435,6 +444,7 @@ const OverlayApp = (() => {
         resetTimer,
         setBgEnabled,
         setColumnsCount,
+        setHoverOpacity,
         setLevel,
         setSquareSize,
         setStrength,

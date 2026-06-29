@@ -128,6 +128,7 @@ const defaultOverlayState = {
     overlayScaleVersion: 3,
     columnsCount: 7,
     columnsLayoutVersion: 1,
+    hoverOpacity: 50,
     seconds: 0,
     running: false,
     startedAt: null,
@@ -150,6 +151,9 @@ function normalizeOverlayState(rawState) {
         ? (shouldMigrateDefaultSizes && sourceUpgradeSize === 32 ? defaultOverlayState.upgradeSize : sourceUpgradeSize)
         : defaultOverlayState.upgradeSize;
     const columnsCount = source.columnsLayoutVersion === 1 ? source.columnsCount : defaultOverlayState.columnsCount;
+    const hoverOpacity = Number.isFinite(Number(source.hoverOpacity))
+        ? Math.min(100, Math.max(20, Number(source.hoverOpacity)))
+        : defaultOverlayState.hoverOpacity;
 
     return {
         ...source,
@@ -159,6 +163,7 @@ function normalizeOverlayState(rawState) {
         overlayScaleVersion: defaultOverlayState.overlayScaleVersion,
         columnsCount,
         columnsLayoutVersion: defaultOverlayState.columnsLayoutVersion,
+        hoverOpacity,
         monsters: Array.isArray(source.monsters) ? source.monsters : [],
         roster: Array.isArray(source.roster) ? source.roster : []
     };

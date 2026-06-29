@@ -19,6 +19,10 @@ let hoverTimer = null;
 let overlayContentBounds = null;
 let overlayInteractiveBounds = null;
 let hoverDimmed = false;
+let hoverOpacity = 0.5;
+let overlayOpacity = 1;
+let opacityTarget = 1;
+let opacityTimer = null;
 let hoverTick = 0;
 let quitting = false;
 let localServerModule = null;
@@ -93,10 +97,46 @@ function reloadOverlay() {
     overlayWindow.loadURL(readConfig().overlayUrl);
 }
 
+function animateOverlayOpacity(targetOpacity) {
+    if (!overlayWindow || overlayWindow.isDestroyed()) return;
+
+    const target = Math.min(1, Math.max(0.2, targetOpacity));
+    if (Math.abs(opacityTarget - target) < 0.001 && !opacityTimer) return;
+
+    opacityTarget = target;
+    clearInterval(opacityTimer);
+
+    const start = overlayOpacity;
+    const startedAt = Date.now();
+    const duration = 180;
+
+    opacityTimer = setInterval(() => {
+        if (!overlayWindow || overlayWindow.isDestroyed()) {
+            clearInterval(opacityTimer);
+            opacityTimer = null;
+            return;
+        }
+
+        const progress = Math.min(1, (Date.now() - startedAt) / duration);
+        const eased = 1 - Math.pow(1 - progress, 3);
+        overlayOpacity = start + (target - start) * eased;
+        overlayWindow.setOpacity(overlayOpacity);
+
+        if (progress >= 1) {
+            overlayOpacity = target;
+            overlayWindow.setOpacity(target);
+            clearInterval(opacityTimer);
+            opacityTimer = null;
+        }
+    }, 16);
+}
+
 function setHoverDimmed(dimmed) {
-    if (!overlayWindow || overlayWindow.isDestroyed() || hoverDimmed === dimmed) return;
+    if (!overlayWindow || overlayWindow.isDestroyed()) return;
+    const targetOpacity = dimmed ? hoverOpacity : 1;
+    if (hoverDimmed === dimmed && Math.abs(opacityTarget - targetOpacity) < 0.001) return;
     hoverDimmed = dimmed;
-    overlayWindow.setOpacity(dimmed ? 0.5 : 1);
+    animateOverlayOpacity(targetOpacity);
 }
 
 async function refreshOverlayContentBounds() {
@@ -123,13 +163,15 @@ async function refreshOverlayContentBounds() {
             const panel = controls ? controls.querySelector(".overlay-control-panel") : null;
             const hotspot = document.getElementById("overlayControlHotspot");
             const controlsOpen = controls && controls.matches(":hover");
+            const hoverOpacity = Number.isFinite(Number(controls?.dataset.hoverOpacity)) ? Number(controls.dataset.hoverOpacity) / 100 : 0.5;
             return {
                 overlay: overlay && overlay.classList.contains("is-visible") && !overlay.classList.contains("is-tab-hidden")
                     ? toRect(overlay)
                     : null,
                 controls: controls && controls.classList.contains("is-enabled")
                     ? unionRects([toRect(hotspot), controlsOpen ? toRect(panel) : null])
-                    : null
+                    : null,
+                hoverOpacity
             };
         })()`);
         if (!rects || !rects.overlay) {
@@ -146,6 +188,7 @@ async function refreshOverlayContentBounds() {
             };
         }
 
+        hoverOpacity = Math.min(1, Math.max(0.2, Number(rects?.hoverOpacity) || 0.5));
         if (rects && rects.controls) {
             const windowBounds = overlayWindow.getBounds();
             const zoom = overlayWindow.webContents.getZoomFactor();
@@ -170,7 +213,7 @@ function startHoverTracking() {
     hoverTick = 0;
     refreshOverlayContentBounds();
     hoverTimer = setInterval(() => {
-        if (++hoverTick % 6 === 0) refreshOverlayContentBounds();
+        if (++hoverTick % 2 === 0) refreshOverlayContentBounds();
         const cursor = screen.getCursorScreenPoint();
         const isOverControls = overlayInteractiveBounds
             && cursor.x >= overlayInteractiveBounds.left
@@ -263,10 +306,14 @@ function createOverlayWindow() {
     });
     overlayWindow.on("closed", () => {
         clearInterval(hoverTimer);
+        clearInterval(opacityTimer);
         hoverTimer = null;
+        opacityTimer = null;
         overlayContentBounds = null;
         overlayInteractiveBounds = null;
         hoverDimmed = false;
+        overlayOpacity = 1;
+        opacityTarget = 1;
         overlayWindow = null;
         if (!quitting) app.quit();
     });

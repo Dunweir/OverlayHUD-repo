@@ -25,6 +25,11 @@
                     <input type="range" id="overlayColumnsSlider" min="4" max="12" value="7" step="1">
                     <span id="overlayColumnsValue">7</span>
                 </div>
+                <div class="overlay-slider-row">
+                    <label for="overlayHoverOpacitySlider">Прозрачность</label>
+                    <input type="range" id="overlayHoverOpacitySlider" min="20" max="100" value="50" step="5">
+                    <span id="overlayHoverOpacityValue">50%</span>
+                </div>
                 <div class="overlay-toggle-list">
                     <label class="overlay-toggle-row">
                         <span>Подложка</span>
@@ -94,6 +99,8 @@
         const overlayUpgradeSizeValue = document.getElementById("overlayUpgradeSizeValue");
         const overlayColumnsSlider = document.getElementById("overlayColumnsSlider");
         const overlayColumnsValue = document.getElementById("overlayColumnsValue");
+        const overlayHoverOpacitySlider = document.getElementById("overlayHoverOpacitySlider");
+        const overlayHoverOpacityValue = document.getElementById("overlayHoverOpacityValue");
         const overlayBgToggle = document.getElementById("overlayBgToggle");
         const overlayTimerToggle = document.getElementById("overlayTimerToggle");
         const overlayUpgradesToggle = document.getElementById("overlayUpgradesToggle");
@@ -384,6 +391,9 @@
             overlayUpgradeSizeValue.textContent = state.upgradeSize;
             overlayColumnsSlider.value = state.columnsCount;
             overlayColumnsValue.textContent = state.columnsCount;
+            overlayHoverOpacitySlider.value = state.hoverOpacity;
+            overlayHoverOpacityValue.textContent = `${state.hoverOpacity}%`;
+            overlayHoverControls.dataset.hoverOpacity = state.hoverOpacity;
             overlayBgToggle.checked = state.bgEnabled;
             overlayTimerToggle.checked = state.timerVisible;
             overlayUpgradesToggle.checked = state.upgradesVisible;
@@ -453,12 +463,13 @@
         overlaySizeSlider.addEventListener("input", () => OverlayApp.setSquareSize(parseInt(overlaySizeSlider.value, 10)));
         overlayUpgradeSizeSlider.addEventListener("input", () => OverlayApp.setUpgradeSize(parseInt(overlayUpgradeSizeSlider.value, 10)));
         overlayColumnsSlider.addEventListener("input", () => OverlayApp.setColumnsCount(parseInt(overlayColumnsSlider.value, 10)));
+        overlayHoverOpacitySlider.addEventListener("input", () => OverlayApp.setHoverOpacity(parseInt(overlayHoverOpacitySlider.value, 10)));
         overlayBgToggle.addEventListener("change", () => OverlayApp.setBgEnabled(overlayBgToggle.checked));
         overlayTimerToggle.addEventListener("change", () => OverlayApp.setTimerVisible(overlayTimerToggle.checked));
         overlayUpgradesToggle.addEventListener("change", () => OverlayApp.setUpgradesVisible(overlayUpgradesToggle.checked));
         overlayRespawnTimerToggle.addEventListener("change", () => OverlayApp.setRespawnTimerVisible(overlayRespawnTimerToggle.checked));
         overlayRespawnIndicatorToggle.addEventListener("change", () => OverlayApp.setRespawnIndicatorVisible(overlayRespawnIndicatorToggle.checked));
-        [overlaySizeSlider, overlayUpgradeSizeSlider, overlayColumnsSlider].forEach((slider) => {
+        [overlaySizeSlider, overlayUpgradeSizeSlider, overlayColumnsSlider, overlayHoverOpacitySlider].forEach((slider) => {
             slider.addEventListener("pointerup", () => slider.blur());
             slider.addEventListener("change", () => slider.blur());
         });
