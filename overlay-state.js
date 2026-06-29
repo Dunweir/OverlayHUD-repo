@@ -78,9 +78,9 @@ const OverlayApp = (() => {
         upgradesVisible: true,
         respawnTimerVisible: true,
         respawnIndicatorVisible: true,
-        squareSize: 64,
-        upgradeSize: 32,
-        overlayScaleVersion: 2,
+        squareSize: 70,
+        upgradeSize: 38,
+        overlayScaleVersion: 3,
         columnsCount: 7,
         columnsLayoutVersion: 1,
         seconds: 0,
@@ -107,14 +107,22 @@ const OverlayApp = (() => {
 
     function normalizeState(nextState) {
         const source = nextState || defaultState;
-        const squareSize = source.overlayScaleVersion === 2 || source.squareSize !== 50 ? source.squareSize : defaultState.squareSize;
-        const upgradeSize = Number.isFinite(Number(source.upgradeSize)) ? Number(source.upgradeSize) : defaultState.upgradeSize;
+        const sourceSquareSize = Number(source.squareSize);
+        const sourceUpgradeSize = Number(source.upgradeSize);
+        const shouldMigrateDefaultSizes = Number(source.overlayScaleVersion) < 3;
+        const squareSize = Number.isFinite(sourceSquareSize)
+            ? (shouldMigrateDefaultSizes && (sourceSquareSize === 50 || sourceSquareSize === 64) ? defaultState.squareSize : sourceSquareSize)
+            : defaultState.squareSize;
+        const upgradeSize = Number.isFinite(sourceUpgradeSize)
+            ? (shouldMigrateDefaultSizes && sourceUpgradeSize === 32 ? defaultState.upgradeSize : sourceUpgradeSize)
+            : defaultState.upgradeSize;
         const columnsCount = source.columnsLayoutVersion === 1 ? source.columnsCount : defaultState.columnsCount;
         return {
             ...defaultState,
             ...source,
             overlayScaleVersion: defaultState.overlayScaleVersion,
             columnsLayoutVersion: defaultState.columnsLayoutVersion,
+            style: 1,
             squareSize,
             upgradeSize,
             columnsCount,
@@ -378,12 +386,8 @@ const OverlayApp = (() => {
         });
     }
 
-    function clearMonsters() {
-        updateState((currentState) => ({ ...currentState, monsters: [] }));
-    }
-
     function setStyle(style) {
-        updateState((currentState) => ({ ...currentState, style }));
+        updateState((currentState) => ({ ...currentState, style: 1 }));
     }
 
     function setBgEnabled(bgEnabled) {
@@ -421,7 +425,6 @@ const OverlayApp = (() => {
     return {
         monsterConfig,
         addMonster,
-        clearMonsters,
         formatTime,
         getCountsForLevel,
         getMonsterCount,

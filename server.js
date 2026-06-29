@@ -123,9 +123,9 @@ const defaultOverlayState = {
     upgradesVisible: true,
     respawnTimerVisible: true,
     respawnIndicatorVisible: true,
-    squareSize: 64,
-    upgradeSize: 32,
-    overlayScaleVersion: 2,
+    squareSize: 70,
+    upgradeSize: 38,
+    overlayScaleVersion: 3,
     columnsCount: 7,
     columnsLayoutVersion: 1,
     seconds: 0,
@@ -135,6 +135,34 @@ const defaultOverlayState = {
     roster: [],
     rosterPending: false
 };
+
+function normalizeOverlayState(rawState) {
+    if (!rawState) return null;
+
+    const source = { ...defaultOverlayState, ...rawState };
+    const sourceSquareSize = Number(source.squareSize);
+    const sourceUpgradeSize = Number(source.upgradeSize);
+    const shouldMigrateDefaultSizes = Number(source.overlayScaleVersion) < 3;
+    const squareSize = Number.isFinite(sourceSquareSize)
+        ? (shouldMigrateDefaultSizes && (sourceSquareSize === 50 || sourceSquareSize === 64) ? defaultOverlayState.squareSize : sourceSquareSize)
+        : defaultOverlayState.squareSize;
+    const upgradeSize = Number.isFinite(sourceUpgradeSize)
+        ? (shouldMigrateDefaultSizes && sourceUpgradeSize === 32 ? defaultOverlayState.upgradeSize : sourceUpgradeSize)
+        : defaultOverlayState.upgradeSize;
+    const columnsCount = source.columnsLayoutVersion === 1 ? source.columnsCount : defaultOverlayState.columnsCount;
+
+    return {
+        ...source,
+        style: 1,
+        squareSize,
+        upgradeSize,
+        overlayScaleVersion: defaultOverlayState.overlayScaleVersion,
+        columnsCount,
+        columnsLayoutVersion: defaultOverlayState.columnsLayoutVersion,
+        monsters: Array.isArray(source.monsters) ? source.monsters : [],
+        roster: Array.isArray(source.roster) ? source.roster : []
+    };
+}
 
 const mimeTypes = {
     ".html": "text/html; charset=utf-8",
@@ -273,7 +301,7 @@ function addSeenMonster(rawName, rawSourceId) {
 
     const state = {
         ...defaultOverlayState,
-        ...(overlayState || {}),
+        ...(normalizeOverlayState(overlayState) || {}),
         monsters: Array.isArray(overlayState?.monsters) ? overlayState.monsters : [],
         roster: Array.isArray(overlayState?.roster) ? overlayState.roster : []
     };
@@ -313,7 +341,7 @@ function updateMonsterRoster(rawMonsters) {
 
     const state = {
         ...defaultOverlayState,
-        ...(overlayState || {}),
+        ...(normalizeOverlayState(overlayState) || {}),
         monsters: Array.isArray(overlayState?.monsters) ? overlayState.monsters : [],
         roster: Array.isArray(overlayState?.roster) ? overlayState.roster : []
     };
@@ -358,7 +386,7 @@ function updateMonsterStatuses(rawStatuses) {
 
     const state = {
         ...defaultOverlayState,
-        ...(overlayState || {}),
+        ...(normalizeOverlayState(overlayState) || {}),
         monsters: Array.isArray(overlayState?.monsters) ? overlayState.monsters : [],
         roster: Array.isArray(overlayState?.roster) ? overlayState.roster : []
     };
@@ -418,7 +446,7 @@ function setGameLevel(rawLevel) {
 
     overlayState = {
         ...defaultOverlayState,
-        ...(overlayState || {}),
+        ...(normalizeOverlayState(overlayState) || {}),
         level,
         gameplayVisible: true,
         ...defaultPlayerUpgrades,
@@ -440,7 +468,7 @@ function setGameplayVisibility(rawVisible) {
 
     overlayState = {
         ...defaultOverlayState,
-        ...(overlayState || {}),
+        ...(normalizeOverlayState(overlayState) || {}),
         gameplayVisible: rawVisible
     };
 
@@ -455,7 +483,7 @@ function setPlayerStrength(rawStrength) {
 
     overlayState = {
         ...defaultOverlayState,
-        ...(overlayState || {}),
+        ...(normalizeOverlayState(overlayState) || {}),
         strength: Math.floor(strength)
     };
 
@@ -469,7 +497,7 @@ function setTabHidden(rawHidden) {
 
     overlayState = {
         ...defaultOverlayState,
-        ...(overlayState || {}),
+        ...(normalizeOverlayState(overlayState) || {}),
         tabHidden: rawHidden
     };
     return { ok: true, statusCode: 200, payload: { ok: true, tabHidden: rawHidden } };
@@ -483,7 +511,7 @@ function setTumbleLaunch(rawTumbleLaunch) {
 
     overlayState = {
         ...defaultOverlayState,
-        ...(overlayState || {}),
+        ...(normalizeOverlayState(overlayState) || {}),
         tumbleLaunch: Math.floor(tumbleLaunch)
     };
 
@@ -511,7 +539,7 @@ function setPlayerUpgrades(rawUpgrades) {
 
     overlayState = {
         ...defaultOverlayState,
-        ...(overlayState || {}),
+        ...(normalizeOverlayState(overlayState) || {}),
         ...updates
     };
     return { ok: true, statusCode: 200, payload: { ok: true, upgrades: updates } };
@@ -519,7 +547,7 @@ function setPlayerUpgrades(rawUpgrades) {
 
 function serveFile(request, response) {
     const requestUrl = new URL(request.url, `http://${request.headers.host}`);
-    const pathname = decodeURIComponent(requestUrl.pathname === "/" ? "/control.html" : requestUrl.pathname);
+    const pathname = decodeURIComponent(requestUrl.pathname === "/" ? "/overlay.html" : requestUrl.pathname);
     const filePath = path.normalize(path.join(serverRoot, pathname));
 
     if (!filePath.startsWith(serverRoot)) {
@@ -554,7 +582,7 @@ const server = http.createServer(async (request, response) => {
         if (request.method === "POST" && request.url === "/api/state") {
             const body = await readBody(request);
             const payload = JSON.parse(body || "{}");
-            overlayState = payload.state || null;
+            overlayState = normalizeOverlayState(payload.state);
             sendJson(response, 200, { ok: true });
             broadcastState();
             return;
@@ -691,8 +719,7 @@ function startOverlayServer(options = {}) {
         server.once("error", handleError);
         server.listen(listenPort, listenHost, () => {
             server.off("error", handleError);
-            console.log(`Overlay server: http://${listenHost}:${listenPort}/control.html`);
-            console.log(`Game overlay:   http://${listenHost}:${listenPort}/overlay.html`);
+            console.log(`Overlay: http://${listenHost}:${listenPort}/overlay.html`);
             resolve(server);
         });
     });

@@ -1,4 +1,4 @@
-const { app, BrowserWindow, Menu, Tray, dialog, globalShortcut, nativeImage, screen, shell } = require("electron");
+const { app, BrowserWindow, Menu, Tray, dialog, globalShortcut, nativeImage, screen } = require("electron");
 const fs = require("fs");
 const path = require("path");
 
@@ -108,14 +108,27 @@ async function refreshOverlayContentBounds() {
                 const bounds = element.getBoundingClientRect();
                 return { left: bounds.left, top: bounds.top, right: bounds.right, bottom: bounds.bottom };
             };
+            const unionRects = (rects) => {
+                const present = rects.filter(Boolean);
+                if (present.length === 0) return null;
+                return {
+                    left: Math.min(...present.map((rect) => rect.left)),
+                    top: Math.min(...present.map((rect) => rect.top)),
+                    right: Math.max(...present.map((rect) => rect.right)),
+                    bottom: Math.max(...present.map((rect) => rect.bottom))
+                };
+            };
             const overlay = document.getElementById("overlayContainer");
             const controls = document.getElementById("overlayHoverControls");
+            const panel = controls ? controls.querySelector(".overlay-control-panel") : null;
+            const hotspot = document.getElementById("overlayControlHotspot");
+            const controlsOpen = controls && controls.matches(":hover");
             return {
                 overlay: overlay && overlay.classList.contains("is-visible") && !overlay.classList.contains("is-tab-hidden")
                     ? toRect(overlay)
                     : null,
                 controls: controls && controls.classList.contains("is-enabled")
-                    ? toRect(controls)
+                    ? unionRects([toRect(hotspot), controlsOpen ? toRect(panel) : null])
                     : null
             };
         })()`);
@@ -183,7 +196,6 @@ function rebuildTrayMenu() {
     tray.setContextMenu(Menu.buildFromTemplate([
         { label: visible ? "Скрыть оверлей" : "Показать оверлей", click: toggleOverlay },
         { label: "Обновить", click: reloadOverlay },
-        { label: "Открыть панель управления", click: () => shell.openExternal("http://127.0.0.1:8787/control.html") },
         {
             label: "Пропускать клики",
             type: "checkbox",

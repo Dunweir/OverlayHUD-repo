@@ -10,10 +10,6 @@
     <div class="overlay">
         <div class="overlay-hover-controls" id="overlayHoverControls">
             <div class="overlay-control-panel">
-                <div class="overlay-theme-row">
-                    <button type="button" class="overlay-theme-button" id="overlayStyle1Btn">Темная</button>
-                    <button type="button" class="overlay-theme-button" id="overlayStyle2Btn">Светлая</button>
-                </div>
                 <div class="overlay-slider-row">
                     <label for="overlaySizeSlider">Размер</label>
                     <input type="range" id="overlaySizeSlider" min="40" max="86" value="64" step="2">
@@ -67,6 +63,7 @@
                     </label>
                 </div>
             </div>
+            <div class="overlay-control-hotspot" id="overlayControlHotspot" aria-hidden="true"></div>
         </div>
         <div class="overlay-container" id="overlayContainer">
             <div class="overlay-header">
@@ -97,8 +94,6 @@
         const overlayUpgradeSizeValue = document.getElementById("overlayUpgradeSizeValue");
         const overlayColumnsSlider = document.getElementById("overlayColumnsSlider");
         const overlayColumnsValue = document.getElementById("overlayColumnsValue");
-        const overlayStyle1Btn = document.getElementById("overlayStyle1Btn");
-        const overlayStyle2Btn = document.getElementById("overlayStyle2Btn");
         const overlayBgToggle = document.getElementById("overlayBgToggle");
         const overlayTimerToggle = document.getElementById("overlayTimerToggle");
         const overlayUpgradesToggle = document.getElementById("overlayUpgradesToggle");
@@ -112,7 +107,7 @@
         const viewportScale = {
             baseWidth: 1920,
             baseHeight: 1080,
-            min: 0.85,
+            min: 0.45,
             max: 1.5,
             edgeOffset: 20
         };
@@ -129,10 +124,17 @@
         ];
 
         function applyViewportScale() {
-            const scale = Math.min(
+            const baseScale = Math.min(
                 window.innerWidth / viewportScale.baseWidth,
                 window.innerHeight / viewportScale.baseHeight
             );
+            const sizingState = latestState || { squareSize: 70, columnsCount: 7 };
+            const squareSize = Number(sizingState.squareSize) || 64;
+            const columnsCount = Number(sizingState.columnsCount) || 7;
+            const gridWidth = columnsCount * squareSize + Math.max(0, columnsCount - 1) * 10;
+            const containerWidth = Math.max(310, gridWidth + 30);
+            const fitScale = (window.innerWidth - viewportScale.edgeOffset * 2) / containerWidth;
+            const scale = Math.min(baseScale, fitScale);
             const clampedScale = Math.min(viewportScale.max, Math.max(viewportScale.min, scale));
             const availableWidth = Math.max(240, (window.innerWidth - viewportScale.edgeOffset * 2) / clampedScale);
 
@@ -375,16 +377,13 @@
             document.documentElement.style.setProperty("--square-size", `${state.squareSize}px`);
             document.documentElement.style.setProperty("--upgrade-size", `${state.upgradeSize}px`);
             document.documentElement.style.setProperty("--columns-count", state.columnsCount);
+            applyViewportScale();
             overlaySizeSlider.value = state.squareSize;
             overlaySizeValue.textContent = state.squareSize;
             overlayUpgradeSizeSlider.value = state.upgradeSize;
             overlayUpgradeSizeValue.textContent = state.upgradeSize;
             overlayColumnsSlider.value = state.columnsCount;
             overlayColumnsValue.textContent = state.columnsCount;
-            overlayStyle1Btn.classList.toggle("is-active", state.style === 1);
-            overlayStyle2Btn.classList.toggle("is-active", state.style === 2);
-            overlayStyle1Btn.setAttribute("aria-pressed", String(state.style === 1));
-            overlayStyle2Btn.setAttribute("aria-pressed", String(state.style === 2));
             overlayBgToggle.checked = state.bgEnabled;
             overlayTimerToggle.checked = state.timerVisible;
             overlayUpgradesToggle.checked = state.upgradesVisible;
@@ -392,7 +391,6 @@
             overlayRespawnIndicatorToggle.checked = state.respawnIndicatorVisible;
 
             overlayContainer.className = "overlay-container";
-            overlayContainer.classList.add(`style-${state.style}`);
             if (state.bgEnabled) overlayContainer.classList.add("with-bg");
             if (!state.timerVisible) overlayContainer.classList.add("hide-level-timer");
             if (!state.upgradesVisible) overlayContainer.classList.add("hide-upgrades");
@@ -452,8 +450,6 @@
         }
 
         buildUpgradeRow();
-        overlayStyle1Btn.addEventListener("click", () => OverlayApp.setStyle(1));
-        overlayStyle2Btn.addEventListener("click", () => OverlayApp.setStyle(2));
         overlaySizeSlider.addEventListener("input", () => OverlayApp.setSquareSize(parseInt(overlaySizeSlider.value, 10)));
         overlayUpgradeSizeSlider.addEventListener("input", () => OverlayApp.setUpgradeSize(parseInt(overlayUpgradeSizeSlider.value, 10)));
         overlayColumnsSlider.addEventListener("input", () => OverlayApp.setColumnsCount(parseInt(overlayColumnsSlider.value, 10)));

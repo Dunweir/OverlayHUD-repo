@@ -15,7 +15,7 @@ Content-Type: application/json
 {"name":"Spewer"}
 ```
 
-The server normalizes the name, applies the current level slot limits, skips already-known monster types, and broadcasts the updated state to `control.html` and `overlay.html`.
+The server normalizes the name, applies the current level slot limits, skips already-known monster types, and broadcasts the updated state to `overlay.html`.
 
 The bridge also posts per-enemy alive/dead state and `DespawnedTimer` values to `/api/monster-status`. If TimerMod is installed, its synchronized multiplayer timer dictionary is preferred; otherwise the bridge uses the local game timer.
 
