@@ -225,7 +225,7 @@ function startHoverTracking() {
             && cursor.x <= overlayContentBounds.right
             && cursor.y >= overlayContentBounds.top
             && cursor.y <= overlayContentBounds.bottom;
-        applyMousePassthrough(clickThrough && !isOverControls && !isOverOverlay);
+        applyMousePassthrough(clickThrough && !isOverControls);
 
         if (!overlayContentBounds) {
             setHoverDimmed(false);
