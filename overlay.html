@@ -53,6 +53,13 @@
                         </span>
                     </label>
                     <label class="overlay-toggle-row">
+                        <span>Подсказки</span>
+                        <span class="overlay-toggle-switch">
+                            <input type="checkbox" id="overlayUpgradeTooltipsToggle">
+                            <span></span>
+                        </span>
+                    </label>
+                    <label class="overlay-toggle-row">
                         <span>Время респавна</span>
                         <span class="overlay-toggle-switch">
                             <input type="checkbox" id="overlayRespawnTimerToggle">
@@ -104,6 +111,7 @@
         const overlayBgToggle = document.getElementById("overlayBgToggle");
         const overlayTimerToggle = document.getElementById("overlayTimerToggle");
         const overlayUpgradesToggle = document.getElementById("overlayUpgradesToggle");
+        const overlayUpgradeTooltipsToggle = document.getElementById("overlayUpgradeTooltipsToggle");
         const overlayRespawnTimerToggle = document.getElementById("overlayRespawnTimerToggle");
         const overlayRespawnIndicatorToggle = document.getElementById("overlayRespawnIndicatorToggle");
         let latestState = null;
@@ -154,7 +162,7 @@
             for (const upgrade of upgradeDefinitions) {
                 const badge = document.createElement("div");
                 badge.className = "upgrade-stat";
-                badge.title = upgrade.name;
+                badge.dataset.upgradeName = upgrade.name;
                 badge.style.setProperty("--upgrade-color", upgrade.color);
                 badge.style.setProperty("--upgrade-background", upgrade.background);
 
@@ -166,6 +174,12 @@
                 const value = document.createElement("span");
                 value.textContent = "0";
                 badge.appendChild(value);
+
+                const tooltip = document.createElement("span");
+                tooltip.className = "upgrade-tooltip";
+                tooltip.textContent = upgrade.name;
+                badge.appendChild(tooltip);
+
                 upgradeElements.set(upgrade.key, { badge, value });
                 upgradeRow.appendChild(badge);
             }
@@ -207,7 +221,27 @@
             if (img.alt !== "Unknown Monster") {
                 img.alt = "Unknown Monster";
             }
-            square.querySelectorAll(".monster-count, .strength-required").forEach((element) => element.remove());
+            square.removeAttribute("title");
+            square.querySelectorAll(".monster-count, .strength-required, .monster-tooltip").forEach((element) => element.remove());
+        }
+
+        function getMonsterStrengthText(monster) {
+            if (!monster || monster.strength === undefined) return "Сила: ?";
+            if (monster.strength === "impossible") return "Сила: нельзя поднять";
+            return `Сила: ${monster.strength}`;
+        }
+
+        function updateMonsterTooltip(square, monster, tooltipsVisible) {
+            let tooltip = square.querySelector(".monster-tooltip");
+            if (!tooltip) {
+                tooltip = document.createElement("div");
+                tooltip.className = "monster-tooltip";
+                tooltip.innerHTML = '<span class="monster-tooltip-name"></span><span class="monster-tooltip-strength"></span>';
+                square.appendChild(tooltip);
+            }
+
+            tooltip.querySelector(".monster-tooltip-name").textContent = monster.name;
+            tooltip.querySelector(".monster-tooltip-strength").textContent = getMonsterStrengthText(monster);
         }
 
         function clearMonsterCooldown(square) {
@@ -305,6 +339,8 @@
                 required.style.color = currentStrength >= monster.strength ? "#4CAF50" : "#ff4444";
             }
 
+            updateMonsterTooltip(square, monster, latestState ? latestState.upgradeTooltipsVisible : true);
+
             if (shouldReveal) {
                 preloadMonsterImage(monster.image).then(() => {
                     if (square.dataset.monsterKey !== monsterKey) return;
@@ -397,6 +433,7 @@
             overlayBgToggle.checked = state.bgEnabled;
             overlayTimerToggle.checked = state.timerVisible;
             overlayUpgradesToggle.checked = state.upgradesVisible;
+            overlayUpgradeTooltipsToggle.checked = state.upgradeTooltipsVisible;
             overlayRespawnTimerToggle.checked = state.respawnTimerVisible;
             overlayRespawnIndicatorToggle.checked = state.respawnIndicatorVisible;
 
@@ -404,6 +441,8 @@
             if (state.bgEnabled) overlayContainer.classList.add("with-bg");
             if (!state.timerVisible) overlayContainer.classList.add("hide-level-timer");
             if (!state.upgradesVisible) overlayContainer.classList.add("hide-upgrades");
+            if (!state.upgradeTooltipsVisible) overlayContainer.classList.add("hide-upgrade-tooltips");
+            if (!state.upgradeTooltipsVisible) overlayContainer.classList.add("hide-tooltips");
             if (!state.respawnTimerVisible) overlayContainer.classList.add("hide-respawn-timer");
             if (!state.respawnIndicatorVisible) overlayContainer.classList.add("hide-respawn-indicator");
             if (!state.respawnTimerVisible && !state.respawnIndicatorVisible) overlayContainer.classList.add("hide-respawn-status");
@@ -467,6 +506,7 @@
         overlayBgToggle.addEventListener("change", () => OverlayApp.setBgEnabled(overlayBgToggle.checked));
         overlayTimerToggle.addEventListener("change", () => OverlayApp.setTimerVisible(overlayTimerToggle.checked));
         overlayUpgradesToggle.addEventListener("change", () => OverlayApp.setUpgradesVisible(overlayUpgradesToggle.checked));
+        overlayUpgradeTooltipsToggle.addEventListener("change", () => OverlayApp.setUpgradeTooltipsVisible(overlayUpgradeTooltipsToggle.checked));
         overlayRespawnTimerToggle.addEventListener("change", () => OverlayApp.setRespawnTimerVisible(overlayRespawnTimerToggle.checked));
         overlayRespawnIndicatorToggle.addEventListener("change", () => OverlayApp.setRespawnIndicatorVisible(overlayRespawnIndicatorToggle.checked));
         [overlaySizeSlider, overlayUpgradeSizeSlider, overlayColumnsSlider, overlayHoverOpacitySlider].forEach((slider) => {

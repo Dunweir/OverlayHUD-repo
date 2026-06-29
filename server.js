@@ -121,6 +121,7 @@ const defaultOverlayState = {
     bgEnabled: false,
     timerVisible: false,
     upgradesVisible: true,
+    upgradeTooltipsVisible: true,
     respawnTimerVisible: true,
     respawnIndicatorVisible: true,
     squareSize: 70,
