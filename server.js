@@ -122,6 +122,8 @@ const defaultOverlayState = {
     timerVisible: false,
     upgradesVisible: true,
     upgradeTooltipsVisible: true,
+    monsterHealthBarsVisible: true,
+    monsterStrengthVisible: true,
     respawnTimerVisible: true,
     respawnIndicatorVisible: true,
     squareSize: 70,

@@ -60,6 +60,20 @@
                         </span>
                     </label>
                     <label class="overlay-toggle-row">
+                        <span>ХП полоска</span>
+                        <span class="overlay-toggle-switch">
+                            <input type="checkbox" id="overlayMonsterHealthBarsToggle">
+                            <span></span>
+                        </span>
+                    </label>
+                    <label class="overlay-toggle-row">
+                        <span>Сила</span>
+                        <span class="overlay-toggle-switch">
+                            <input type="checkbox" id="overlayMonsterStrengthToggle">
+                            <span></span>
+                        </span>
+                    </label>
+                    <label class="overlay-toggle-row">
                         <span>Время респавна</span>
                         <span class="overlay-toggle-switch">
                             <input type="checkbox" id="overlayRespawnTimerToggle">
@@ -112,6 +126,8 @@
         const overlayTimerToggle = document.getElementById("overlayTimerToggle");
         const overlayUpgradesToggle = document.getElementById("overlayUpgradesToggle");
         const overlayUpgradeTooltipsToggle = document.getElementById("overlayUpgradeTooltipsToggle");
+        const overlayMonsterHealthBarsToggle = document.getElementById("overlayMonsterHealthBarsToggle");
+        const overlayMonsterStrengthToggle = document.getElementById("overlayMonsterStrengthToggle");
         const overlayRespawnTimerToggle = document.getElementById("overlayRespawnTimerToggle");
         const overlayRespawnIndicatorToggle = document.getElementById("overlayRespawnIndicatorToggle");
         let latestState = null;
@@ -222,7 +238,7 @@
                 img.alt = "Unknown Monster";
             }
             square.removeAttribute("title");
-            square.querySelectorAll(".monster-count, .strength-required, .monster-tooltip").forEach((element) => element.remove());
+            square.querySelectorAll(".monster-count, .strength-required, .monster-tooltip, .monster-health-bar").forEach((element) => element.remove());
         }
 
         function getMonsterStrengthText(monster) {
@@ -237,6 +253,27 @@
             if (!Number.isFinite(health)) return "ХП: ?";
             if (!Number.isFinite(maxHealth) || maxHealth <= 0) return `ХП: ${Math.ceil(health)} / ?`;
             return `ХП: ${Math.ceil(health)} / ${Math.ceil(maxHealth)}`;
+        }
+
+        function updateMonsterHealthBar(square, status) {
+            let bar = square.querySelector(".monster-health-bar");
+            if (!bar) {
+                bar = document.createElement("div");
+                bar.className = "monster-health-bar";
+                bar.innerHTML = '<span class="monster-health-fill"></span>';
+                square.appendChild(bar);
+            }
+
+            const health = Number(status?.health);
+            const maxHealth = Number(status?.maxHealth);
+            const hasHealth = Number.isFinite(health) && Number.isFinite(maxHealth) && maxHealth > 0;
+            bar.classList.toggle("is-hidden", !hasHealth);
+            if (!hasHealth) return;
+
+            const ratio = Math.min(1, Math.max(0, health / maxHealth));
+            bar.style.setProperty("--monster-health-ratio", `${Math.round(ratio * 1000) / 10}%`);
+            bar.classList.toggle("is-low", ratio > 0 && ratio <= 0.3);
+            bar.classList.toggle("is-empty", ratio <= 0);
         }
 
         function updateMonsterTooltip(square, monster, status) {
@@ -349,6 +386,7 @@
             }
 
             updateMonsterTooltip(square, monster, status);
+            updateMonsterHealthBar(square, status);
 
             if (shouldReveal) {
                 preloadMonsterImage(monster.image).then(() => {
@@ -443,6 +481,8 @@
             overlayTimerToggle.checked = state.timerVisible;
             overlayUpgradesToggle.checked = state.upgradesVisible;
             overlayUpgradeTooltipsToggle.checked = state.upgradeTooltipsVisible;
+            overlayMonsterHealthBarsToggle.checked = state.monsterHealthBarsVisible;
+            overlayMonsterStrengthToggle.checked = state.monsterStrengthVisible;
             overlayRespawnTimerToggle.checked = state.respawnTimerVisible;
             overlayRespawnIndicatorToggle.checked = state.respawnIndicatorVisible;
 
@@ -452,6 +492,8 @@
             if (!state.upgradesVisible) overlayContainer.classList.add("hide-upgrades");
             if (!state.upgradeTooltipsVisible) overlayContainer.classList.add("hide-upgrade-tooltips");
             if (!state.upgradeTooltipsVisible) overlayContainer.classList.add("hide-tooltips");
+            if (!state.monsterHealthBarsVisible) overlayContainer.classList.add("hide-monster-health-bars");
+            if (!state.monsterStrengthVisible) overlayContainer.classList.add("hide-monster-strength");
             if (!state.respawnTimerVisible) overlayContainer.classList.add("hide-respawn-timer");
             if (!state.respawnIndicatorVisible) overlayContainer.classList.add("hide-respawn-indicator");
             if (!state.respawnTimerVisible && !state.respawnIndicatorVisible) overlayContainer.classList.add("hide-respawn-status");
@@ -516,6 +558,8 @@
         overlayTimerToggle.addEventListener("change", () => OverlayApp.setTimerVisible(overlayTimerToggle.checked));
         overlayUpgradesToggle.addEventListener("change", () => OverlayApp.setUpgradesVisible(overlayUpgradesToggle.checked));
         overlayUpgradeTooltipsToggle.addEventListener("change", () => OverlayApp.setUpgradeTooltipsVisible(overlayUpgradeTooltipsToggle.checked));
+        overlayMonsterHealthBarsToggle.addEventListener("change", () => OverlayApp.setMonsterHealthBarsVisible(overlayMonsterHealthBarsToggle.checked));
+        overlayMonsterStrengthToggle.addEventListener("change", () => OverlayApp.setMonsterStrengthVisible(overlayMonsterStrengthToggle.checked));
         overlayRespawnTimerToggle.addEventListener("change", () => OverlayApp.setRespawnTimerVisible(overlayRespawnTimerToggle.checked));
         overlayRespawnIndicatorToggle.addEventListener("change", () => OverlayApp.setRespawnIndicatorVisible(overlayRespawnIndicatorToggle.checked));
         [overlaySizeSlider, overlayUpgradeSizeSlider, overlayColumnsSlider, overlayHoverOpacitySlider].forEach((slider) => {

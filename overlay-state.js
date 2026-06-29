@@ -77,6 +77,8 @@ const OverlayApp = (() => {
         timerVisible: false,
         upgradesVisible: true,
         upgradeTooltipsVisible: true,
+        monsterHealthBarsVisible: true,
+        monsterStrengthVisible: true,
         respawnTimerVisible: true,
         respawnIndicatorVisible: true,
         squareSize: 70,
@@ -412,6 +414,14 @@ const OverlayApp = (() => {
         updateState((currentState) => ({ ...currentState, upgradeTooltipsVisible }));
     }
 
+    function setMonsterHealthBarsVisible(monsterHealthBarsVisible) {
+        updateState((currentState) => ({ ...currentState, monsterHealthBarsVisible }));
+    }
+
+    function setMonsterStrengthVisible(monsterStrengthVisible) {
+        updateState((currentState) => ({ ...currentState, monsterStrengthVisible }));
+    }
+
     function setRespawnTimerVisible(respawnTimerVisible) {
         updateState((currentState) => ({ ...currentState, respawnTimerVisible }));
     }
@@ -451,6 +461,8 @@ const OverlayApp = (() => {
         setColumnsCount,
         setHoverOpacity,
         setLevel,
+        setMonsterHealthBarsVisible,
+        setMonsterStrengthVisible,
         setSquareSize,
         setStrength,
         setTumbleLaunch,

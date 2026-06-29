@@ -362,6 +362,52 @@ body {
     transform: translateY(-3px) scale(0.9);
 }
 
+.monster-health-bar {
+    --monster-health-ratio: 100%;
+    position: absolute;
+    right: calc(var(--square-size) * 0.07);
+    bottom: calc(var(--square-size) * 0.07);
+    left: calc(var(--square-size) * 0.07);
+    z-index: 4;
+    height: max(8px, calc(var(--square-size) * 0.12));
+    overflow: hidden;
+    border: 2px solid rgba(0, 0, 0, 0.86);
+    border-radius: 999px;
+    background: rgba(0, 0, 0, 0.82);
+    box-shadow: 0 2px 7px rgba(0, 0, 0, 0.72), 0 0 0 1px rgba(255, 255, 255, 0.16);
+    opacity: 1;
+    pointer-events: none;
+    transition: opacity 0.14s ease;
+}
+
+.monster-health-bar.is-hidden {
+    opacity: 0;
+}
+
+.monster-health-fill {
+    display: block;
+    width: var(--monster-health-ratio);
+    height: 100%;
+    border-radius: inherit;
+    background: linear-gradient(180deg, #b8ff8d 0%, #32d862 48%, #10913d 100%);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.44), 0 0 10px rgba(53, 214, 111, 0.58);
+    transition: width 0.16s ease, background 0.16s ease, box-shadow 0.16s ease;
+}
+
+.monster-health-bar.is-low .monster-health-fill {
+    background: linear-gradient(180deg, #fff176 0%, #ffc333 50%, #d56b00 100%);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.38), 0 0 10px rgba(255, 191, 61, 0.58);
+}
+
+.monster-health-bar.is-empty .monster-health-fill {
+    background: linear-gradient(180deg, #ff8a80 0%, #ff3f35 52%, #9d1515 100%);
+    box-shadow: none;
+}
+
+.overlay-container.hide-monster-health-bars .monster-health-bar {
+    display: none;
+}
+
 .monster-tooltip {
     position: absolute;
     bottom: calc(100% + 10px);
@@ -575,6 +621,10 @@ body {
     line-height: 1;
     text-align: center;
     white-space: nowrap;
+}
+
+.overlay-container.hide-monster-strength .strength-required {
+    display: none;
 }
 
 .overlay-hover-controls {
