@@ -231,16 +231,25 @@
             return `Сила: ${monster.strength}`;
         }
 
-        function updateMonsterTooltip(square, monster, tooltipsVisible) {
+        function getMonsterHealthText(status) {
+            const health = Number(status?.health);
+            const maxHealth = Number(status?.maxHealth);
+            if (!Number.isFinite(health)) return "ХП: ?";
+            if (!Number.isFinite(maxHealth) || maxHealth <= 0) return `ХП: ${Math.ceil(health)} / ?`;
+            return `ХП: ${Math.ceil(health)} / ${Math.ceil(maxHealth)}`;
+        }
+
+        function updateMonsterTooltip(square, monster, status) {
             let tooltip = square.querySelector(".monster-tooltip");
             if (!tooltip) {
                 tooltip = document.createElement("div");
                 tooltip.className = "monster-tooltip";
-                tooltip.innerHTML = '<span class="monster-tooltip-name"></span><span class="monster-tooltip-strength"></span>';
+                tooltip.innerHTML = '<span class="monster-tooltip-name"></span><span class="monster-tooltip-health"></span><span class="monster-tooltip-strength"></span>';
                 square.appendChild(tooltip);
             }
 
             tooltip.querySelector(".monster-tooltip-name").textContent = monster.name;
+            tooltip.querySelector(".monster-tooltip-health").textContent = getMonsterHealthText(status);
             tooltip.querySelector(".monster-tooltip-strength").textContent = getMonsterStrengthText(monster);
         }
 
@@ -339,7 +348,7 @@
                 required.style.color = currentStrength >= monster.strength ? "#4CAF50" : "#ff4444";
             }
 
-            updateMonsterTooltip(square, monster, latestState ? latestState.upgradeTooltipsVisible : true);
+            updateMonsterTooltip(square, monster, status);
 
             if (shouldReveal) {
                 preloadMonsterImage(monster.image).then(() => {

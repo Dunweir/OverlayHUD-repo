@@ -400,9 +400,13 @@ function updateMonsterStatuses(rawStatuses) {
     for (const rawStatus of rawStatuses) {
         if (rawStatus?.id == null || typeof rawStatus.alive !== "boolean") continue;
         const remaining = Number(rawStatus.respawnRemaining);
+        const health = Number(rawStatus.health);
+        const maxHealth = Number(rawStatus.maxHealth);
         statuses.set(String(rawStatus.id), {
             alive: rawStatus.alive,
-            respawnRemaining: Number.isFinite(remaining) ? Math.max(0, remaining) : 0
+            respawnRemaining: Number.isFinite(remaining) ? Math.max(0, remaining) : 0,
+            health: Number.isFinite(health) ? Math.max(0, health) : null,
+            maxHealth: Number.isFinite(maxHealth) ? Math.max(0, maxHealth) : null
         });
     }
 
@@ -414,15 +418,24 @@ function updateMonsterStatuses(rawStatuses) {
         if (sourceStatuses.length === 0 || sourceStatuses.length !== sourceIds.length) return slot;
 
         updatedSlots++;
+        const healthStatuses = sourceStatuses.filter((status) => status.health != null);
+        const healthPatch = healthStatuses.length > 0
+            ? {
+                health: healthStatuses.reduce((total, status) => total + status.health, 0),
+                maxHealth: healthStatuses.some((status) => status.maxHealth != null)
+                    ? healthStatuses.reduce((total, status) => total + (status.maxHealth || 0), 0)
+                    : null
+            }
+            : { health: null, maxHealth: null };
         if (sourceStatuses.some((status) => status.alive)) {
-            return { ...slot, alive: true, respawnEndsAt: null, respawnDuration: null };
+            return { ...slot, ...healthPatch, alive: true, respawnEndsAt: null, respawnDuration: null };
         }
 
         const remainingValues = sourceStatuses
             .map((status) => status.respawnRemaining)
             .filter((remaining) => remaining > 0);
         if (remainingValues.length === 0) {
-            return { ...slot, alive: false, respawnEndsAt: null, respawnDuration: null };
+            return { ...slot, ...healthPatch, alive: false, respawnEndsAt: null, respawnDuration: null };
         }
 
         const remaining = Math.min(...remainingValues);
@@ -437,7 +450,7 @@ function updateMonsterStatuses(rawStatuses) {
             ? Math.max(previousDuration, remaining)
             : remaining;
 
-        return { ...slot, alive: false, respawnEndsAt, respawnDuration };
+        return { ...slot, ...healthPatch, alive: false, respawnEndsAt, respawnDuration };
     });
 
     overlayState = { ...state, roster };

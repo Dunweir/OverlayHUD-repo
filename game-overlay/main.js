@@ -220,16 +220,18 @@ function startHoverTracking() {
             && cursor.x <= overlayInteractiveBounds.right
             && cursor.y >= overlayInteractiveBounds.top
             && cursor.y <= overlayInteractiveBounds.bottom;
-        applyMousePassthrough(clickThrough && !isOverControls);
+        const isOverOverlay = overlayContentBounds
+            && cursor.x >= overlayContentBounds.left
+            && cursor.x <= overlayContentBounds.right
+            && cursor.y >= overlayContentBounds.top
+            && cursor.y <= overlayContentBounds.bottom;
+        applyMousePassthrough(clickThrough && !isOverControls && !isOverOverlay);
 
         if (!overlayContentBounds) {
             setHoverDimmed(false);
             return;
         }
-        setHoverDimmed(cursor.x >= overlayContentBounds.left
-            && cursor.x <= overlayContentBounds.right
-            && cursor.y >= overlayContentBounds.top
-            && cursor.y <= overlayContentBounds.bottom);
+        setHoverDimmed(isOverOverlay);
     }, 100);
 }
 

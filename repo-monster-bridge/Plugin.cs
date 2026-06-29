@@ -16,7 +16,7 @@ using UnityEngine;
 
 namespace RepoMonsterBridge
 {
-    [BepInPlugin("local.overlay.repo_monster_bridge", "REPO Monster Bridge", "0.2.48")]
+    [BepInPlugin("local.overlay.repo_monster_bridge", "REPO Monster Bridge", "0.2.50")]
     public sealed class Plugin : BaseUnityPlugin
     {
         private static Plugin instance;
@@ -108,10 +108,36 @@ namespace RepoMonsterBridge
             { "ItemUpgradePlayerTumbleClimb", "tumbleClimb" }
         };
 
+        private static readonly string[] CurrentHealthMemberNames =
+        {
+            "currentHealth",
+            "healthCurrent",
+            "_currentSyncedHealth",
+            "_syncedHealth",
+            "currentHP",
+            "healthValue",
+            "HealthValue"
+        };
+
+        private static readonly string[] MaxHealthMemberNames =
+        {
+            "maxHealth",
+            "MaxHealth",
+            "healthMax",
+            "HealthMax",
+            "healthMaximum",
+            "maximumHealth",
+            "maxHP",
+            "HPMax",
+            "health",
+            "Health"
+        };
+
         private readonly Dictionary<string, float> lastSeenLoggedAt = new Dictionary<string, float>();
         private readonly Dictionary<int, string> resolvedMonsterNames = new Dictionary<int, string>();
         private readonly Dictionary<int, int> sourceIdsByEnemyParent = new Dictionary<int, int>();
         private readonly Dictionary<int, bool> lastAliveBySourceId = new Dictionary<int, bool>();
+        private readonly Dictionary<int, string> lastHealthDebugBySourceId = new Dictionary<int, string>();
         private float nextScanAt;
         private float nextStatusSyncAt;
         private float nextUpgradeSyncAt;
@@ -524,6 +550,7 @@ namespace RepoMonsterBridge
                 int instanceId = sourceIds[index];
                 EnemyCandidate candidate = statusCandidates[instanceId];
                 if (!TryGetEnemyRespawnStatus(candidate, out bool alive, out float remaining)) continue;
+                bool hasHealth = TryGetEnemyHealth(candidate, out float health, out float maxHealth);
 
                 if (!lastAliveBySourceId.TryGetValue(instanceId, out bool previousAlive) || previousAlive != alive)
                 {
@@ -537,13 +564,30 @@ namespace RepoMonsterBridge
 
                 float roundedRemaining = alive ? 0f : (float)Math.Ceiling(Math.Max(0f, remaining) * 10f) / 10f;
                 string remainingText = roundedRemaining.ToString("0.0", CultureInfo.InvariantCulture);
-                fingerprint.Append(instanceId).Append(':').Append(alive ? '1' : '0').Append(':').Append(remainingText).Append(';');
+                string healthText = hasHealth ? Math.Max(0f, health).ToString("0.#", CultureInfo.InvariantCulture) : "";
+                string maxHealthText = hasHealth && maxHealth > 0f ? maxHealth.ToString("0.#", CultureInfo.InvariantCulture) : "";
+                if (debugLogging.Value && hasHealth)
+                {
+                    string healthDebug = healthText + "/" + (maxHealthText.Length > 0 ? maxHealthText : "?");
+                    if (!lastHealthDebugBySourceId.TryGetValue(instanceId, out string previousHealthDebug) || previousHealthDebug != healthDebug)
+                    {
+                        lastHealthDebugBySourceId[instanceId] = healthDebug;
+                        Logger.LogInfo("Monster health state " + instanceId + ": hp=" + healthDebug + ".");
+                    }
+                }
+                fingerprint.Append(instanceId).Append(':').Append(alive ? '1' : '0').Append(':').Append(remainingText)
+                    .Append(':').Append(healthText).Append('/').Append(maxHealthText).Append(';');
 
                 if (statusCount++ > 0) json.Append(',');
                 json.Append("{\"id\":").Append(instanceId)
                     .Append(",\"alive\":").Append(alive ? "true" : "false")
-                    .Append(",\"respawnRemaining\":").Append(remainingText)
-                    .Append('}');
+                    .Append(",\"respawnRemaining\":").Append(remainingText);
+                if (hasHealth)
+                {
+                    json.Append(",\"health\":").Append(healthText.Length > 0 ? healthText : "0");
+                    if (maxHealthText.Length > 0) json.Append(",\"maxHealth\":").Append(maxHealthText);
+                }
+                json.Append('}');
             }
 
             if (statusCount == 0) return;
@@ -579,6 +623,95 @@ namespace RepoMonsterBridge
             remaining = Math.Max(0f, remaining);
             alive = remaining <= 0.000001f;
             return true;
+        }
+
+        private static bool TryGetEnemyHealth(EnemyCandidate candidate, out float health, out float maxHealth)
+        {
+            health = 0f;
+            maxHealth = 0f;
+            bool hasHealth = false;
+
+            foreach (object source in GetEnemyHealthSources(candidate))
+            {
+                if (source == null) continue;
+
+                float currentValue;
+                if (!hasHealth && TryReadFirstFloat(source, CurrentHealthMemberNames, out currentValue))
+                {
+                    health = Math.Max(0f, currentValue);
+                    hasHealth = true;
+                }
+
+                float maxValue;
+                if (maxHealth <= 0f && TryReadFirstFloat(source, MaxHealthMemberNames, out maxValue))
+                {
+                    maxHealth = Math.Max(0f, maxValue);
+                }
+
+                if (hasHealth && maxHealth > 0f) return true;
+            }
+
+            if (!hasHealth && maxHealth > 0f)
+            {
+                health = maxHealth;
+                return true;
+            }
+
+            return hasHealth;
+        }
+
+        private static IEnumerable<object> GetEnemyHealthSources(EnemyCandidate candidate)
+        {
+            if (candidate.Root != null)
+            {
+                Component enemyHealth = candidate.Root.GetComponent("EnemyHealth");
+                if (enemyHealth != null) yield return enemyHealth;
+
+                Component[] components = candidate.Root.GetComponentsInChildren<Component>(true);
+                foreach (Component component in components)
+                {
+                    if (component == null) continue;
+                    string typeName = component.GetType().Name;
+                    if (typeName.IndexOf("Health", StringComparison.OrdinalIgnoreCase) >= 0)
+                    {
+                        yield return component;
+                    }
+                }
+
+                Component enemy = candidate.Root.GetComponent("Enemy");
+                if (enemy != null) yield return enemy;
+            }
+
+            if (candidate.Component != null) yield return candidate.Component;
+
+            Component enemyParent = GetEnemyParent(candidate);
+            if (enemyParent != null) yield return enemyParent;
+
+            if (candidate.Root == null) yield break;
+
+            Component[] damageComponents = candidate.Root.GetComponentsInChildren<Component>(true);
+            foreach (Component component in damageComponents)
+            {
+                if (component == null) continue;
+                string typeName = component.GetType().Name;
+                if (typeName.IndexOf("Damage", StringComparison.OrdinalIgnoreCase) >= 0)
+                {
+                    yield return component;
+                }
+            }
+        }
+
+        private static bool TryReadFirstFloat(object source, string[] memberNames, out float value)
+        {
+            for (int index = 0; index < memberNames.Length; index++)
+            {
+                object rawValue = ReadMember(source, memberNames[index]);
+                if (rawValue == null) continue;
+                if (TryConvertFloat(rawValue, out value)) return true;
+            }
+
+            value = 0f;
+            return false;
         }
 
         private static bool TryGetTimerModRespawnStatus(Component enemyParent, out bool alive, out float remaining, out bool timerModAvailable)

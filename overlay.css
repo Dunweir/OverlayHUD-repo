@@ -404,6 +404,12 @@ body {
     font-weight: inherit;
 }
 
+.monster-tooltip-health {
+    color: #f7fbff;
+    font-size: 15px;
+    font-weight: 700;
+}
+
 .monster-tooltip-strength {
     color: #ffcf62;
     font-size: 15px;
