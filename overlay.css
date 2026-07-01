@@ -689,19 +689,19 @@ body {
 
 .strength-required {
     position: absolute;
-    bottom: calc(var(--square-size) * 0.065);
-    left: 50%;
+    bottom: -4px;
+    left: -4px;
     z-index: 5;
-    min-width: 40px;
-    max-width: calc(var(--square-size) + 12px);
-    padding: 4px 8px 3px;
-    transform: translateX(-50%) translateY(0) scale(1);
+    min-width: 24px;
+    max-width: calc(var(--square-size) + 10px);
+    padding: 4px 7px 3px;
+    transform: scale(1);
     overflow: visible;
     border-radius: 999px;
-    background: rgba(0, 0, 0, 0.78);
+    background: rgba(0, 0, 0, 0.82);
     color: #ffb200;
     font-family: Arial, sans-serif;
-    font-size: 16px;
+    font-size: 15px;
     font-weight: 700;
     line-height: 1;
     text-align: center;
@@ -712,7 +712,7 @@ body {
 
 .overlay-container.hide-monster-strength .strength-required {
     opacity: 0;
-    transform: translateX(-50%) translateY(-4px) scale(0.88);
+    transform: translate(-3px, 3px) scale(0.88);
     visibility: hidden;
     transition-delay: 0s, 0s, 0.18s;
 }
@@ -768,6 +768,50 @@ body {
     width: 80px;
     height: 54px;
     pointer-events: auto;
+}
+
+.overlay-language-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    min-width: 0;
+    gap: 12px;
+    color: #eef4f8;
+    font-family: Arial, sans-serif;
+    font-size: 15px;
+    font-weight: 700;
+}
+
+.overlay-language-switch {
+    display: grid;
+    grid-template-columns: repeat(2, 44px);
+    gap: 4px;
+    padding: 3px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.06);
+}
+
+.overlay-language-switch button {
+    height: 28px;
+    padding: 0;
+    border: 0;
+    border-radius: 6px;
+    background: transparent;
+    color: #b9c7d2;
+    font-family: Arial, sans-serif;
+    font-size: 13px;
+    font-weight: 800;
+    cursor: pointer;
+}
+
+.overlay-language-switch button.is-active {
+    background: #ffb200;
+    color: #151922;
+}
+
+.overlay-language-switch button:focus-visible {
+    outline: 3px solid rgba(255, 178, 0, 0.18);
 }
 
 .overlay-slider-row {

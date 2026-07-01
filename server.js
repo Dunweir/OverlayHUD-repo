@@ -118,6 +118,7 @@ const defaultOverlayState = {
     tabHidden: false,
     ...defaultPlayerUpgrades,
     style: 1,
+    interfaceLanguage: "ru",
     bgEnabled: false,
     timerVisible: false,
     upgradesVisible: true,
@@ -157,6 +158,7 @@ function normalizeOverlayState(rawState) {
     const hoverOpacity = Number.isFinite(Number(source.hoverOpacity))
         ? Math.min(100, Math.max(20, Number(source.hoverOpacity)))
         : defaultOverlayState.hoverOpacity;
+    const interfaceLanguage = source.interfaceLanguage === "en" ? "en" : defaultOverlayState.interfaceLanguage;
 
     return {
         ...source,
@@ -167,6 +169,7 @@ function normalizeOverlayState(rawState) {
         columnsCount,
         columnsLayoutVersion: defaultOverlayState.columnsLayoutVersion,
         hoverOpacity,
+        interfaceLanguage,
         monsters: Array.isArray(source.monsters) ? source.monsters : [],
         roster: Array.isArray(source.roster) ? source.roster : []
     };

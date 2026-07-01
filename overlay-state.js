@@ -73,6 +73,7 @@ const OverlayApp = (() => {
         extraJump: 0,
         tumbleClimb: 0,
         style: 1,
+        interfaceLanguage: "ru",
         bgEnabled: false,
         timerVisible: false,
         upgradesVisible: true,
@@ -124,6 +125,7 @@ const OverlayApp = (() => {
         const hoverOpacity = Number.isFinite(Number(source.hoverOpacity))
             ? Math.min(100, Math.max(20, Number(source.hoverOpacity)))
             : defaultState.hoverOpacity;
+        const interfaceLanguage = source.interfaceLanguage === "en" ? "en" : defaultState.interfaceLanguage;
         return {
             ...defaultState,
             ...source,
@@ -134,6 +136,7 @@ const OverlayApp = (() => {
             upgradeSize,
             columnsCount,
             hoverOpacity,
+            interfaceLanguage,
             monsters: Array.isArray(source.monsters) ? source.monsters : [],
             roster: Array.isArray(source.roster) ? source.roster : []
         };
@@ -398,6 +401,10 @@ const OverlayApp = (() => {
         updateState((currentState) => ({ ...currentState, style: 1 }));
     }
 
+    function setInterfaceLanguage(interfaceLanguage) {
+        updateState((currentState) => ({ ...currentState, interfaceLanguage: interfaceLanguage === "en" ? "en" : "ru" }));
+    }
+
     function setBgEnabled(bgEnabled) {
         updateState((currentState) => ({ ...currentState, bgEnabled }));
     }
@@ -460,6 +467,7 @@ const OverlayApp = (() => {
         setBgEnabled,
         setColumnsCount,
         setHoverOpacity,
+        setInterfaceLanguage,
         setLevel,
         setMonsterHealthBarsVisible,
         setMonsterStrengthVisible,
