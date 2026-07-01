@@ -134,6 +134,7 @@ const defaultOverlayState = {
     overlayScaleVersion: 3,
     columnsCount: 7,
     columnsLayoutVersion: 1,
+    overlayAlignment: "left",
     hoverOpacity: 50,
     seconds: 0,
     running: false,
@@ -161,6 +162,9 @@ function normalizeOverlayState(rawState) {
         ? Math.min(100, Math.max(20, Number(source.hoverOpacity)))
         : defaultOverlayState.hoverOpacity;
     const interfaceLanguage = source.interfaceLanguage === "en" ? "en" : defaultOverlayState.interfaceLanguage;
+    const overlayAlignment = ["left", "center", "right"].includes(source.overlayAlignment)
+        ? source.overlayAlignment
+        : defaultOverlayState.overlayAlignment;
 
     return {
         ...source,
@@ -172,6 +176,7 @@ function normalizeOverlayState(rawState) {
         columnsLayoutVersion: defaultOverlayState.columnsLayoutVersion,
         hoverOpacity,
         interfaceLanguage,
+        overlayAlignment,
         monsters: Array.isArray(source.monsters) ? source.monsters : [],
         roster: Array.isArray(source.roster) ? source.roster : []
     };

@@ -37,6 +37,14 @@
                     <input type="range" id="overlayHoverOpacitySlider" min="20" max="100" value="50" step="5">
                     <span id="overlayHoverOpacityValue">50%</span>
                 </div>
+                <div class="overlay-segment-row">
+                    <span data-i18n="alignment">Выравнивание</span>
+                    <div class="overlay-alignment-switch" role="group" aria-label="Overlay alignment">
+                        <button type="button" data-alignment="left" aria-label="Align left">←</button>
+                        <button type="button" data-alignment="center" aria-label="Align center">•</button>
+                        <button type="button" data-alignment="right" aria-label="Align right">→</button>
+                    </div>
+                </div>
                 <div class="overlay-toggle-list">
                     <section class="overlay-toggle-group" aria-labelledby="overlayVisibilityGroupTitle">
                         <div class="overlay-toggle-group-title" id="overlayVisibilityGroupTitle" data-i18n="groupVisibility">Видимость</div>
@@ -158,6 +166,7 @@
         const overlayColumnsValue = document.getElementById("overlayColumnsValue");
         const overlayHoverOpacitySlider = document.getElementById("overlayHoverOpacitySlider");
         const overlayHoverOpacityValue = document.getElementById("overlayHoverOpacityValue");
+        const overlayAlignmentButtons = [...document.querySelectorAll("[data-alignment]")];
         const overlayBgToggle = document.getElementById("overlayBgToggle");
         const overlayTimerToggle = document.getElementById("overlayTimerToggle");
         const overlayUpgradesToggle = document.getElementById("overlayUpgradesToggle");
@@ -201,6 +210,7 @@
                 upgrades: "Апгрейды",
                 columns: "Колонки",
                 opacity: "Прозрачность",
+                alignment: "Выравнивание",
                 groupVisibility: "Видимость",
                 groupBlocks: "Блоки",
                 groupDetails: "Детали",
@@ -239,6 +249,7 @@
                 upgrades: "Upgrades",
                 columns: "Columns",
                 opacity: "Opacity",
+                alignment: "Alignment",
                 groupVisibility: "Visibility",
                 groupBlocks: "Blocks",
                 groupDetails: "Details",
@@ -651,6 +662,8 @@
             document.documentElement.style.setProperty("--square-size", `${state.squareSize}px`);
             document.documentElement.style.setProperty("--upgrade-size", `${state.upgradeSize}px`);
             document.documentElement.style.setProperty("--columns-count", state.columnsCount);
+            const monsterGridWidth = state.columnsCount * state.squareSize + Math.max(0, state.columnsCount - 1) * 10;
+            document.documentElement.style.setProperty("--monster-grid-width", `${monsterGridWidth}px`);
             applyViewportScale();
             overlaySizeSlider.value = state.squareSize;
             overlaySizeValue.textContent = state.squareSize;
@@ -661,6 +674,11 @@
             overlayHoverOpacitySlider.value = state.hoverOpacity;
             overlayHoverOpacityValue.textContent = `${state.hoverOpacity}%`;
             overlayHoverControls.dataset.hoverOpacity = state.hoverOpacity;
+            overlayAlignmentButtons.forEach((button) => {
+                const isActive = button.dataset.alignment === state.overlayAlignment;
+                button.classList.toggle("is-active", isActive);
+                button.setAttribute("aria-pressed", String(isActive));
+            });
             overlayBgToggle.checked = state.bgEnabled;
             overlayTimerToggle.checked = state.timerVisible;
             overlayUpgradesToggle.checked = state.upgradesVisible;
@@ -673,6 +691,7 @@
             overlayRespawnIndicatorToggle.checked = state.respawnIndicatorVisible;
 
             overlayContainer.className = "overlay-container";
+            overlayContainer.classList.add(`align-${state.overlayAlignment}`);
             if (state.bgEnabled) overlayContainer.classList.add("with-bg");
             if (!state.timerVisible) overlayContainer.classList.add("hide-level-timer");
             if (!state.upgradesVisible) overlayContainer.classList.add("hide-upgrades");
@@ -742,6 +761,9 @@
         overlayUpgradeSizeSlider.addEventListener("input", () => OverlayApp.setUpgradeSize(parseInt(overlayUpgradeSizeSlider.value, 10)));
         overlayColumnsSlider.addEventListener("input", () => OverlayApp.setColumnsCount(parseInt(overlayColumnsSlider.value, 10)));
         overlayHoverOpacitySlider.addEventListener("input", () => OverlayApp.setHoverOpacity(parseInt(overlayHoverOpacitySlider.value, 10)));
+        overlayAlignmentButtons.forEach((button) => {
+            button.addEventListener("click", () => OverlayApp.setOverlayAlignment(button.dataset.alignment));
+        });
         overlayBgToggle.addEventListener("change", () => OverlayApp.setBgEnabled(overlayBgToggle.checked));
         overlayTimerToggle.addEventListener("change", () => OverlayApp.setTimerVisible(overlayTimerToggle.checked));
         overlayUpgradesToggle.addEventListener("change", () => OverlayApp.setUpgradesVisible(overlayUpgradesToggle.checked));

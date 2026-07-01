@@ -34,6 +34,7 @@
     --viewport-scale: 1;
     --overlay-edge-offset: 20px;
     --overlay-available-width: calc(100vw - 40px);
+    --monster-grid-width: 0px;
     --teko-visual-y: 0.08em;
 }
 
@@ -62,10 +63,12 @@ body {
 }
 
 .overlay-container {
+    --overlay-slide-y: 18px;
     position: absolute;
     left: var(--overlay-edge-offset);
+    right: auto;
     bottom: var(--overlay-edge-offset);
-    min-width: 310px;
+    min-width: max(310px, calc(var(--monster-grid-width) + 28px));
     width: max-content;
     max-width: var(--overlay-available-width);
     padding: 14px;
@@ -74,7 +77,7 @@ body {
     background-color: transparent;
     opacity: 0;
     visibility: hidden;
-    transform: translateY(18px) scale(calc(var(--viewport-scale) * 0.98));
+    transform: translateY(var(--overlay-slide-y)) scale(calc(var(--viewport-scale) * 0.98));
     transform-origin: left bottom;
     transition: opacity 0.28s ease, transform 0.28s ease, visibility 0s linear 0.28s,
         background-color 0.24s ease, border-color 0.24s ease;
@@ -82,9 +85,10 @@ body {
 }
 
 .overlay-container.is-visible {
+    --overlay-slide-y: 0;
     opacity: 1;
     visibility: visible;
-    transform: translateY(0) scale(var(--viewport-scale));
+    transform: translateY(var(--overlay-slide-y)) scale(var(--viewport-scale));
     transition-delay: 0s;
 }
 
@@ -109,7 +113,7 @@ body {
 .overlay-header {
     display: flex;
     align-items: center;
-    justify-content: flex-start;
+    justify-content: start;
     gap: 0;
     max-height: 58px;
     margin-bottom: 6px;
@@ -119,6 +123,14 @@ body {
     transition: max-height 0.24s ease, margin-bottom 0.24s ease, opacity 0.18s ease,
         transform 0.18s ease, visibility 0s linear 0s;
     visibility: visible;
+}
+
+.overlay-container.align-center .overlay-header {
+    justify-content: center;
+}
+
+.overlay-container.align-right .overlay-header {
+    justify-content: flex-end;
 }
 
 .overlay-container.hide-level-badge.hide-level-timer .overlay-header {
@@ -220,6 +232,7 @@ body {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
+    justify-content: start;
     width: 100%;
     max-width: 100%;
     max-height: calc((var(--upgrade-size) + max(6px, calc(var(--upgrade-size) * 0.19))) * 4);
@@ -230,6 +243,14 @@ body {
     visibility: visible;
     transition: max-height 0.24s ease, margin-bottom 0.24s ease, opacity 0.18s ease,
         visibility 0s linear 0s;
+}
+
+.overlay-container.align-center .upgrade-row {
+    justify-content: center;
+}
+
+.overlay-container.align-right .upgrade-row {
+    justify-content: flex-end;
 }
 
 .upgrade-row.is-empty,
@@ -300,8 +321,8 @@ body {
     visibility: visible;
     transform: translateY(0) scale(1);
     transform-origin: left top;
-    transition: margin-left 0.24s ease, opacity 0.22s ease, transform 0.22s ease,
-        visibility 0s linear 0s;
+    transition: width 0.24s ease, margin-left 0.24s ease, opacity 0.22s ease,
+        transform 0.22s ease, visibility 0s linear 0s;
 }
 
 .overlay-container.hide-level-badge .overlay-meta {
@@ -320,17 +341,29 @@ body {
     white-space: nowrap;
 }
 
+.overlay-container.align-center .timer {
+    text-align: center;
+}
+
+.overlay-container.align-right .timer {
+    text-align: right;
+}
+
 .overlay-container.hide-level-timer .overlay-meta {
+    width: 0;
+    margin-left: 0;
+    overflow: hidden;
     opacity: 0;
     visibility: hidden;
     transform: translateY(6px) scale(0.98);
-    transition-delay: 0s, 0s, 0s, 0.22s;
+    transition-delay: 0s, 0s, 0s, 0s, 0.24s;
 }
 
 .monsters-squares {
-    display: grid;
-    grid-template-columns: repeat(var(--columns-count), var(--square-size));
-    width: max-content;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-start;
+    width: var(--monster-grid-width);
     max-width: 100%;
     gap: 10px;
     max-height: 900px;
@@ -341,6 +374,14 @@ body {
     transition: max-height 0.26s ease, opacity 0.2s ease, transform 0.2s ease,
         visibility 0s linear 0s;
     visibility: visible;
+}
+
+.overlay-container.align-center .monsters-squares {
+    justify-content: center;
+}
+
+.overlay-container.align-right .monsters-squares {
+    justify-content: flex-end;
 }
 
 .overlay-container.hide-monster-icons .monsters-squares {
@@ -910,6 +951,59 @@ body {
 }
 
 .overlay-language-switch button:focus-visible {
+    outline: 3px solid rgba(255, 178, 0, 0.18);
+}
+
+.overlay-segment-row {
+    display: grid;
+    grid-template-columns: 116px minmax(0, 1fr);
+    align-items: center;
+    gap: 10px;
+    color: #eef4f8;
+    font-family: "Roboto", Arial, sans-serif;
+    font-weight: 700;
+}
+
+.overlay-segment-row > span {
+    min-width: 0;
+    overflow: hidden;
+    font-size: 15px;
+    line-height: 1;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.overlay-alignment-switch {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 4px;
+    min-width: 0;
+    padding: 3px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.06);
+}
+
+.overlay-alignment-switch button {
+    height: 30px;
+    padding: 0;
+    border: 0;
+    border-radius: 6px;
+    background: transparent;
+    color: #b9c7d2;
+    font-family: "Roboto", Arial, sans-serif;
+    font-size: 17px;
+    font-weight: 800;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.overlay-alignment-switch button.is-active {
+    background: #ffb200;
+    color: #151922;
+}
+
+.overlay-alignment-switch button:focus-visible {
     outline: 3px solid rgba(255, 178, 0, 0.18);
 }
 

@@ -89,6 +89,7 @@ const OverlayApp = (() => {
         overlayScaleVersion: 3,
         columnsCount: 7,
         columnsLayoutVersion: 1,
+        overlayAlignment: "left",
         hoverOpacity: 50,
         seconds: 0,
         running: false,
@@ -128,6 +129,9 @@ const OverlayApp = (() => {
             ? Math.min(100, Math.max(20, Number(source.hoverOpacity)))
             : defaultState.hoverOpacity;
         const interfaceLanguage = source.interfaceLanguage === "en" ? "en" : defaultState.interfaceLanguage;
+        const overlayAlignment = ["left", "center", "right"].includes(source.overlayAlignment)
+            ? source.overlayAlignment
+            : defaultState.overlayAlignment;
         return {
             ...defaultState,
             ...source,
@@ -139,6 +143,7 @@ const OverlayApp = (() => {
             columnsCount,
             hoverOpacity,
             interfaceLanguage,
+            overlayAlignment,
             monsters: Array.isArray(source.monsters) ? source.monsters : [],
             roster: Array.isArray(source.roster) ? source.roster : []
         };
@@ -468,6 +473,13 @@ const OverlayApp = (() => {
         updateState((currentState) => ({ ...currentState, hoverOpacity }));
     }
 
+    function setOverlayAlignment(overlayAlignment) {
+        updateState((currentState) => ({
+            ...currentState,
+            overlayAlignment: ["left", "center", "right"].includes(overlayAlignment) ? overlayAlignment : defaultState.overlayAlignment
+        }));
+    }
+
     return {
         monsterConfig,
         addMonster,
@@ -488,6 +500,7 @@ const OverlayApp = (() => {
         setMonsterIconsVisible,
         setMonsterHealthBarsVisible,
         setMonsterStrengthVisible,
+        setOverlayAlignment,
         setSquareSize,
         setStrength,
         setTumbleLaunch,
