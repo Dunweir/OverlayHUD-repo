@@ -149,9 +149,9 @@ body {
     position: relative;
     display: inline-flex;
     align-items: center;
-    gap: max(4px, calc(var(--upgrade-size) * 0.13));
+    gap: 3px;
     min-height: var(--upgrade-size);
-    padding: max(1px, calc(var(--upgrade-size) * 0.03)) max(6px, calc(var(--upgrade-size) * 0.19));
+    padding: 0 max(6px, calc(var(--upgrade-size) * 0.19)) 0 0;
     border-radius: 5px;
     background: var(--upgrade-background, rgba(255, 178, 0, 0.14));
     color: var(--upgrade-color, #ffd884);
@@ -171,10 +171,11 @@ body {
 
 .upgrade-stat img {
     position: static;
-    width: calc(var(--upgrade-size) * 0.63);
-    height: calc(var(--upgrade-size) * 0.94);
-    border-radius: 3px;
+    width: calc(var(--upgrade-size) * 0.82);
+    height: var(--upgrade-size);
+    border-radius: 5px 0 0 5px;
     object-fit: contain;
+    object-position: left center;
     filter: none;
 }
 
