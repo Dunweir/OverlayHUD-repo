@@ -18,6 +18,8 @@ let retryTimer = null;
 let hoverTimer = null;
 let overlayContentBounds = null;
 let overlayInteractiveBounds = null;
+let overlayHotspotBounds = null;
+let overlayControlsEnabled = false;
 let hoverDimmed = false;
 let hoverOpacity = 0.5;
 let overlayOpacity = 1;
@@ -139,6 +141,46 @@ function setHoverDimmed(dimmed) {
     animateOverlayOpacity(targetOpacity);
 }
 
+function getOverlayHotspotFallbackBounds() {
+    if (!overlayWindow || overlayWindow.isDestroyed()) return null;
+    const bounds = overlayWindow.getBounds();
+    const edgeOffset = 20;
+    return {
+        left: bounds.x + bounds.width - edgeOffset - 80,
+        top: bounds.y + bounds.height - edgeOffset - 54,
+        right: bounds.x + bounds.width - edgeOffset,
+        bottom: bounds.y + bounds.height - edgeOffset
+    };
+}
+
+async function setOverlayHoverState(isOpen, cursor) {
+    if (!overlayWindow || overlayWindow.isDestroyed() || overlayWindow.webContents.isLoading()) return;
+    try {
+        const windowBounds = overlayWindow.getBounds();
+        const zoom = overlayWindow.webContents.getZoomFactor();
+        const clientX = (cursor.x - windowBounds.x) / zoom;
+        const clientY = (cursor.y - windowBounds.y) / zoom;
+        await overlayWindow.webContents.executeJavaScript(`(() => {
+            const controls = document.getElementById("overlayHoverControls");
+            if (controls) controls.classList.toggle("is-open", ${Boolean(isOpen)});
+
+            const clientX = ${clientX.toFixed(2)};
+            const clientY = ${clientY.toFixed(2)};
+            document.querySelectorAll(".is-tooltip-active").forEach((element) => {
+                const bounds = element.getBoundingClientRect();
+                const active = clientX >= bounds.left && clientX <= bounds.right
+                    && clientY >= bounds.top && clientY <= bounds.bottom;
+                if (!active) element.classList.remove("is-tooltip-active");
+            });
+            const target = document.elementFromPoint(clientX, clientY);
+            const tooltipTarget = target ? target.closest(".upgrade-stat, .monster-square") : null;
+            if (tooltipTarget) tooltipTarget.classList.add("is-tooltip-active");
+        })()`, true);
+    } catch {
+        // The page can be between reloads during startup; the next hover tick will retry.
+    }
+}
+
 async function refreshOverlayContentBounds() {
     if (!overlayWindow || overlayWindow.isDestroyed() || overlayWindow.webContents.isLoading()) return;
     try {
@@ -168,8 +210,12 @@ async function refreshOverlayContentBounds() {
                 overlay: overlay && overlay.classList.contains("is-visible") && !overlay.classList.contains("is-tab-hidden")
                     ? toRect(overlay)
                     : null,
+                controlsEnabled: Boolean(controls && controls.classList.contains("is-enabled")),
                 controls: controls && controls.classList.contains("is-enabled")
-                    ? unionRects([toRect(hotspot), controlsOpen ? toRect(panel) : null])
+                    ? unionRects([toRect(hotspot), controlsOpen || controls.classList.contains("is-open") ? toRect(panel) : null])
+                    : null,
+                hotspot: controls && controls.classList.contains("is-enabled")
+                    ? toRect(hotspot)
                     : null,
                 hoverOpacity
             };
@@ -189,6 +235,7 @@ async function refreshOverlayContentBounds() {
         }
 
         hoverOpacity = Math.min(1, Math.max(0.2, Number(rects?.hoverOpacity) || 0.5));
+        overlayControlsEnabled = Boolean(rects?.controlsEnabled);
         if (rects && rects.controls) {
             const windowBounds = overlayWindow.getBounds();
             const zoom = overlayWindow.webContents.getZoomFactor();
@@ -201,9 +248,23 @@ async function refreshOverlayContentBounds() {
         } else {
             overlayInteractiveBounds = null;
         }
+        if (rects && rects.hotspot) {
+            const windowBounds = overlayWindow.getBounds();
+            const zoom = overlayWindow.webContents.getZoomFactor();
+            overlayHotspotBounds = {
+                left: windowBounds.x + rects.hotspot.left * zoom,
+                top: windowBounds.y + rects.hotspot.top * zoom,
+                right: windowBounds.x + rects.hotspot.right * zoom,
+                bottom: windowBounds.y + rects.hotspot.bottom * zoom
+            };
+        } else {
+            overlayHotspotBounds = null;
+        }
     } catch {
         overlayContentBounds = null;
         overlayInteractiveBounds = null;
+        overlayHotspotBounds = null;
+        overlayControlsEnabled = false;
         setHoverDimmed(false);
     }
 }
@@ -220,12 +281,19 @@ function startHoverTracking() {
             && cursor.x <= overlayInteractiveBounds.right
             && cursor.y >= overlayInteractiveBounds.top
             && cursor.y <= overlayInteractiveBounds.bottom;
+        const hotspotBounds = overlayHotspotBounds || (overlayControlsEnabled ? getOverlayHotspotFallbackBounds() : null);
+        const isOverHotspot = hotspotBounds
+            && cursor.x >= hotspotBounds.left
+            && cursor.x <= hotspotBounds.right
+            && cursor.y >= hotspotBounds.top
+            && cursor.y <= hotspotBounds.bottom;
         const isOverOverlay = overlayContentBounds
             && cursor.x >= overlayContentBounds.left
             && cursor.x <= overlayContentBounds.right
             && cursor.y >= overlayContentBounds.top
             && cursor.y <= overlayContentBounds.bottom;
-        applyMousePassthrough(clickThrough && !isOverControls);
+        applyMousePassthrough(clickThrough && !isOverControls && !isOverHotspot);
+        setOverlayHoverState(isOverControls || isOverHotspot, cursor);
 
         if (!overlayContentBounds) {
             setHoverDimmed(false);
@@ -313,6 +381,8 @@ function createOverlayWindow() {
         opacityTimer = null;
         overlayContentBounds = null;
         overlayInteractiveBounds = null;
+        overlayHotspotBounds = null;
+        overlayControlsEnabled = false;
         hoverDimmed = false;
         overlayOpacity = 1;
         opacityTarget = 1;

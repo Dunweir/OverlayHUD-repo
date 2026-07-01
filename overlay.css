@@ -239,7 +239,8 @@ body {
     transform: translate(-50%, -4px) rotate(45deg);
 }
 
-.upgrade-stat:hover .upgrade-tooltip {
+.upgrade-stat:hover .upgrade-tooltip,
+.upgrade-stat.is-tooltip-active .upgrade-tooltip {
     opacity: 1;
     transform: translateX(-50%) translateY(0);
 }
@@ -544,7 +545,8 @@ body {
     font-weight: 700;
 }
 
-.monster-square:hover .monster-tooltip {
+.monster-square:hover .monster-tooltip,
+.monster-square.is-tooltip-active .monster-tooltip {
     opacity: 1;
     transform: translateX(-50%) translateY(0);
 }
@@ -791,7 +793,8 @@ body {
     transition: opacity 0.16s ease, transform 0.16s ease;
 }
 
-.overlay-hover-controls:hover .overlay-control-panel {
+.overlay-hover-controls:hover .overlay-control-panel,
+.overlay-hover-controls.is-open .overlay-control-panel {
     opacity: 1;
     pointer-events: auto;
     transform: translateY(0) scale(1);

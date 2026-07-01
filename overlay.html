@@ -641,8 +641,8 @@
             if (!state.respawnIndicatorVisible) overlayContainer.classList.add("hide-respawn-indicator");
             if (!state.respawnTimerVisible && !state.respawnIndicatorVisible) overlayContainer.classList.add("hide-respawn-status");
             if (state.tabHidden) overlayContainer.classList.add("is-tab-hidden");
-            if (state.gameplayVisible && !state.rosterPending) overlayContainer.classList.add("is-visible");
-            overlayHoverControls.classList.toggle("is-enabled", state.gameplayVisible && !state.rosterPending && !state.tabHidden);
+            if (state.gameplayVisible) overlayContainer.classList.add("is-visible");
+            overlayHoverControls.classList.toggle("is-enabled", state.gameplayVisible && !state.tabHidden);
 
             levelNumber.textContent = state.level;
             let visibleUpgradeCount = 0;
