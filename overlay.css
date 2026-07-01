@@ -3,6 +3,30 @@
     src: url("Teko.ttf") format("truetype");
 }
 
+@font-face {
+    font-family: "Roboto";
+    src: url("Roboto-Regular.ttf") format("truetype");
+    font-weight: 400;
+}
+
+@font-face {
+    font-family: "Roboto";
+    src: url("Roboto-Medium.ttf") format("truetype");
+    font-weight: 500;
+}
+
+@font-face {
+    font-family: "Roboto";
+    src: url("Roboto-Bold.ttf") format("truetype");
+    font-weight: 700;
+}
+
+@font-face {
+    font-family: "Roboto";
+    src: url("Roboto-ExtraBold.ttf") format("truetype");
+    font-weight: 800;
+}
+
 :root {
     --square-size: 64px;
     --upgrade-size: 32px;
@@ -10,6 +34,7 @@
     --viewport-scale: 1;
     --overlay-edge-offset: 20px;
     --overlay-available-width: calc(100vw - 40px);
+    --teko-visual-y: 0.08em;
 }
 
 * {
@@ -18,7 +43,7 @@
 
 body {
     margin: 0;
-    font-family: "Teko", Arial, sans-serif;
+    font-family: "Teko", "Roboto", Arial, sans-serif;
     font-weight: 600;
 }
 
@@ -98,7 +123,7 @@ body {
 
 .level-badge {
     display: inline-flex;
-    align-items: baseline;
+    align-items: center;
     gap: 8px;
     min-height: 48px;
     padding: 4px 13px 3px;
@@ -107,13 +132,17 @@ body {
 }
 
 .level-text {
+    display: inline-block;
     font-size: 28px;
     line-height: 1;
+    transform: translateY(var(--teko-visual-y));
 }
 
 .level-number {
+    display: inline-block;
     font-size: 48px;
     line-height: 0.95;
+    transform: translateY(var(--teko-visual-y));
 }
 
 .upgrade-stat {
@@ -129,6 +158,11 @@ body {
     font-size: calc(var(--upgrade-size) * 0.69);
     line-height: 1;
     white-space: nowrap;
+}
+
+.upgrade-stat > span:not(.upgrade-tooltip) {
+    display: inline-block;
+    transform: translateY(var(--teko-visual-y));
 }
 
 .upgrade-stat:hover {
@@ -181,7 +215,7 @@ body {
     background: rgba(12, 17, 23, 0.95);
     box-shadow: 0 8px 18px rgba(0, 0, 0, 0.3);
     color: #f7fbff;
-    font-family: Arial, sans-serif;
+    font-family: "Roboto", Arial, sans-serif;
     font-size: 17px;
     font-weight: 700;
     line-height: 1.15;
@@ -238,6 +272,7 @@ body {
     font-size: 32px;
     line-height: 1;
     text-align: left;
+    transform: translateY(var(--teko-visual-y));
     white-space: nowrap;
 }
 
@@ -357,7 +392,7 @@ body {
     border-radius: 999px;
     background: rgba(0, 0, 0, 0.52);
     color: #fff;
-    font-family: Arial, sans-serif;
+    font-family: "Roboto", Arial, sans-serif;
     font-size: clamp(10px, calc(var(--square-size) * 0.18), 14px);
     font-weight: 800;
     line-height: 1;
@@ -444,7 +479,7 @@ body {
     border-radius: 999px;
     background: rgba(0, 0, 0, 0.86);
     color: #ffdedb;
-    font-family: Arial, sans-serif;
+    font-family: "Roboto", Arial, sans-serif;
     font-size: clamp(14px, calc(var(--square-size) * 0.26), 20px);
     font-weight: 800;
     line-height: 1;
@@ -469,7 +504,7 @@ body {
     background: rgba(12, 17, 23, 0.95);
     box-shadow: 0 8px 18px rgba(0, 0, 0, 0.3);
     color: #f7fbff;
-    font-family: Arial, sans-serif;
+    font-family: "Roboto", Arial, sans-serif;
     font-weight: 700;
     line-height: 1.15;
     opacity: 0;
@@ -680,7 +715,7 @@ body {
     border-radius: 999px;
     background: rgba(0, 0, 0, 0.82);
     color: white;
-    font-family: Arial, sans-serif;
+    font-family: "Roboto", Arial, sans-serif;
     font-size: 13px;
     font-weight: 700;
     line-height: 1;
@@ -700,7 +735,7 @@ body {
     border-radius: 999px;
     background: rgba(0, 0, 0, 0.82);
     color: #ffb200;
-    font-family: Arial, sans-serif;
+    font-family: "Roboto", Arial, sans-serif;
     font-size: 15px;
     font-weight: 700;
     line-height: 1;
@@ -777,7 +812,7 @@ body {
     min-width: 0;
     gap: 12px;
     color: #eef4f8;
-    font-family: Arial, sans-serif;
+    font-family: "Roboto", Arial, sans-serif;
     font-size: 15px;
     font-weight: 700;
 }
@@ -799,7 +834,7 @@ body {
     border-radius: 6px;
     background: transparent;
     color: #b9c7d2;
-    font-family: Arial, sans-serif;
+    font-family: "Roboto", Arial, sans-serif;
     font-size: 13px;
     font-weight: 800;
     cursor: pointer;
@@ -820,7 +855,7 @@ body {
     align-items: center;
     gap: 10px;
     color: #eef4f8;
-    font-family: Arial, sans-serif;
+    font-family: "Roboto", Arial, sans-serif;
     font-weight: 700;
 }
 
@@ -880,7 +915,7 @@ body {
     min-height: 32px;
     gap: 8px;
     color: #eef4f8;
-    font-family: Arial, sans-serif;
+    font-family: "Roboto", Arial, sans-serif;
     font-size: 14px;
     font-weight: 700;
 }
