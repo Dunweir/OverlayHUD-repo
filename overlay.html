@@ -38,76 +38,91 @@
                     <span id="overlayHoverOpacityValue">50%</span>
                 </div>
                 <div class="overlay-toggle-list">
-                    <label class="overlay-toggle-row">
-                        <span data-i18n="background">Подложка</span>
-                        <span class="overlay-toggle-switch">
-                            <input type="checkbox" id="overlayBgToggle">
-                            <span></span>
-                        </span>
-                    </label>
-                    <label class="overlay-toggle-row">
-                        <span data-i18n="timer">Таймер</span>
-                        <span class="overlay-toggle-switch">
-                            <input type="checkbox" id="overlayTimerToggle">
-                            <span></span>
-                        </span>
-                    </label>
-                    <label class="overlay-toggle-row">
-                        <span data-i18n="upgrades">Апгрейды</span>
-                        <span class="overlay-toggle-switch">
-                            <input type="checkbox" id="overlayUpgradesToggle">
-                            <span></span>
-                        </span>
-                    </label>
-                    <label class="overlay-toggle-row">
-                        <span data-i18n="monsterIcons">Монстры</span>
-                        <span class="overlay-toggle-switch">
-                            <input type="checkbox" id="overlayMonsterIconsToggle">
-                            <span></span>
-                        </span>
-                    </label>
-                    <label class="overlay-toggle-row">
-                        <span data-i18n="levelBadge">Уровень</span>
-                        <span class="overlay-toggle-switch">
-                            <input type="checkbox" id="overlayLevelBadgeToggle">
-                            <span></span>
-                        </span>
-                    </label>
-                    <label class="overlay-toggle-row">
-                        <span data-i18n="tooltips">Подсказки</span>
-                        <span class="overlay-toggle-switch">
-                            <input type="checkbox" id="overlayUpgradeTooltipsToggle">
-                            <span></span>
-                        </span>
-                    </label>
-                    <label class="overlay-toggle-row">
-                        <span data-i18n="healthBar">ХП полоска</span>
-                        <span class="overlay-toggle-switch">
-                            <input type="checkbox" id="overlayMonsterHealthBarsToggle">
-                            <span></span>
-                        </span>
-                    </label>
-                    <label class="overlay-toggle-row">
-                        <span data-i18n="strength">Сила</span>
-                        <span class="overlay-toggle-switch">
-                            <input type="checkbox" id="overlayMonsterStrengthToggle">
-                            <span></span>
-                        </span>
-                    </label>
-                    <label class="overlay-toggle-row">
-                        <span data-i18n="respawnTime">Время респавна</span>
-                        <span class="overlay-toggle-switch">
-                            <input type="checkbox" id="overlayRespawnTimerToggle">
-                            <span></span>
-                        </span>
-                    </label>
-                    <label class="overlay-toggle-row">
-                        <span data-i18n="cooldownIndicator">Индикатор КД</span>
-                        <span class="overlay-toggle-switch">
-                            <input type="checkbox" id="overlayRespawnIndicatorToggle">
-                            <span></span>
-                        </span>
-                    </label>
+                    <section class="overlay-toggle-group" aria-labelledby="overlayVisibilityGroupTitle">
+                        <div class="overlay-toggle-group-title" id="overlayVisibilityGroupTitle" data-i18n="groupVisibility">Видимость</div>
+                        <div class="overlay-toggle-group-items">
+                            <label class="overlay-toggle-row">
+                                <span data-i18n="background">Подложка</span>
+                                <span class="overlay-toggle-switch">
+                                    <input type="checkbox" id="overlayBgToggle">
+                                    <span></span>
+                                </span>
+                            </label>
+                            <label class="overlay-toggle-row">
+                                <span data-i18n="levelBadge">Уровень</span>
+                                <span class="overlay-toggle-switch">
+                                    <input type="checkbox" id="overlayLevelBadgeToggle">
+                                    <span></span>
+                                </span>
+                            </label>
+                            <label class="overlay-toggle-row">
+                                <span data-i18n="timer">Таймер</span>
+                                <span class="overlay-toggle-switch">
+                                    <input type="checkbox" id="overlayTimerToggle">
+                                    <span></span>
+                                </span>
+                            </label>
+                        </div>
+                    </section>
+                    <section class="overlay-toggle-group" aria-labelledby="overlayBlocksGroupTitle">
+                        <div class="overlay-toggle-group-title" id="overlayBlocksGroupTitle" data-i18n="groupBlocks">Блоки</div>
+                        <div class="overlay-toggle-group-items">
+                            <label class="overlay-toggle-row">
+                                <span data-i18n="upgrades">Апгрейды</span>
+                                <span class="overlay-toggle-switch">
+                                    <input type="checkbox" id="overlayUpgradesToggle">
+                                    <span></span>
+                                </span>
+                            </label>
+                            <label class="overlay-toggle-row">
+                                <span data-i18n="monsterIcons">Монстры</span>
+                                <span class="overlay-toggle-switch">
+                                    <input type="checkbox" id="overlayMonsterIconsToggle">
+                                    <span></span>
+                                </span>
+                            </label>
+                        </div>
+                    </section>
+                    <section class="overlay-toggle-group" aria-labelledby="overlayDetailsGroupTitle">
+                        <div class="overlay-toggle-group-title" id="overlayDetailsGroupTitle" data-i18n="groupDetails">Детали</div>
+                        <div class="overlay-toggle-group-items">
+                            <label class="overlay-toggle-row">
+                                <span data-i18n="tooltips">Подсказки</span>
+                                <span class="overlay-toggle-switch">
+                                    <input type="checkbox" id="overlayUpgradeTooltipsToggle">
+                                    <span></span>
+                                </span>
+                            </label>
+                            <label class="overlay-toggle-row">
+                                <span data-i18n="healthBar">ХП полоска</span>
+                                <span class="overlay-toggle-switch">
+                                    <input type="checkbox" id="overlayMonsterHealthBarsToggle">
+                                    <span></span>
+                                </span>
+                            </label>
+                            <label class="overlay-toggle-row">
+                                <span data-i18n="strength">Сила</span>
+                                <span class="overlay-toggle-switch">
+                                    <input type="checkbox" id="overlayMonsterStrengthToggle">
+                                    <span></span>
+                                </span>
+                            </label>
+                            <label class="overlay-toggle-row">
+                                <span data-i18n="respawnTime">Время респавна</span>
+                                <span class="overlay-toggle-switch">
+                                    <input type="checkbox" id="overlayRespawnTimerToggle">
+                                    <span></span>
+                                </span>
+                            </label>
+                            <label class="overlay-toggle-row">
+                                <span data-i18n="cooldownIndicator">Индикатор КД</span>
+                                <span class="overlay-toggle-switch">
+                                    <input type="checkbox" id="overlayRespawnIndicatorToggle">
+                                    <span></span>
+                                </span>
+                            </label>
+                        </div>
+                    </section>
                 </div>
             </div>
             <div class="overlay-control-hotspot" id="overlayControlHotspot" aria-hidden="true"></div>
@@ -186,6 +201,9 @@
                 upgrades: "Апгрейды",
                 columns: "Колонки",
                 opacity: "Прозрачность",
+                groupVisibility: "Видимость",
+                groupBlocks: "Блоки",
+                groupDetails: "Детали",
                 background: "Подложка",
                 timer: "Таймер",
                 monsterIcons: "Монстры",
@@ -221,6 +239,9 @@
                 upgrades: "Upgrades",
                 columns: "Columns",
                 opacity: "Opacity",
+                groupVisibility: "Visibility",
+                groupBlocks: "Blocks",
+                groupDetails: "Details",
                 background: "Background",
                 timer: "Timer",
                 monsterIcons: "Monsters",

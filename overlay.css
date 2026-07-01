@@ -966,9 +966,33 @@ body {
 
 .overlay-toggle-list {
     display: grid;
+    gap: 11px;
+    padding-top: 2px;
+}
+
+.overlay-toggle-group {
+    display: grid;
+    min-width: 0;
+    gap: 7px;
+}
+
+.overlay-toggle-group + .overlay-toggle-group {
+    padding-top: 10px;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.overlay-toggle-group-title {
+    color: #ffcf62;
+    font-family: "Roboto", Arial, sans-serif;
+    font-size: 12px;
+    font-weight: 800;
+    line-height: 1;
+}
+
+.overlay-toggle-group-items {
+    display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 8px 12px;
-    padding-top: 2px;
 }
 
 .overlay-toggle-row {
