@@ -60,6 +60,20 @@
                         </span>
                     </label>
                     <label class="overlay-toggle-row">
+                        <span data-i18n="monsterIcons">Монстры</span>
+                        <span class="overlay-toggle-switch">
+                            <input type="checkbox" id="overlayMonsterIconsToggle">
+                            <span></span>
+                        </span>
+                    </label>
+                    <label class="overlay-toggle-row">
+                        <span data-i18n="levelBadge">Уровень</span>
+                        <span class="overlay-toggle-switch">
+                            <input type="checkbox" id="overlayLevelBadgeToggle">
+                            <span></span>
+                        </span>
+                    </label>
+                    <label class="overlay-toggle-row">
                         <span data-i18n="tooltips">Подсказки</span>
                         <span class="overlay-toggle-switch">
                             <input type="checkbox" id="overlayUpgradeTooltipsToggle">
@@ -132,6 +146,8 @@
         const overlayBgToggle = document.getElementById("overlayBgToggle");
         const overlayTimerToggle = document.getElementById("overlayTimerToggle");
         const overlayUpgradesToggle = document.getElementById("overlayUpgradesToggle");
+        const overlayMonsterIconsToggle = document.getElementById("overlayMonsterIconsToggle");
+        const overlayLevelBadgeToggle = document.getElementById("overlayLevelBadgeToggle");
         const overlayUpgradeTooltipsToggle = document.getElementById("overlayUpgradeTooltipsToggle");
         const overlayMonsterHealthBarsToggle = document.getElementById("overlayMonsterHealthBarsToggle");
         const overlayMonsterStrengthToggle = document.getElementById("overlayMonsterStrengthToggle");
@@ -172,6 +188,8 @@
                 opacity: "Прозрачность",
                 background: "Подложка",
                 timer: "Таймер",
+                monsterIcons: "Монстры",
+                levelBadge: "Уровень",
                 tooltips: "Подсказки",
                 healthBar: "ХП полоска",
                 strength: "Сила",
@@ -205,6 +223,8 @@
                 opacity: "Opacity",
                 background: "Background",
                 timer: "Timer",
+                monsterIcons: "Monsters",
+                levelBadge: "Level",
                 tooltips: "Tooltips",
                 healthBar: "HP bar",
                 strength: "Strength",
@@ -623,6 +643,8 @@
             overlayBgToggle.checked = state.bgEnabled;
             overlayTimerToggle.checked = state.timerVisible;
             overlayUpgradesToggle.checked = state.upgradesVisible;
+            overlayMonsterIconsToggle.checked = state.monsterIconsVisible;
+            overlayLevelBadgeToggle.checked = state.levelBadgeVisible;
             overlayUpgradeTooltipsToggle.checked = state.upgradeTooltipsVisible;
             overlayMonsterHealthBarsToggle.checked = state.monsterHealthBarsVisible;
             overlayMonsterStrengthToggle.checked = state.monsterStrengthVisible;
@@ -633,6 +655,8 @@
             if (state.bgEnabled) overlayContainer.classList.add("with-bg");
             if (!state.timerVisible) overlayContainer.classList.add("hide-level-timer");
             if (!state.upgradesVisible) overlayContainer.classList.add("hide-upgrades");
+            if (!state.monsterIconsVisible) overlayContainer.classList.add("hide-monster-icons");
+            if (!state.levelBadgeVisible) overlayContainer.classList.add("hide-level-badge");
             if (!state.upgradeTooltipsVisible) overlayContainer.classList.add("hide-upgrade-tooltips");
             if (!state.upgradeTooltipsVisible) overlayContainer.classList.add("hide-tooltips");
             if (!state.monsterHealthBarsVisible) overlayContainer.classList.add("hide-monster-health-bars");
@@ -700,6 +724,8 @@
         overlayBgToggle.addEventListener("change", () => OverlayApp.setBgEnabled(overlayBgToggle.checked));
         overlayTimerToggle.addEventListener("change", () => OverlayApp.setTimerVisible(overlayTimerToggle.checked));
         overlayUpgradesToggle.addEventListener("change", () => OverlayApp.setUpgradesVisible(overlayUpgradesToggle.checked));
+        overlayMonsterIconsToggle.addEventListener("change", () => OverlayApp.setMonsterIconsVisible(overlayMonsterIconsToggle.checked));
+        overlayLevelBadgeToggle.addEventListener("change", () => OverlayApp.setLevelBadgeVisible(overlayLevelBadgeToggle.checked));
         overlayUpgradeTooltipsToggle.addEventListener("change", () => OverlayApp.setUpgradeTooltipsVisible(overlayUpgradeTooltipsToggle.checked));
         overlayMonsterHealthBarsToggle.addEventListener("change", () => OverlayApp.setMonsterHealthBarsVisible(overlayMonsterHealthBarsToggle.checked));
         overlayMonsterStrengthToggle.addEventListener("change", () => OverlayApp.setMonsterStrengthVisible(overlayMonsterStrengthToggle.checked));

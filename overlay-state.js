@@ -77,6 +77,8 @@ const OverlayApp = (() => {
         bgEnabled: false,
         timerVisible: false,
         upgradesVisible: true,
+        monsterIconsVisible: true,
+        levelBadgeVisible: true,
         upgradeTooltipsVisible: true,
         monsterHealthBarsVisible: true,
         monsterStrengthVisible: true,
@@ -417,6 +419,14 @@ const OverlayApp = (() => {
         updateState((currentState) => ({ ...currentState, upgradesVisible }));
     }
 
+    function setMonsterIconsVisible(monsterIconsVisible) {
+        updateState((currentState) => ({ ...currentState, monsterIconsVisible }));
+    }
+
+    function setLevelBadgeVisible(levelBadgeVisible) {
+        updateState((currentState) => ({ ...currentState, levelBadgeVisible }));
+    }
+
     function setUpgradeTooltipsVisible(upgradeTooltipsVisible) {
         updateState((currentState) => ({ ...currentState, upgradeTooltipsVisible }));
     }
@@ -469,6 +479,8 @@ const OverlayApp = (() => {
         setHoverOpacity,
         setInterfaceLanguage,
         setLevel,
+        setLevelBadgeVisible,
+        setMonsterIconsVisible,
         setMonsterHealthBarsVisible,
         setMonsterStrengthVisible,
         setSquareSize,

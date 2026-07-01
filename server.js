@@ -122,6 +122,8 @@ const defaultOverlayState = {
     bgEnabled: false,
     timerVisible: false,
     upgradesVisible: true,
+    monsterIconsVisible: true,
+    levelBadgeVisible: true,
     upgradeTooltipsVisible: true,
     monsterHealthBarsVisible: true,
     monsterStrengthVisible: true,

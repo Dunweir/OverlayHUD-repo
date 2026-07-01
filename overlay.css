@@ -111,7 +111,24 @@ body {
     align-items: center;
     justify-content: flex-start;
     gap: 0;
+    max-height: 58px;
     margin-bottom: 6px;
+    overflow: visible;
+    opacity: 1;
+    transform: translateY(0);
+    transition: max-height 0.24s ease, margin-bottom 0.24s ease, opacity 0.18s ease,
+        transform 0.18s ease, visibility 0s linear 0s;
+    visibility: visible;
+}
+
+.overlay-container.hide-level-badge.hide-level-timer .overlay-header {
+    max-height: 0;
+    margin-bottom: 0;
+    overflow: hidden;
+    opacity: 0;
+    transform: translateY(-4px);
+    visibility: hidden;
+    transition-delay: 0s, 0s, 0s, 0s, 0.24s;
 }
 
 .overlay-container.is-tab-hidden,
@@ -125,10 +142,30 @@ body {
     display: inline-flex;
     align-items: center;
     gap: 8px;
+    max-width: 220px;
     min-height: 48px;
     padding: 4px 13px 3px;
     border-radius: 6px;
+    opacity: 1;
+    overflow: hidden;
+    transform: translateY(0) scale(1);
+    transform-origin: left center;
+    transition: max-width 0.24s ease, min-height 0.24s ease, padding 0.24s ease,
+        opacity 0.18s ease, transform 0.18s ease, visibility 0s linear 0s;
+    visibility: visible;
     white-space: nowrap;
+}
+
+.overlay-container.hide-level-badge .level-badge {
+    max-width: 0;
+    min-height: 0;
+    padding-right: 0;
+    padding-left: 0;
+    opacity: 0;
+    pointer-events: none;
+    transform: translateY(5px) scale(0.94);
+    visibility: hidden;
+    transition-delay: 0s, 0s, 0s, 0s, 0s, 0.24s;
 }
 
 .level-text {
@@ -263,7 +300,12 @@ body {
     visibility: visible;
     transform: translateY(0) scale(1);
     transform-origin: left top;
-    transition: opacity 0.22s ease, transform 0.22s ease, visibility 0s linear 0s;
+    transition: margin-left 0.24s ease, opacity 0.22s ease, transform 0.22s ease,
+        visibility 0s linear 0s;
+}
+
+.overlay-container.hide-level-badge .overlay-meta {
+    margin-left: 0;
 }
 
 .timer {
@@ -282,7 +324,7 @@ body {
     opacity: 0;
     visibility: hidden;
     transform: translateY(6px) scale(0.98);
-    transition-delay: 0s, 0s, 0.22s;
+    transition-delay: 0s, 0s, 0s, 0.22s;
 }
 
 .monsters-squares {
@@ -291,6 +333,24 @@ body {
     width: max-content;
     max-width: 100%;
     gap: 10px;
+    max-height: 900px;
+    opacity: 1;
+    overflow: visible;
+    transform: translateY(0) scale(1);
+    transform-origin: left top;
+    transition: max-height 0.26s ease, opacity 0.2s ease, transform 0.2s ease,
+        visibility 0s linear 0s;
+    visibility: visible;
+}
+
+.overlay-container.hide-monster-icons .monsters-squares {
+    max-height: 0;
+    opacity: 0;
+    overflow: hidden;
+    pointer-events: none;
+    transform: translateY(8px) scale(0.98);
+    visibility: hidden;
+    transition-delay: 0s, 0s, 0s, 0.26s;
 }
 
 .monster-square {
