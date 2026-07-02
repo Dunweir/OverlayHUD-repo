@@ -84,6 +84,14 @@ body {
     will-change: opacity, transform;
 }
 
+.overlay-container.is-positioned {
+    top: var(--overlay-top);
+    right: auto;
+    bottom: auto;
+    left: var(--overlay-left);
+    transform-origin: left top;
+}
+
 .overlay-container.is-visible {
     --overlay-slide-y: 0;
     opacity: 1;
@@ -377,10 +385,13 @@ body {
 }
 
 .overlay-container.align-center .monsters-squares {
+    margin-right: auto;
+    margin-left: auto;
     justify-content: center;
 }
 
 .overlay-container.align-right .monsters-squares {
+    margin-left: auto;
     justify-content: flex-end;
 }
 
@@ -496,7 +507,7 @@ body {
     background: rgba(0, 0, 0, 0.52);
     color: #fff;
     font-family: "Roboto", Arial, sans-serif;
-    font-size: clamp(10px, calc(var(--square-size) * 0.18), 14px);
+    font-size: clamp(11px, calc(var(--square-size) * 0.21), 16px);
     font-weight: 800;
     line-height: 1;
     text-shadow: 0 1px 3px #000;
@@ -661,7 +672,7 @@ body {
 }
 
 .monster-square.is-revealing .strength-required {
-    animation: monster-detail-reveal 0.38s ease-out 0.2s both;
+    animation: monster-strength-reveal 0.38s ease-out 0.2s both;
 }
 
 .monster-square.is-revealing .monster-count {
@@ -709,6 +720,17 @@ body {
     to {
         opacity: 1;
         transform: translateX(-50%) translateY(0);
+    }
+}
+
+@keyframes monster-strength-reveal {
+    from {
+        opacity: 0;
+        transform: translateY(5px) scale(0.9);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
     }
 }
 
@@ -864,11 +886,18 @@ body {
     display: grid;
     justify-items: end;
     width: min(430px, calc(100vw - var(--overlay-edge-offset) * 2));
-    padding: 0 0 54px;
+    padding: 0;
     opacity: 0;
     pointer-events: none;
     visibility: hidden;
     transition: opacity 0.16s ease, visibility 0s linear 0.16s;
+}
+
+.overlay-hover-controls.is-positioned {
+    top: var(--overlay-top);
+    right: auto;
+    bottom: auto;
+    left: var(--overlay-left);
 }
 
 .overlay-hover-controls.is-enabled {
@@ -890,7 +919,7 @@ body {
     opacity: 0;
     pointer-events: none;
     transform: translateY(8px) scale(0.98);
-    transform-origin: right bottom;
+    transform-origin: right top;
     transition: opacity 0.16s ease, transform 0.16s ease;
 }
 
@@ -908,6 +937,61 @@ body {
     width: 80px;
     height: 54px;
     pointer-events: auto;
+}
+
+.overlay-drag-corner {
+    position: absolute;
+    top: 0;
+    left: 0;
+    z-index: 40;
+    width: 48px;
+    height: 48px;
+    border-radius: 8px;
+    cursor: grab;
+    opacity: 0;
+    pointer-events: auto;
+    transition: opacity 0.12s ease;
+}
+
+.overlay-drag-corner::before {
+    position: absolute;
+    top: 8px;
+    left: 8px;
+    width: 18px;
+    height: 18px;
+    border-top: 3px solid rgba(255, 207, 98, 0.94);
+    border-left: 3px solid rgba(255, 207, 98, 0.94);
+    border-radius: 5px 0 0 0;
+    box-shadow: -5px -5px 12px rgba(0, 0, 0, 0.34);
+    content: "";
+}
+
+.overlay-drag-corner::after {
+    position: absolute;
+    top: 14px;
+    left: 14px;
+    width: 8px;
+    height: 8px;
+    border-top: 2px solid rgba(255, 255, 255, 0.72);
+    border-left: 2px solid rgba(255, 255, 255, 0.72);
+    border-radius: 3px 0 0 0;
+    content: "";
+}
+
+.overlay-drag-corner:hover,
+.overlay-container.is-dragging .overlay-drag-corner,
+.overlay-hover-controls.is-dragging .overlay-drag-corner {
+    opacity: 1;
+}
+
+.overlay-container.is-dragging,
+.overlay-hover-controls.is-dragging {
+    transition: none;
+}
+
+.overlay-container.is-dragging .overlay-drag-corner,
+.overlay-hover-controls.is-dragging .overlay-drag-corner {
+    cursor: grabbing;
 }
 
 .overlay-language-row {

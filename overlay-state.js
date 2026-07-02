@@ -90,6 +90,8 @@ const OverlayApp = (() => {
         columnsCount: 7,
         columnsLayoutVersion: 1,
         overlayAlignment: "left",
+        overlayPosition: null,
+        controlsPosition: null,
         hoverOpacity: 50,
         seconds: 0,
         running: false,
@@ -132,6 +134,8 @@ const OverlayApp = (() => {
         const overlayAlignment = ["left", "center", "right"].includes(source.overlayAlignment)
             ? source.overlayAlignment
             : defaultState.overlayAlignment;
+        const overlayPosition = normalizePosition(source.overlayPosition);
+        const controlsPosition = normalizePosition(source.controlsPosition);
         return {
             ...defaultState,
             ...source,
@@ -144,8 +148,23 @@ const OverlayApp = (() => {
             hoverOpacity,
             interfaceLanguage,
             overlayAlignment,
+            overlayPosition,
+            controlsPosition,
             monsters: Array.isArray(source.monsters) ? source.monsters : [],
             roster: Array.isArray(source.roster) ? source.roster : []
+        };
+    }
+
+    function normalizePosition(position) {
+        if (!position || typeof position !== "object") return null;
+        const left = Number(position.left);
+        const top = Number(position.top);
+        if (!Number.isFinite(left) || !Number.isFinite(top)) return null;
+        return {
+            left: Math.max(0, Math.round(left)),
+            top: Math.max(0, Math.round(top)),
+            anchorX: ["left", "center", "right"].includes(position.anchorX) ? position.anchorX : null,
+            anchorY: ["top", "center", "bottom"].includes(position.anchorY) ? position.anchorY : null
         };
     }
 
@@ -480,6 +499,14 @@ const OverlayApp = (() => {
         }));
     }
 
+    function setOverlayPosition(overlayPosition) {
+        updateState((currentState) => ({ ...currentState, overlayPosition: normalizePosition(overlayPosition) }));
+    }
+
+    function setControlsPosition(controlsPosition) {
+        updateState((currentState) => ({ ...currentState, controlsPosition: normalizePosition(controlsPosition) }));
+    }
+
     return {
         monsterConfig,
         addMonster,
@@ -494,6 +521,7 @@ const OverlayApp = (() => {
         setBgEnabled,
         setColumnsCount,
         setHoverOpacity,
+        setControlsPosition,
         setInterfaceLanguage,
         setLevel,
         setLevelBadgeVisible,
@@ -501,6 +529,7 @@ const OverlayApp = (() => {
         setMonsterHealthBarsVisible,
         setMonsterStrengthVisible,
         setOverlayAlignment,
+        setOverlayPosition,
         setSquareSize,
         setStrength,
         setTumbleLaunch,

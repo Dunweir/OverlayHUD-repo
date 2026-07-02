@@ -19,6 +19,9 @@ let hoverTimer = null;
 let overlayContentBounds = null;
 let overlayInteractiveBounds = null;
 let overlayHotspotBounds = null;
+let overlayDragBounds = [];
+let overlayDragging = false;
+let dragHoldUntil = 0;
 let overlayControlsEnabled = false;
 let hoverDimmed = false;
 let hoverOpacity = 0.5;
@@ -204,19 +207,28 @@ async function refreshOverlayContentBounds() {
             const controls = document.getElementById("overlayHoverControls");
             const panel = controls ? controls.querySelector(".overlay-control-panel") : null;
             const hotspot = document.getElementById("overlayControlHotspot");
+            const overlayDragCorner = document.querySelector(".overlay-drag-corner-main");
+            const controlsDragCorner = document.querySelector(".overlay-drag-corner-controls");
             const controlsOpen = controls && controls.matches(":hover");
             const hoverOpacity = Number.isFinite(Number(controls?.dataset.hoverOpacity)) ? Number(controls.dataset.hoverOpacity) / 100 : 0.5;
+            const overlayVisible = overlay && overlay.classList.contains("is-visible") && !overlay.classList.contains("is-tab-hidden");
+            const controlsEnabled = Boolean(controls && controls.classList.contains("is-enabled"));
             return {
-                overlay: overlay && overlay.classList.contains("is-visible") && !overlay.classList.contains("is-tab-hidden")
+                overlay: overlayVisible
                     ? toRect(overlay)
                     : null,
-                controlsEnabled: Boolean(controls && controls.classList.contains("is-enabled")),
-                controls: controls && controls.classList.contains("is-enabled")
-                    ? unionRects([toRect(hotspot), controlsOpen || controls.classList.contains("is-open") ? toRect(panel) : null])
+                controlsEnabled,
+                controls: controlsEnabled
+                    ? unionRects([toRect(hotspot), toRect(controlsDragCorner), controlsOpen || controls.classList.contains("is-open") ? toRect(panel) : null])
                     : null,
-                hotspot: controls && controls.classList.contains("is-enabled")
-                    ? toRect(hotspot)
+                hotspot: controlsEnabled
+                    ? unionRects([toRect(hotspot), toRect(controlsDragCorner)])
                     : null,
+                drag: [
+                    overlayVisible ? toRect(overlayDragCorner) : null,
+                    controlsEnabled ? toRect(controlsDragCorner) : null
+                ].filter(Boolean),
+                dragging: Boolean(document.documentElement.dataset.overlayDragging),
                 hoverOpacity
             };
         })()`);
@@ -235,6 +247,7 @@ async function refreshOverlayContentBounds() {
         }
 
         hoverOpacity = Math.min(1, Math.max(0.2, Number(rects?.hoverOpacity) || 0.5));
+        overlayDragging = Boolean(rects?.dragging);
         overlayControlsEnabled = Boolean(rects?.controlsEnabled);
         if (rects && rects.controls) {
             const windowBounds = overlayWindow.getBounds();
@@ -260,10 +273,24 @@ async function refreshOverlayContentBounds() {
         } else {
             overlayHotspotBounds = null;
         }
+        if (rects && Array.isArray(rects.drag)) {
+            const windowBounds = overlayWindow.getBounds();
+            const zoom = overlayWindow.webContents.getZoomFactor();
+            overlayDragBounds = rects.drag.map((rect) => ({
+                left: windowBounds.x + rect.left * zoom,
+                top: windowBounds.y + rect.top * zoom,
+                right: windowBounds.x + rect.right * zoom,
+                bottom: windowBounds.y + rect.bottom * zoom
+            }));
+        } else {
+            overlayDragBounds = [];
+        }
     } catch {
         overlayContentBounds = null;
         overlayInteractiveBounds = null;
         overlayHotspotBounds = null;
+        overlayDragBounds = [];
+        overlayDragging = false;
         overlayControlsEnabled = false;
         setHoverDimmed(false);
     }
@@ -287,12 +314,20 @@ function startHoverTracking() {
             && cursor.x <= hotspotBounds.right
             && cursor.y >= hotspotBounds.top
             && cursor.y <= hotspotBounds.bottom;
+        const isOverDrag = overlayDragBounds.some((bounds) => cursor.x >= bounds.left
+            && cursor.x <= bounds.right
+            && cursor.y >= bounds.top
+            && cursor.y <= bounds.bottom);
+        if (isOverDrag || overlayDragging) {
+            dragHoldUntil = Date.now() + 500;
+        }
+        const isDragHeld = overlayDragging || Date.now() < dragHoldUntil;
         const isOverOverlay = overlayContentBounds
             && cursor.x >= overlayContentBounds.left
             && cursor.x <= overlayContentBounds.right
             && cursor.y >= overlayContentBounds.top
             && cursor.y <= overlayContentBounds.bottom;
-        applyMousePassthrough(clickThrough && !isOverControls && !isOverHotspot);
+        applyMousePassthrough(clickThrough && !isOverControls && !isOverHotspot && !isDragHeld);
         setOverlayHoverState(isOverControls || isOverHotspot, cursor);
 
         if (!overlayContentBounds) {
@@ -382,6 +417,9 @@ function createOverlayWindow() {
         overlayContentBounds = null;
         overlayInteractiveBounds = null;
         overlayHotspotBounds = null;
+        overlayDragBounds = [];
+        overlayDragging = false;
+        dragHoldUntil = 0;
         overlayControlsEnabled = false;
         hoverDimmed = false;
         overlayOpacity = 1;

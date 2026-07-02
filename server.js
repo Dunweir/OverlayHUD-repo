@@ -135,6 +135,8 @@ const defaultOverlayState = {
     columnsCount: 7,
     columnsLayoutVersion: 1,
     overlayAlignment: "left",
+    overlayPosition: null,
+    controlsPosition: null,
     hoverOpacity: 50,
     seconds: 0,
     running: false,
@@ -165,6 +167,8 @@ function normalizeOverlayState(rawState) {
     const overlayAlignment = ["left", "center", "right"].includes(source.overlayAlignment)
         ? source.overlayAlignment
         : defaultOverlayState.overlayAlignment;
+    const overlayPosition = normalizePosition(source.overlayPosition);
+    const controlsPosition = normalizePosition(source.controlsPosition);
 
     return {
         ...source,
@@ -177,8 +181,23 @@ function normalizeOverlayState(rawState) {
         hoverOpacity,
         interfaceLanguage,
         overlayAlignment,
+        overlayPosition,
+        controlsPosition,
         monsters: Array.isArray(source.monsters) ? source.monsters : [],
         roster: Array.isArray(source.roster) ? source.roster : []
+    };
+}
+
+function normalizePosition(position) {
+    if (!position || typeof position !== "object") return null;
+    const left = Number(position.left);
+    const top = Number(position.top);
+    if (!Number.isFinite(left) || !Number.isFinite(top)) return null;
+    return {
+        left: Math.max(0, Math.round(left)),
+        top: Math.max(0, Math.round(top)),
+        anchorX: ["left", "center", "right"].includes(position.anchorX) ? position.anchorX : null,
+        anchorY: ["top", "center", "bottom"].includes(position.anchorY) ? position.anchorY : null
     };
 }
 

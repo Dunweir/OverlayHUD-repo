@@ -134,8 +134,10 @@
                 </div>
             </div>
             <div class="overlay-control-hotspot" id="overlayControlHotspot" aria-hidden="true"></div>
+            <div class="overlay-drag-corner overlay-drag-corner-controls" data-drag-target="controls" aria-hidden="true"></div>
         </div>
         <div class="overlay-container" id="overlayContainer">
+            <div class="overlay-drag-corner overlay-drag-corner-main" data-drag-target="overlay" aria-hidden="true"></div>
             <div class="overlay-header">
                 <div class="level-badge">
                     <span class="level-text" data-i18n="level">УРОВЕНЬ</span>
@@ -167,6 +169,7 @@
         const overlayHoverOpacitySlider = document.getElementById("overlayHoverOpacitySlider");
         const overlayHoverOpacityValue = document.getElementById("overlayHoverOpacityValue");
         const overlayAlignmentButtons = [...document.querySelectorAll("[data-alignment]")];
+        const overlayDragCorners = [...document.querySelectorAll("[data-drag-target]")];
         const overlayBgToggle = document.getElementById("overlayBgToggle");
         const overlayTimerToggle = document.getElementById("overlayTimerToggle");
         const overlayUpgradesToggle = document.getElementById("overlayUpgradesToggle");
@@ -190,8 +193,11 @@
             baseHeight: 1080,
             min: 0.45,
             max: 1.5,
-            edgeOffset: 20
+            edgeOffset: 20,
+            snapDistance: 18
         };
+        let activeDrag = null;
+        let lastPositionLayoutKey = "";
         const upgradeDefinitions = [
             { key: "strength", name: "Strength", image: "upgrades/Strength_Upgrade.webp", color: "#ff9a3d", background: "rgba(255, 106, 22, 0.2)" },
             { key: "tumbleLaunch", name: "Tumble Launch", image: "upgrades/Tumble_Launch_Upgrade.webp", color: "#58bdff", background: "rgba(32, 151, 235, 0.2)" },
@@ -330,6 +336,204 @@
             document.documentElement.style.setProperty("--viewport-scale", clampedScale.toFixed(4));
             document.documentElement.style.setProperty("--overlay-edge-offset", `${viewportScale.edgeOffset}px`);
             document.documentElement.style.setProperty("--overlay-available-width", `${availableWidth}px`);
+        }
+
+        function getSavedPosition(targetName) {
+            if (!latestState) return null;
+            const position = targetName === "controls" ? latestState.controlsPosition : latestState.overlayPosition;
+            if (!position || !Number.isFinite(Number(position.left)) || !Number.isFinite(Number(position.top))) return null;
+            return {
+                left: Number(position.left),
+                top: Number(position.top),
+                anchorX: ["left", "center", "right"].includes(position.anchorX) ? position.anchorX : null,
+                anchorY: ["top", "center", "bottom"].includes(position.anchorY) ? position.anchorY : null
+            };
+        }
+
+        function getPositionMetrics(element) {
+            const safe = viewportScale.edgeOffset;
+            const rect = element.getBoundingClientRect();
+            const width = Math.min(rect.width || element.offsetWidth || 0, window.innerWidth - safe * 2);
+            const height = Math.min(rect.height || element.offsetHeight || 0, window.innerHeight - safe * 2);
+            return {
+                safe,
+                width,
+                height,
+                left: safe,
+                centerX: Math.round((window.innerWidth - width) / 2),
+                right: window.innerWidth - safe - width,
+                top: safe,
+                centerY: Math.round((window.innerHeight - height) / 2),
+                bottom: window.innerHeight - safe - height
+            };
+        }
+
+        function clampPosition(element, left, top) {
+            const metrics = getPositionMetrics(element);
+            return {
+                left: Math.min(Math.max(metrics.safe, left), Math.max(metrics.safe, metrics.right)),
+                top: Math.min(Math.max(metrics.safe, top), Math.max(metrics.safe, metrics.bottom))
+            };
+        }
+
+        function resolveAnchoredPosition(element, position) {
+            if (!position) return null;
+            const metrics = getPositionMetrics(element);
+            const left = position.anchorX === "left" ? metrics.left
+                : position.anchorX === "center" ? metrics.centerX
+                    : position.anchorX === "right" ? metrics.right
+                        : position.left;
+            const top = position.anchorY === "top" ? metrics.top
+                : position.anchorY === "center" ? metrics.centerY
+                    : position.anchorY === "bottom" ? metrics.bottom
+                        : position.top;
+            return { ...position, ...clampPosition(element, left, top) };
+        }
+
+        function snapPosition(element, left, top) {
+            const metrics = getPositionMetrics(element);
+            const snapDistance = viewportScale.snapDistance;
+            const targets = {
+                left: [
+                    { anchor: "left", value: metrics.left },
+                    { anchor: "center", value: metrics.centerX },
+                    { anchor: "right", value: metrics.right }
+                ],
+                top: [
+                    { anchor: "top", value: metrics.top },
+                    { anchor: "center", value: metrics.centerY },
+                    { anchor: "bottom", value: metrics.bottom }
+                ]
+            };
+            let snappedLeft = left;
+            let snappedTop = top;
+            let anchorX = null;
+            let anchorY = null;
+            for (const target of targets.left) {
+                if (Math.abs(left - target.value) <= snapDistance) {
+                    snappedLeft = target.value;
+                    anchorX = target.anchor;
+                    break;
+                }
+            }
+            for (const target of targets.top) {
+                if (Math.abs(top - target.value) <= snapDistance) {
+                    snappedTop = target.value;
+                    anchorY = target.anchor;
+                    break;
+                }
+            }
+            return { ...clampPosition(element, snappedLeft, snappedTop), anchorX, anchorY };
+        }
+
+        function positionElement(element, targetName, position) {
+            element.classList.toggle("is-positioned", Boolean(position));
+            if (!position) {
+                element.style.removeProperty("--overlay-left");
+                element.style.removeProperty("--overlay-top");
+                return;
+            }
+
+            const resolved = resolveAnchoredPosition(element, position);
+            element.style.setProperty("--overlay-left", `${Math.round(resolved.left)}px`);
+            element.style.setProperty("--overlay-top", `${Math.round(resolved.top)}px`);
+        }
+
+        function applySavedPositions() {
+            positionElement(overlayContainer, "overlay", getSavedPosition("overlay"));
+            positionElement(overlayHoverControls, "controls", getSavedPosition("controls"));
+        }
+
+        function getPositionLayoutKey(state) {
+            return JSON.stringify({
+                width: window.innerWidth,
+                height: window.innerHeight,
+                squareSize: state.squareSize,
+                upgradeSize: state.upgradeSize,
+                columnsCount: state.columnsCount,
+                bgEnabled: state.bgEnabled,
+                timerVisible: state.timerVisible,
+                upgradesVisible: state.upgradesVisible,
+                monsterIconsVisible: state.monsterIconsVisible,
+                levelBadgeVisible: state.levelBadgeVisible,
+                overlayAlignment: state.overlayAlignment,
+                tabHidden: state.tabHidden,
+                overlayPosition: state.overlayPosition,
+                controlsPosition: state.controlsPosition
+            });
+        }
+
+        function applySavedPositionsWhenLayoutChanges(state) {
+            const positionLayoutKey = getPositionLayoutKey(state);
+            const needsInitialPosition = Boolean((state.overlayPosition && !overlayContainer.style.getPropertyValue("--overlay-left"))
+                || (state.controlsPosition && !overlayHoverControls.style.getPropertyValue("--overlay-left")));
+            if (!needsInitialPosition && positionLayoutKey === lastPositionLayoutKey) return;
+
+            lastPositionLayoutKey = positionLayoutKey;
+            applySavedPositions();
+        }
+
+        function startOverlayDrag(event) {
+            const targetName = event.currentTarget.dataset.dragTarget;
+            const element = targetName === "controls" ? overlayHoverControls : overlayContainer;
+            if (!element || event.button !== 0) return;
+
+            const rect = element.getBoundingClientRect();
+            const startPosition = clampPosition(element, rect.left, rect.top);
+            activeDrag = {
+                targetName,
+                element,
+                handle: event.currentTarget,
+                pointerId: event.pointerId,
+                startX: event.clientX,
+                startY: event.clientY,
+                startLeft: startPosition.left,
+                startTop: startPosition.top
+            };
+            element.classList.add("is-dragging", "is-positioned");
+            document.documentElement.dataset.overlayDragging = targetName;
+            element.style.setProperty("--overlay-left", `${Math.round(startPosition.left)}px`);
+            element.style.setProperty("--overlay-top", `${Math.round(startPosition.top)}px`);
+            event.currentTarget.setPointerCapture(event.pointerId);
+            window.addEventListener("pointermove", moveOverlayDrag, true);
+            window.addEventListener("pointerup", stopOverlayDrag, true);
+            window.addEventListener("pointercancel", stopOverlayDrag, true);
+            event.preventDefault();
+        }
+
+        function moveOverlayDrag(event) {
+            if (!activeDrag || event.pointerId !== activeDrag.pointerId) return;
+            const nextPosition = snapPosition(
+                activeDrag.element,
+                activeDrag.startLeft + event.clientX - activeDrag.startX,
+                activeDrag.startTop + event.clientY - activeDrag.startY
+            );
+            activeDrag.element.style.setProperty("--overlay-left", `${Math.round(nextPosition.left)}px`);
+            activeDrag.element.style.setProperty("--overlay-top", `${Math.round(nextPosition.top)}px`);
+            event.preventDefault();
+        }
+
+        function stopOverlayDrag(event) {
+            if (!activeDrag || event.pointerId !== activeDrag.pointerId) return;
+            const finalPosition = snapPosition(activeDrag.element, activeDrag.element.getBoundingClientRect().left, activeDrag.element.getBoundingClientRect().top);
+            activeDrag.element.classList.remove("is-dragging");
+            try {
+                activeDrag.handle.releasePointerCapture(event.pointerId);
+            } catch {
+                // The capture can already be gone if Electron briefly changed hit-testing.
+            }
+            if (activeDrag.targetName === "controls") {
+                OverlayApp.setControlsPosition(finalPosition);
+            } else {
+                OverlayApp.setOverlayPosition(finalPosition);
+            }
+            lastPositionLayoutKey = "";
+            activeDrag = null;
+            delete document.documentElement.dataset.overlayDragging;
+            window.removeEventListener("pointermove", moveOverlayDrag, true);
+            window.removeEventListener("pointerup", stopOverlayDrag, true);
+            window.removeEventListener("pointercancel", stopOverlayDrag, true);
+            event.preventDefault();
         }
 
         function buildUpgradeRow() {
@@ -690,7 +894,11 @@
             overlayRespawnTimerToggle.checked = state.respawnTimerVisible;
             overlayRespawnIndicatorToggle.checked = state.respawnIndicatorVisible;
 
+            const keepOverlayPositioned = overlayContainer.classList.contains("is-positioned");
+            const keepOverlayDragging = overlayContainer.classList.contains("is-dragging");
             overlayContainer.className = "overlay-container";
+            overlayContainer.classList.toggle("is-positioned", keepOverlayPositioned || Boolean(state.overlayPosition));
+            overlayContainer.classList.toggle("is-dragging", keepOverlayDragging);
             overlayContainer.classList.add(`align-${state.overlayAlignment}`);
             if (state.bgEnabled) overlayContainer.classList.add("with-bg");
             if (!state.timerVisible) overlayContainer.classList.add("hide-level-timer");
@@ -748,13 +956,26 @@
                     }
                 }
             }
+
+            applySavedPositionsWhenLayoutChanges(state);
         }
 
         applyViewportScale();
-        window.addEventListener("resize", applyViewportScale);
+        window.addEventListener("resize", () => {
+            applyViewportScale();
+            lastPositionLayoutKey = "";
+            applySavedPositions();
+        });
         if (window.visualViewport) {
-            window.visualViewport.addEventListener("resize", applyViewportScale);
+            window.visualViewport.addEventListener("resize", () => {
+                applyViewportScale();
+                lastPositionLayoutKey = "";
+                applySavedPositions();
+            });
         }
+        overlayDragCorners.forEach((corner) => {
+            corner.addEventListener("pointerdown", startOverlayDrag);
+        });
 
         buildUpgradeRow();
         overlaySizeSlider.addEventListener("input", () => OverlayApp.setSquareSize(parseInt(overlaySizeSlider.value, 10)));
