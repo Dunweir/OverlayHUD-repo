@@ -16,7 +16,7 @@ using UnityEngine;
 
 namespace RepoMonsterBridge
 {
-    [BepInPlugin("local.overlay.repo_monster_bridge", "REPO Monster Bridge", "0.2.52")]
+    [BepInPlugin("local.overlay.repo_monster_bridge", "REPO Monster Bridge", "0.2.53")]
     public sealed class Plugin : BaseUnityPlugin
     {
         private static Plugin instance;
@@ -30,6 +30,8 @@ namespace RepoMonsterBridge
         private static readonly Dictionary<string, MemberInfo> memberCache = new Dictionary<string, MemberInfo>();
         private static readonly HashSet<string> missingMemberCache = new HashSet<string>();
         private static Task networkQueueTail = Task.CompletedTask;
+        private static float mapValue;
+        private static float mapValueInitial;
 
         private static readonly Dictionary<string, string> KnownMonsters = new Dictionary<string, string>
         {
@@ -141,6 +143,7 @@ namespace RepoMonsterBridge
         private float nextScanAt;
         private float nextStatusSyncAt;
         private float nextUpgradeSyncAt;
+        private float nextMapValueSyncAt;
         private float nextDebugSummaryAt;
         private float nextBroadEnemyDiscoveryAt;
         private float scanPausedUntil;
@@ -153,6 +156,8 @@ namespace RepoMonsterBridge
         private string pendingRosterFingerprint = "";
         private int rosterStableScans;
         private bool rosterPublished;
+        private bool mapValueDirty;
+        private string lastMapValueFingerprint = "";
         private int visibilityProbeIndex;
         private bool gameplayActive;
         private bool? lastTabHeld;
@@ -223,11 +228,23 @@ namespace RepoMonsterBridge
                 harmony = new Harmony("local.overlay.repo_monster_bridge");
                 MethodInfo enemyParentSpawnRpc = AccessTools.Method("EnemyParent:SpawnRPC");
                 MethodInfo levelGeneratorGenerateDone = AccessTools.Method("LevelGenerator:GenerateDone");
+                MethodInfo levelGeneratorStartRoomGeneration = AccessTools.Method("LevelGenerator:StartRoomGeneration");
                 MethodInfo runManagerChangeLevel = AccessTools.Method("RunManager:ChangeLevel");
+                MethodInfo roundDirectorExtractionCompleted = AccessTools.Method("RoundDirector:ExtractionCompleted");
+                MethodInfo valuableDollarValueSetRpc = AccessTools.Method("ValuableObject:DollarValueSetRPC");
+                MethodInfo valuableDollarValueSetLogic = AccessTools.Method("ValuableObject:DollarValueSetLogic");
+                MethodInfo physGrabObjectBreakRpc = AccessTools.Method("PhysGrabObjectImpactDetector:BreakRPC");
+                MethodInfo physGrabObjectDestroyRpc = AccessTools.Method("PhysGrabObject:DestroyPhysGrabObjectRPC");
                 HarmonyMethod levelGeneratedPostfix = new HarmonyMethod(typeof(Plugin).GetMethod(nameof(LevelGeneratedPostfix), BindingFlags.NonPublic | BindingFlags.Static));
+                HarmonyMethod levelGenerationStartingPrefix = new HarmonyMethod(typeof(Plugin).GetMethod(nameof(LevelGenerationStartingPrefix), BindingFlags.NonPublic | BindingFlags.Static));
                 HarmonyMethod enemySpawnedPostfix = new HarmonyMethod(typeof(Plugin).GetMethod(nameof(EnemyParentSpawnedPostfix), BindingFlags.NonPublic | BindingFlags.Static));
                 HarmonyMethod levelChangingPrefix = new HarmonyMethod(typeof(Plugin).GetMethod(nameof(LevelChangingPrefix), BindingFlags.NonPublic | BindingFlags.Static));
                 HarmonyMethod playerUpgradeConsumedPostfix = new HarmonyMethod(typeof(Plugin).GetMethod(nameof(PlayerUpgradeConsumedPostfix), BindingFlags.NonPublic | BindingFlags.Static));
+                HarmonyMethod extractionCompletedPostfix = new HarmonyMethod(typeof(Plugin).GetMethod(nameof(ExtractionCompletedPostfix), BindingFlags.NonPublic | BindingFlags.Static));
+                HarmonyMethod valuableDollarValueSetRpcPostfix = new HarmonyMethod(typeof(Plugin).GetMethod(nameof(ValuableDollarValueSetRpcPostfix), BindingFlags.NonPublic | BindingFlags.Static));
+                HarmonyMethod valuableDollarValueSetLogicPostfix = new HarmonyMethod(typeof(Plugin).GetMethod(nameof(ValuableDollarValueSetLogicPostfix), BindingFlags.NonPublic | BindingFlags.Static));
+                HarmonyMethod physGrabObjectBreakPostfix = new HarmonyMethod(typeof(Plugin).GetMethod(nameof(PhysGrabObjectBreakPostfix), BindingFlags.NonPublic | BindingFlags.Static));
+                HarmonyMethod physGrabObjectDestroyedPostfix = new HarmonyMethod(typeof(Plugin).GetMethod(nameof(PhysGrabObjectDestroyedPostfix), BindingFlags.NonPublic | BindingFlags.Static));
 
                 if (enemyParentSpawnRpc != null)
                 {
@@ -241,10 +258,46 @@ namespace RepoMonsterBridge
                     Logger.LogInfo("Patched LevelGenerator.GenerateDone for monster reset.");
                 }
 
+                if (levelGeneratorStartRoomGeneration != null)
+                {
+                    harmony.Patch(levelGeneratorStartRoomGeneration, prefix: levelGenerationStartingPrefix);
+                    Logger.LogInfo("Patched LevelGenerator.StartRoomGeneration for map value reset.");
+                }
+
                 if (runManagerChangeLevel != null)
                 {
                     harmony.Patch(runManagerChangeLevel, prefix: levelChangingPrefix);
                     Logger.LogInfo("Patched RunManager.ChangeLevel for overlay visibility.");
+                }
+
+                if (roundDirectorExtractionCompleted != null)
+                {
+                    harmony.Patch(roundDirectorExtractionCompleted, postfix: extractionCompletedPostfix);
+                    Logger.LogInfo("Patched RoundDirector.ExtractionCompleted for map value refresh.");
+                }
+
+                if (valuableDollarValueSetRpc != null)
+                {
+                    harmony.Patch(valuableDollarValueSetRpc, postfix: valuableDollarValueSetRpcPostfix);
+                    Logger.LogInfo("Patched ValuableObject.DollarValueSetRPC for map value tracking.");
+                }
+
+                if (valuableDollarValueSetLogic != null)
+                {
+                    harmony.Patch(valuableDollarValueSetLogic, postfix: valuableDollarValueSetLogicPostfix);
+                    Logger.LogInfo("Patched ValuableObject.DollarValueSetLogic for map value tracking.");
+                }
+
+                if (physGrabObjectBreakRpc != null)
+                {
+                    harmony.Patch(physGrabObjectBreakRpc, postfix: physGrabObjectBreakPostfix);
+                    Logger.LogInfo("Patched PhysGrabObjectImpactDetector.BreakRPC for map value loss.");
+                }
+
+                if (physGrabObjectDestroyRpc != null)
+                {
+                    harmony.Patch(physGrabObjectDestroyRpc, postfix: physGrabObjectDestroyedPostfix);
+                    Logger.LogInfo("Patched PhysGrabObject.DestroyPhysGrabObjectRPC for map value removal.");
                 }
 
                 int patchedUpgradeTypes = 0;
@@ -275,6 +328,11 @@ namespace RepoMonsterBridge
             instance?.HandleLevelGenerated();
         }
 
+        private static void LevelGenerationStartingPrefix()
+        {
+            instance?.ResetMapValue("room generation started");
+        }
+
         private static void LevelChangingPrefix()
         {
             instance?.HandleLevelChanging();
@@ -297,10 +355,48 @@ namespace RepoMonsterBridge
             }
         }
 
+        private static void ExtractionCompletedPostfix()
+        {
+            instance?.RefreshMapValue("extraction completed");
+        }
+
+        private static void ValuableDollarValueSetRpcPostfix(object __instance, float value)
+        {
+            instance?.AddMapValue(value, "valuable rpc");
+        }
+
+        private static void ValuableDollarValueSetLogicPostfix(object __instance)
+        {
+            if (!IsMasterClientOrSingleplayer()) return;
+            instance?.AddMapValue(ReadValuableCurrentValue(__instance), "valuable logic");
+        }
+
+        private static void PhysGrabObjectBreakPostfix(object __instance, float valueLost, bool _loseValue)
+        {
+            if (!_loseValue) return;
+            instance?.AddMapValue(-valueLost, "valuable break");
+        }
+
+        private static void PhysGrabObjectDestroyedPostfix(object __instance)
+        {
+            if (!IsRunLevel()) return;
+            Component valuable = GetValuableComponent(__instance);
+            if (valuable == null) return;
+
+            float currentValue = ReadValuableCurrentValue(valuable);
+            float originalValue = ReadValuableOriginalValue(valuable);
+            if (originalValue > 0f && currentValue < originalValue * 0.15f) return;
+            instance?.AddMapValue(-currentValue, "valuable destroyed");
+        }
+
         private void TickScan()
         {
             if (!gameplayActive) return;
             float now = Time.realtimeSinceStartup;
+            if (mapValueDirty && now >= nextMapValueSyncAt)
+            {
+                SyncMapValueIfChanged();
+            }
             if (now < scanPausedUntil) return;
 
             if (pendingUpgradeKeys.Count > 0 && now >= nextUpgradeSyncAt)
@@ -338,6 +434,8 @@ namespace RepoMonsterBridge
         private void HandleLevelGenerated()
         {
             ResetSeenMonsters("new level generated");
+            RefreshMapValue("level generated");
+            mapValueInitial = mapValue;
             gameplayActive = IsRegularGameplayLevel();
             if (!gameplayActive)
             {
@@ -347,12 +445,70 @@ namespace RepoMonsterBridge
 
             int level = ResolveCurrentLevel();
             if (level > 0) SyncLevelToOverlay(level);
+            MarkMapValueDirty();
         }
 
         private void HandleLevelChanging()
         {
             gameplayActive = false;
+            ResetMapValue("level changing");
             if (sendToWebOverlay.Value) StartCoroutine(PostVisibility(false));
+        }
+
+        private void ResetMapValue(string reason)
+        {
+            mapValue = 0f;
+            mapValueInitial = 0f;
+            lastMapValueFingerprint = "";
+            mapValueDirty = false;
+            if (debugLogging.Value)
+            {
+                Logger.LogInfo("Reset map value: " + reason + ".");
+            }
+        }
+
+        private void RefreshMapValue(string reason)
+        {
+            if (!IsRunLevel()) return;
+            mapValue = CalculateMapValue();
+            if (debugLogging.Value)
+            {
+                Logger.LogInfo("Refreshed map value after " + reason + ": " + mapValue.ToString("0", CultureInfo.InvariantCulture) + ".");
+            }
+            MarkMapValueDirty();
+        }
+
+        private void AddMapValue(float delta, string reason)
+        {
+            if (!IsRunLevel()) return;
+            if (float.IsNaN(delta) || float.IsInfinity(delta) || Math.Abs(delta) < 0.01f) return;
+            mapValue = Math.Max(0f, mapValue + delta);
+            if (debugLogging.Value)
+            {
+                Logger.LogInfo("Updated map value from " + reason + ": delta=" + delta.ToString("0.#", CultureInfo.InvariantCulture)
+                    + ", value=" + mapValue.ToString("0", CultureInfo.InvariantCulture) + ".");
+            }
+            MarkMapValueDirty();
+        }
+
+        private void MarkMapValueDirty()
+        {
+            mapValueDirty = true;
+            nextMapValueSyncAt = Time.realtimeSinceStartup + 0.2f;
+        }
+
+        private void SyncMapValueIfChanged()
+        {
+            mapValueDirty = false;
+            if (!sendToWebOverlay.Value) return;
+
+            int value = Math.Max(0, (int)Math.Round(mapValue));
+            int initial = Math.Max(0, (int)Math.Round(mapValueInitial));
+            int? goal = ResolveExtractionGoal();
+            string fingerprint = value.ToString(CultureInfo.InvariantCulture) + ":" + initial.ToString(CultureInfo.InvariantCulture) + ":" + (goal.HasValue ? goal.Value.ToString(CultureInfo.InvariantCulture) : "");
+            if (fingerprint == lastMapValueFingerprint) return;
+            lastMapValueFingerprint = fingerprint;
+            StartCoroutine(PostMapValue(value, initial, goal));
         }
 
         private void ResetSeenMonsters(string reason)
@@ -937,6 +1093,94 @@ namespace RepoMonsterBridge
             object levelsValue = ReadMember(runManager, "levels");
             if (currentLevel == null || !(levelsValue is IList levels)) return false;
             return levels.Contains(currentLevel);
+        }
+
+        private static bool IsRunLevel()
+        {
+            Type semiFuncType = AccessTools.TypeByName("SemiFunc");
+            object result = InvokeNoArgMethod(semiFuncType, "RunIsLevel");
+            return result is bool value && value;
+        }
+
+        private static bool IsMasterClientOrSingleplayer()
+        {
+            Type semiFuncType = AccessTools.TypeByName("SemiFunc");
+            object result = InvokeNoArgMethod(semiFuncType, "IsMasterClientOrSingleplayer");
+            return !(result is bool value) || value;
+        }
+
+        private static float CalculateMapValue()
+        {
+            Type valuableType = AccessTools.TypeByName("ValuableObject");
+            if (valuableType == null) return 0f;
+
+            float total = 0f;
+            UnityEngine.Object[] valuables = UnityEngine.Object.FindObjectsOfType(valuableType);
+            for (int index = 0; index < valuables.Length; index++)
+            {
+                total += ReadValuableCurrentValue(valuables[index]);
+            }
+            return Math.Max(0f, total);
+        }
+
+        private static int? ResolveExtractionGoal()
+        {
+            Type roundDirectorType = AccessTools.TypeByName("RoundDirector");
+            object roundDirector = ReadMember(roundDirectorType, "instance");
+            object goal = ReadMember(roundDirector, "extractionHaulGoal");
+            if (goal == null) return null;
+            try
+            {
+                return Math.Max(0, Convert.ToInt32(goal));
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        private static Component GetValuableComponent(object source)
+        {
+            if (source is Component component)
+            {
+                Component valuable = component.GetComponent("ValuableObject");
+                if (valuable != null) return valuable;
+            }
+            if (source is GameObject gameObject)
+            {
+                return gameObject.GetComponent("ValuableObject");
+            }
+            return null;
+        }
+
+        private static float ReadValuableCurrentValue(object source)
+        {
+            return ReadFloatMember(GetValuableSource(source), "dollarValueCurrent");
+        }
+
+        private static float ReadValuableOriginalValue(object source)
+        {
+            return ReadFloatMember(GetValuableSource(source), "dollarValueOriginal");
+        }
+
+        private static object GetValuableSource(object source)
+        {
+            Component valuable = GetValuableComponent(source);
+            return valuable != null ? valuable : source;
+        }
+
+        private static float ReadFloatMember(object source, string memberName)
+        {
+            object value = ReadMember(source, memberName);
+            if (value == null) return 0f;
+            try
+            {
+                return Convert.ToSingle(value, CultureInfo.InvariantCulture);
+            }
+            catch
+            {
+                return 0f;
+            }
         }
 
         private void SyncLevelToOverlay(int level)
@@ -1553,6 +1797,29 @@ namespace RepoMonsterBridge
             yield break;
         }
 
+        private IEnumerator PostMapValue(int value, int initial, int? goal)
+        {
+            string mapValueEndpoint = BuildSiblingEndpoint(levelEndpoint.Value, "/api/map-value");
+            string json = "{\"value\":" + value.ToString(CultureInfo.InvariantCulture)
+                + ",\"initial\":" + initial.ToString(CultureInfo.InvariantCulture);
+            if (goal.HasValue) json += ",\"goal\":" + goal.Value.ToString(CultureInfo.InvariantCulture);
+            json += "}";
+
+            Task<string> request = QueueNetworkRequest(() => SendHttpPost(mapValueEndpoint, json));
+            while (!request.IsCompleted) yield return null;
+            string result = request.IsFaulted ? "ERROR:" + request.Exception.GetBaseException().Message : request.Result;
+            if (!IsHttpSuccess(result))
+            {
+                Logger.LogWarning("Failed to sync map value: " + TrimHttpResult(result));
+            }
+            else if (debugLogging.Value)
+            {
+                Logger.LogInfo("Synced map value " + value + ": " + result);
+            }
+
+            yield break;
+        }
+
         private static string SendStateLevelFallback(int level, string levelEndpointUrl)
         {
             string stateEndpoint = BuildSiblingEndpoint(levelEndpointUrl, "/api/state");
@@ -1598,6 +1865,9 @@ namespace RepoMonsterBridge
             stateObject = SetJsonNumberProperty(stateObject, "extraJump", 0);
             stateObject = SetJsonNumberProperty(stateObject, "tumbleClimb", 0);
             stateObject = SetJsonRawProperty(stateObject, "monsters", "[]");
+            stateObject = SetJsonNumberProperty(stateObject, "mapValue", 0);
+            stateObject = SetJsonNumberProperty(stateObject, "mapValueInitial", 0);
+            stateObject = SetJsonRawProperty(stateObject, "mapValueGoal", "null");
             return stateObject;
         }
 

@@ -124,6 +124,64 @@ body {
     color: #f7fbff;
 }
 
+.map-value-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    max-width: 190px;
+    min-height: 38px;
+    margin-left: 10px;
+    margin-bottom: 0;
+    padding: 4px 11px 3px;
+    overflow: hidden;
+    border-radius: 6px;
+    background: rgba(45, 190, 115, 0.16);
+    color: #9cffc0;
+    white-space: nowrap;
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    transform-origin: left center;
+    transition: max-width var(--overlay-layout-duration) var(--overlay-reveal-ease),
+        min-height var(--overlay-layout-duration) var(--overlay-reveal-ease),
+        margin-left var(--overlay-layout-duration) var(--overlay-reveal-ease),
+        margin-bottom var(--overlay-layout-duration) var(--overlay-reveal-ease),
+        padding var(--overlay-layout-duration) var(--overlay-reveal-ease),
+        opacity var(--overlay-reveal-duration) ease,
+        transform var(--overlay-reveal-duration) var(--overlay-reveal-ease),
+        visibility 0s linear 0s;
+    visibility: visible;
+}
+
+.map-value-label,
+.map-value-number {
+    display: inline-block;
+    line-height: 1;
+    transform: translateY(var(--teko-visual-y));
+}
+
+.map-value-label {
+    color: rgba(247, 251, 255, 0.72);
+    font-size: 22px;
+}
+
+.map-value-number {
+    color: #9cffc0;
+    font-size: 34px;
+}
+
+.overlay-container.hide-map-value .map-value-pill {
+    max-width: 0;
+    min-height: 0;
+    margin-left: 0;
+    margin-bottom: 0;
+    padding-right: 0;
+    padding-left: 0;
+    opacity: 0;
+    transform: translateY(var(--overlay-hidden-y)) scale(var(--overlay-hidden-scale));
+    visibility: hidden;
+    transition-delay: 0s, 0s, 0s, 0s, 0s, 0s, var(--overlay-reveal-duration);
+}
+
 .overlay-topbar {
     display: block;
     max-width: 100%;
@@ -180,7 +238,7 @@ body {
     justify-content: flex-end;
 }
 
-.overlay-container.hide-level-badge.hide-level-timer .overlay-header {
+.overlay-container.hide-level-badge.hide-level-timer.hide-map-value .overlay-header {
     max-height: 0;
     margin-bottom: 0;
     overflow: hidden;
@@ -188,6 +246,10 @@ body {
     transform: translateY(var(--overlay-hidden-y)) scale(var(--overlay-hidden-scale));
     visibility: hidden;
     transition-delay: 0s, 0s, 0s, 0s, var(--overlay-reveal-duration);
+}
+
+.overlay-container.hide-level-badge.hide-level-timer .map-value-pill {
+    margin-left: 0;
 }
 
 .overlay-container.is-tab-hidden,
@@ -925,6 +987,7 @@ body {
     .level-badge,
     .level-core,
     .timer,
+    .map-value-pill,
     .upgrade-row,
     .monsters-squares,
     .monster-health-bar,

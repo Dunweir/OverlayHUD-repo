@@ -77,6 +77,7 @@ const OverlayApp = (() => {
         bgEnabled: false,
         timerVisible: false,
         upgradesVisible: true,
+        mapValueVisible: true,
         monsterIconsVisible: true,
         levelBadgeVisible: true,
         upgradeTooltipsVisible: true,
@@ -98,7 +99,10 @@ const OverlayApp = (() => {
         startedAt: null,
         monsters: [],
         roster: [],
-        rosterPending: false
+        rosterPending: false,
+        mapValue: 0,
+        mapValueInitial: 0,
+        mapValueGoal: null
     };
 
     let state = defaultState;
@@ -136,6 +140,9 @@ const OverlayApp = (() => {
             : defaultState.overlayAlignment;
         const overlayPosition = normalizePosition(source.overlayPosition);
         const controlsPosition = normalizePosition(source.controlsPosition);
+        const mapValue = normalizeCurrencyValue(source.mapValue, defaultState.mapValue);
+        const mapValueInitial = normalizeCurrencyValue(source.mapValueInitial, defaultState.mapValueInitial);
+        const mapValueGoal = normalizeCurrencyValue(source.mapValueGoal, defaultState.mapValueGoal);
         return {
             ...defaultState,
             ...source,
@@ -151,8 +158,18 @@ const OverlayApp = (() => {
             overlayPosition,
             controlsPosition,
             monsters: Array.isArray(source.monsters) ? source.monsters : [],
-            roster: Array.isArray(source.roster) ? source.roster : []
+            roster: Array.isArray(source.roster) ? source.roster : [],
+            mapValue,
+            mapValueInitial,
+            mapValueGoal
         };
+    }
+
+    function normalizeCurrencyValue(value, fallback) {
+        if (value === null && fallback === null) return null;
+        const parsed = Number(value);
+        if (!Number.isFinite(parsed)) return fallback;
+        return Math.max(0, Math.round(parsed));
     }
 
     function normalizePosition(position) {
@@ -371,7 +388,10 @@ const OverlayApp = (() => {
                 startedAt: null,
                 monsters: [],
                 roster: [],
-                rosterPending: false
+                rosterPending: false,
+                mapValue: 0,
+                mapValueInitial: 0,
+                mapValueGoal: null
             };
             return nextState;
         });
@@ -446,6 +466,10 @@ const OverlayApp = (() => {
 
     function setUpgradesVisible(upgradesVisible) {
         updateState((currentState) => ({ ...currentState, upgradesVisible }));
+    }
+
+    function setMapValueVisible(mapValueVisible) {
+        updateState((currentState) => ({ ...currentState, mapValueVisible }));
     }
 
     function setMonsterIconsVisible(monsterIconsVisible) {
@@ -525,6 +549,7 @@ const OverlayApp = (() => {
         setInterfaceLanguage,
         setLevel,
         setLevelBadgeVisible,
+        setMapValueVisible,
         setMonsterIconsVisible,
         setMonsterHealthBarsVisible,
         setMonsterStrengthVisible,

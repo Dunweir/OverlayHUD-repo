@@ -122,6 +122,7 @@ const defaultOverlayState = {
     bgEnabled: false,
     timerVisible: false,
     upgradesVisible: true,
+    mapValueVisible: true,
     monsterIconsVisible: true,
     levelBadgeVisible: true,
     upgradeTooltipsVisible: true,
@@ -143,7 +144,10 @@ const defaultOverlayState = {
     startedAt: null,
     monsters: [],
     roster: [],
-    rosterPending: false
+    rosterPending: false,
+    mapValue: 0,
+    mapValueInitial: 0,
+    mapValueGoal: null
 };
 
 function normalizeOverlayState(rawState) {
@@ -169,6 +173,9 @@ function normalizeOverlayState(rawState) {
         : defaultOverlayState.overlayAlignment;
     const overlayPosition = normalizePosition(source.overlayPosition);
     const controlsPosition = normalizePosition(source.controlsPosition);
+    const mapValue = normalizeCurrencyValue(source.mapValue, defaultOverlayState.mapValue);
+    const mapValueInitial = normalizeCurrencyValue(source.mapValueInitial, defaultOverlayState.mapValueInitial);
+    const mapValueGoal = normalizeCurrencyValue(source.mapValueGoal, defaultOverlayState.mapValueGoal);
 
     return {
         ...source,
@@ -184,8 +191,18 @@ function normalizeOverlayState(rawState) {
         overlayPosition,
         controlsPosition,
         monsters: Array.isArray(source.monsters) ? source.monsters : [],
-        roster: Array.isArray(source.roster) ? source.roster : []
+        roster: Array.isArray(source.roster) ? source.roster : [],
+        mapValue,
+        mapValueInitial,
+        mapValueGoal
     };
+}
+
+function normalizeCurrencyValue(value, fallback) {
+    if (value === null && fallback === null) return null;
+    const parsed = Number(value);
+    if (!Number.isFinite(parsed)) return fallback;
+    return Math.max(0, Math.round(parsed));
 }
 
 function normalizePosition(position) {
@@ -505,7 +522,10 @@ function setGameLevel(rawLevel) {
         startedAt: Date.now(),
         monsters: [],
         roster: [],
-        rosterPending: true
+        rosterPending: true,
+        mapValue: 0,
+        mapValueInitial: 0,
+        mapValueGoal: null
     };
 
     return { ok: true, statusCode: 200, payload: { ok: true, level } };
@@ -593,6 +613,31 @@ function setPlayerUpgrades(rawUpgrades) {
         ...updates
     };
     return { ok: true, statusCode: 200, payload: { ok: true, upgrades: updates } };
+}
+
+function setMapValue(rawPayload) {
+    if (!rawPayload || typeof rawPayload !== "object" || Array.isArray(rawPayload)) {
+        return { ok: false, statusCode: 422, payload: { error: "Invalid map value payload" } };
+    }
+
+    const mapValue = normalizeCurrencyValue(rawPayload.value ?? rawPayload.mapValue ?? rawPayload.current, null);
+    if (mapValue == null) {
+        return { ok: false, statusCode: 422, payload: { error: "Invalid map value", received: rawPayload.value ?? rawPayload.mapValue ?? rawPayload.current } };
+    }
+
+    const updates = { mapValue };
+    const mapValueInitial = normalizeCurrencyValue(rawPayload.initial ?? rawPayload.mapValueInitial, null);
+    const mapValueGoal = normalizeCurrencyValue(rawPayload.goal ?? rawPayload.mapValueGoal, null);
+    if (mapValueInitial != null) updates.mapValueInitial = mapValueInitial;
+    if (mapValueGoal != null) updates.mapValueGoal = mapValueGoal;
+
+    overlayState = {
+        ...defaultOverlayState,
+        ...(normalizeOverlayState(overlayState) || {}),
+        ...updates
+    };
+
+    return { ok: true, statusCode: 200, payload: { ok: true, mapValue: overlayState.mapValue, mapValueInitial: overlayState.mapValueInitial, mapValueGoal: overlayState.mapValueGoal } };
 }
 
 function serveFile(request, response) {
@@ -726,6 +771,17 @@ const server = http.createServer(async (request, response) => {
             const body = await readBody(request);
             const payload = JSON.parse(body || "{}");
             const result = setPlayerUpgrades(payload.upgrades ?? payload);
+            sendJson(response, result.statusCode, result.payload);
+            if (result.ok) {
+                broadcastState();
+            }
+            return;
+        }
+
+        if (request.method === "POST" && request.url === "/api/map-value") {
+            const body = await readBody(request);
+            const payload = JSON.parse(body || "{}");
+            const result = setMapValue(payload);
             sendJson(response, result.statusCode, result.payload);
             if (result.ok) {
                 broadcastState();
