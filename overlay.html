@@ -138,16 +138,18 @@
         </div>
         <div class="overlay-container" id="overlayContainer">
             <div class="overlay-drag-corner overlay-drag-corner-main" data-drag-target="overlay" aria-hidden="true"></div>
-            <div class="overlay-header">
-                <div class="level-badge">
-                    <span class="level-text" data-i18n="level">УРОВЕНЬ</span>
-                    <span class="level-number" id="levelNumber">1</span>
+            <div class="overlay-topbar" id="overlayTopbar">
+                <div class="overlay-header" id="overlayHeader">
+                    <div class="level-badge" id="levelBadge">
+                        <span class="level-core">
+                            <span class="level-text" data-i18n="level">УРОВЕНЬ</span>
+                            <span class="level-number" id="levelNumber">1</span>
+                        </span>
+                        <span class="timer" id="timer">00:00</span>
+                    </div>
                 </div>
-                <div class="overlay-meta">
-                    <span class="timer" id="timer">00:00</span>
-                </div>
+                <div class="upgrade-row" id="upgradeRow" aria-label="Player upgrades"></div>
             </div>
-            <div class="upgrade-row" id="upgradeRow" aria-label="Player upgrades"></div>
             <div class="monsters-squares" id="monstersSquares"></div>
         </div>
     </div>
@@ -155,7 +157,9 @@
     <script src="overlay-state.js"></script>
     <script>
         const overlayContainer = document.getElementById("overlayContainer");
+        const overlayTopbar = document.getElementById("overlayTopbar");
         const overlayHoverControls = document.getElementById("overlayHoverControls");
+        const levelBadge = document.getElementById("levelBadge");
         const levelNumber = document.getElementById("levelNumber");
         const timer = document.getElementById("timer");
         const upgradeRow = document.getElementById("upgradeRow");
@@ -186,6 +190,8 @@
         let renderedSquareCount = 0;
         let lastTimerText = "";
         let currentLanguage = "ru";
+        let topbarInlineCleanupTimer = 0;
+        let topbarInlineCleanupVersion = 0;
         const monsterImageLoads = new Map();
         const upgradeElements = new Map();
         const viewportScale = {
@@ -857,10 +863,68 @@
             if (timerText !== lastTimerText) {
                 timer.textContent = timerText;
                 lastTimerText = timerText;
+                if (!latestState || latestState.upgradesVisible) requestAnimationFrame(updateTopbarLayout);
             }
         }
 
+        function getHorizontalOuterSize(element) {
+            const styles = getComputedStyle(element);
+            return element.offsetWidth + (parseFloat(styles.marginLeft) || 0) + (parseFloat(styles.marginRight) || 0);
+        }
+
+        function getOverlayInnerWidth() {
+            const styles = getComputedStyle(overlayContainer);
+            return overlayContainer.clientWidth - (parseFloat(styles.paddingLeft) || 0) - (parseFloat(styles.paddingRight) || 0);
+        }
+
+        function scheduleTopbarInlineCleanup(predicate, delay = 460) {
+            const cleanupVersion = ++topbarInlineCleanupVersion;
+            window.clearTimeout(topbarInlineCleanupTimer);
+            topbarInlineCleanupTimer = window.setTimeout(() => {
+                if (cleanupVersion === topbarInlineCleanupVersion && latestState && predicate(latestState)) {
+                    updateTopbarLayout();
+                }
+            }, delay);
+        }
+
+        function updateTopbarLayout(options = {}) {
+            if (!latestState || !overlayContainer.isConnected) return;
+
+            if (options.keepInlineUntilUpgradesHidden || options.keepInlineUntilHeaderHidden) {
+                overlayContainer.classList.add("is-topbar-inline");
+                return;
+            }
+
+            overlayContainer.classList.remove("is-topbar-inline");
+
+            const hasHeader = Boolean(latestState.levelBadgeVisible || latestState.timerVisible);
+            const visibleUpgrades = [...upgradeRow.children].filter((element) => !element.classList.contains("is-zero"));
+            const hasUpgrades = Boolean(latestState.upgradesVisible && visibleUpgrades.length > 0);
+            if (!hasHeader || !hasUpgrades) return;
+
+            const rowStyles = getComputedStyle(upgradeRow);
+            const topbarStyles = getComputedStyle(overlayTopbar);
+            const topbarGap = parseFloat(topbarStyles.columnGap || topbarStyles.gap) || 0;
+            const upgradeGap = parseFloat(rowStyles.columnGap || rowStyles.gap) || 0;
+            const headerWidth = getHorizontalOuterSize(levelBadge);
+            const upgradeWidth = visibleUpgrades.reduce((total, element) => total + getHorizontalOuterSize(element), 0)
+                + Math.max(0, visibleUpgrades.length - 1) * upgradeGap;
+            const requiredWidth = Math.ceil(headerWidth + upgradeWidth + topbarGap);
+            const availableWidth = Math.floor(getOverlayInnerWidth());
+
+            overlayContainer.classList.toggle("is-topbar-inline", requiredWidth <= availableWidth);
+        }
+
         function render(state) {
+            const keepInlineUntilUpgradesHidden = overlayContainer.classList.contains("is-topbar-inline") && !state.upgradesVisible;
+            const keepInlineUntilHeaderHidden = overlayContainer.classList.contains("is-topbar-inline")
+                && state.upgradesVisible
+                && !state.levelBadgeVisible
+                && !state.timerVisible;
+            if (state.upgradesVisible) {
+                topbarInlineCleanupVersion++;
+                window.clearTimeout(topbarInlineCleanupTimer);
+            }
             latestState = state;
             applyInterfaceLanguage(state.interfaceLanguage);
             document.documentElement.style.setProperty("--square-size", `${state.squareSize}px`);
@@ -900,6 +964,7 @@
             overlayContainer.classList.toggle("is-positioned", keepOverlayPositioned || Boolean(state.overlayPosition));
             overlayContainer.classList.toggle("is-dragging", keepOverlayDragging);
             overlayContainer.classList.add(`align-${state.overlayAlignment}`);
+            if (keepInlineUntilUpgradesHidden || keepInlineUntilHeaderHidden) overlayContainer.classList.add("is-topbar-inline");
             if (state.bgEnabled) overlayContainer.classList.add("with-bg");
             if (!state.timerVisible) overlayContainer.classList.add("hide-level-timer");
             if (!state.upgradesVisible) overlayContainer.classList.add("hide-upgrades");
@@ -957,18 +1022,26 @@
                 }
             }
 
+            updateTopbarLayout({ keepInlineUntilUpgradesHidden, keepInlineUntilHeaderHidden });
+            if (keepInlineUntilUpgradesHidden) {
+                scheduleTopbarInlineCleanup((currentState) => !currentState.upgradesVisible, 460);
+            } else if (keepInlineUntilHeaderHidden) {
+                scheduleTopbarInlineCleanup((currentState) => currentState.upgradesVisible && !currentState.levelBadgeVisible && !currentState.timerVisible, 280);
+            }
             applySavedPositionsWhenLayoutChanges(state);
         }
 
         applyViewportScale();
         window.addEventListener("resize", () => {
             applyViewportScale();
+            updateTopbarLayout();
             lastPositionLayoutKey = "";
             applySavedPositions();
         });
         if (window.visualViewport) {
             window.visualViewport.addEventListener("resize", () => {
                 applyViewportScale();
+                updateTopbarLayout();
                 lastPositionLayoutKey = "";
                 applySavedPositions();
             });
