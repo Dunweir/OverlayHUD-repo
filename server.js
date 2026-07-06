@@ -122,6 +122,7 @@ const defaultOverlayState = {
     bgEnabled: false,
     timerVisible: false,
     upgradesVisible: true,
+    upgradeLayout: "stacked",
     mapValueVisible: true,
     monsterIconsVisible: true,
     levelBadgeVisible: true,
@@ -171,6 +172,9 @@ function normalizeOverlayState(rawState) {
     const overlayAlignment = ["left", "center", "right"].includes(source.overlayAlignment)
         ? source.overlayAlignment
         : defaultOverlayState.overlayAlignment;
+    const upgradeLayout = ["inline", "stacked"].includes(source.upgradeLayout)
+        ? source.upgradeLayout
+        : defaultOverlayState.upgradeLayout;
     const overlayPosition = normalizePosition(source.overlayPosition);
     const controlsPosition = normalizePosition(source.controlsPosition);
     const mapValue = normalizeCurrencyValue(source.mapValue, defaultOverlayState.mapValue);
@@ -188,6 +192,7 @@ function normalizeOverlayState(rawState) {
         hoverOpacity,
         interfaceLanguage,
         overlayAlignment,
+        upgradeLayout,
         overlayPosition,
         controlsPosition,
         monsters: Array.isArray(source.monsters) ? source.monsters : [],

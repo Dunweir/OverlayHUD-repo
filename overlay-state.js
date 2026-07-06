@@ -77,6 +77,7 @@ const OverlayApp = (() => {
         bgEnabled: false,
         timerVisible: false,
         upgradesVisible: true,
+        upgradeLayout: "stacked",
         mapValueVisible: true,
         monsterIconsVisible: true,
         levelBadgeVisible: true,
@@ -138,6 +139,9 @@ const OverlayApp = (() => {
         const overlayAlignment = ["left", "center", "right"].includes(source.overlayAlignment)
             ? source.overlayAlignment
             : defaultState.overlayAlignment;
+        const upgradeLayout = ["inline", "stacked"].includes(source.upgradeLayout)
+            ? source.upgradeLayout
+            : defaultState.upgradeLayout;
         const overlayPosition = normalizePosition(source.overlayPosition);
         const controlsPosition = normalizePosition(source.controlsPosition);
         const mapValue = normalizeCurrencyValue(source.mapValue, defaultState.mapValue);
@@ -155,6 +159,7 @@ const OverlayApp = (() => {
             hoverOpacity,
             interfaceLanguage,
             overlayAlignment,
+            upgradeLayout,
             overlayPosition,
             controlsPosition,
             monsters: Array.isArray(source.monsters) ? source.monsters : [],
@@ -468,6 +473,13 @@ const OverlayApp = (() => {
         updateState((currentState) => ({ ...currentState, upgradesVisible }));
     }
 
+    function setUpgradeLayout(upgradeLayout) {
+        updateState((currentState) => ({
+            ...currentState,
+            upgradeLayout: upgradeLayout === "inline" ? "inline" : "stacked"
+        }));
+    }
+
     function setMapValueVisible(mapValueVisible) {
         updateState((currentState) => ({ ...currentState, mapValueVisible }));
     }
@@ -560,6 +572,7 @@ const OverlayApp = (() => {
         setTumbleLaunch,
         setStyle,
         setTimerVisible,
+        setUpgradeLayout,
         setUpgradeTooltipsVisible,
         setUpgradeSize,
         setUpgradesVisible,

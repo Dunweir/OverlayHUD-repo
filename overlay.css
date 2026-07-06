@@ -1260,9 +1260,9 @@ body {
     white-space: nowrap;
 }
 
-.overlay-alignment-switch {
+.overlay-alignment-switch,
+.overlay-layout-switch {
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 4px;
     min-width: 0;
     padding: 3px;
@@ -1271,7 +1271,16 @@ body {
     background: rgba(255, 255, 255, 0.06);
 }
 
-.overlay-alignment-switch button {
+.overlay-alignment-switch {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.overlay-layout-switch {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.overlay-alignment-switch button,
+.overlay-layout-switch button {
     height: 30px;
     padding: 0;
     border: 0;
@@ -1285,12 +1294,18 @@ body {
     cursor: pointer;
 }
 
-.overlay-alignment-switch button.is-active {
+.overlay-layout-switch button {
+    font-size: 13px;
+}
+
+.overlay-alignment-switch button.is-active,
+.overlay-layout-switch button.is-active {
     background: #ffb200;
     color: #151922;
 }
 
-.overlay-alignment-switch button:focus-visible {
+.overlay-alignment-switch button:focus-visible,
+.overlay-layout-switch button:focus-visible {
     outline: 3px solid rgba(255, 178, 0, 0.18);
 }
 
