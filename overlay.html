@@ -992,6 +992,11 @@
             overlayRespawnTimerToggle.checked = state.respawnTimerVisible;
             overlayRespawnIndicatorToggle.checked = state.respawnIndicatorVisible;
 
+            const roster = Array.isArray(state.roster) ? [...state.roster] : [];
+            const hasMonsterIconSlots = !state.rosterPending
+                && (roster.length > 0 || (Array.isArray(state.monsters) && state.monsters.length > 0));
+            const overlayShouldBeVisible = Boolean(state.gameplayVisible && hasMonsterIconSlots);
+
             const keepOverlayPositioned = overlayContainer.classList.contains("is-positioned");
             const keepOverlayDragging = overlayContainer.classList.contains("is-dragging");
             overlayContainer.className = "overlay-container";
@@ -1012,8 +1017,8 @@
             if (!state.respawnIndicatorVisible) overlayContainer.classList.add("hide-respawn-indicator");
             if (!state.respawnTimerVisible && !state.respawnIndicatorVisible) overlayContainer.classList.add("hide-respawn-status");
             if (state.tabHidden) overlayContainer.classList.add("is-tab-hidden");
-            if (state.gameplayVisible) overlayContainer.classList.add("is-visible");
-            overlayHoverControls.classList.toggle("is-enabled", state.gameplayVisible && !state.tabHidden);
+            if (overlayShouldBeVisible) overlayContainer.classList.add("is-visible");
+            overlayHoverControls.classList.toggle("is-enabled", overlayShouldBeVisible && !state.tabHidden);
 
             levelNumber.textContent = state.level;
             let visibleUpgradeCount = 0;
@@ -1027,7 +1032,6 @@
             upgradeRow.classList.toggle("is-empty", visibleUpgradeCount === 0);
             renderTimer(state);
 
-            const roster = Array.isArray(state.roster) ? [...state.roster] : [];
             if (state.rosterPending) {
                 ensureMonsterSquares(0);
             } else if (roster.length > 0) {

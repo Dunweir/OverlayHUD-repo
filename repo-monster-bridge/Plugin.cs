@@ -16,7 +16,7 @@ using UnityEngine;
 
 namespace RepoMonsterBridge
 {
-    [BepInPlugin("local.overlay.repo_monster_bridge", "REPO Monster Bridge", "0.2.50")]
+    [BepInPlugin("local.overlay.repo_monster_bridge", "REPO Monster Bridge", "0.2.52")]
     public sealed class Plugin : BaseUnityPlugin
     {
         private static Plugin instance;
@@ -161,6 +161,7 @@ namespace RepoMonsterBridge
         private ConfigEntry<string> levelEndpoint;
         private ConfigEntry<float> scanInterval;
         private ConfigEntry<float> maxDistance;
+        private ConfigEntry<float> peeperMaxDistance;
         private ConfigEntry<float> viewportPadding;
         private ConfigEntry<bool> preferGameOnScreen;
         private ConfigEntry<bool> requireLineOfSight;
@@ -176,6 +177,7 @@ namespace RepoMonsterBridge
             levelEndpoint = Config.Bind("Overlay", "LevelEndpoint", "http://127.0.0.1:8787/api/level", "Level sync endpoint on this PC.");
             scanInterval = Config.Bind("Detection", "ScanIntervalSeconds", 1f, "How often visible enemies are scanned.");
             maxDistance = Config.Bind("Detection", "MaxDistance", 45f, "Maximum distance from camera to count an enemy as encountered.");
+            peeperMaxDistance = Config.Bind("Detection", "PeeperMaxDistance", 120f, "Maximum distance for Peeper only when the game marks it as very close to the player.");
             viewportPadding = Config.Bind("Detection", "ViewportPadding", 0.03f, "Allowed viewport padding outside the screen edges.");
             preferGameOnScreen = Config.Bind("Detection", "PreferGameOnScreen", true, "Use the game's local on-screen state when line of sight is enabled.");
             requireLineOfSight = Config.Bind("Detection", "RequireLineOfSight", false, "Reveal only enemies marked on-screen for the local player by the game.");
@@ -1242,7 +1244,7 @@ namespace RepoMonsterBridge
             Transform root = candidate.Root.transform;
             Vector3 center = candidate.Center;
             float distance = Vector3.Distance(camera.transform.position, center);
-            if (distance > maxDistance.Value) return false;
+            if (distance > maxDistance.Value && !IsPeeperVeryClose(candidate, monsterName, distance)) return false;
 
             if (preferGameOnScreen.Value)
             {
@@ -1261,19 +1263,26 @@ namespace RepoMonsterBridge
             if (monsterName != "Peeper" && monsterName != "Headgrab" && monsterName != "Spewer" && monsterName != "Hidden" && monsterName != "Rugrat" && monsterName != "Upscream"
                 && monsterName != "Gnomes" && monsterName != "Tick" && monsterName != "Banger") return false;
 
+            if (IsPeeperVeryClose(candidate, monsterName, Vector3.Distance(camera.transform.position, candidate.Center))) return true;
+
             float fallbackDistance = Math.Min(maxDistance.Value, 8f);
             if (Vector3.Distance(camera.transform.position, candidate.Center) > fallbackDistance) return false;
-
-            Component enemy = candidate.Root.GetComponent("Enemy") ?? candidate.Component;
-            object enemyParent = ReadMember(enemy, "EnemyParent");
-            object playerVeryClose = ReadMember(enemyParent, "playerVeryClose");
-            if (playerVeryClose is bool isVeryClose && isVeryClose) return true;
 
             if (IsPointInViewport(camera, candidate.Center)) return true;
             Collider collider = candidate.Root.GetComponentInChildren<Collider>();
             if (collider != null && IsPointInViewport(camera, collider.bounds.center)) return true;
             Renderer renderer = candidate.Root.GetComponentInChildren<Renderer>();
             return renderer != null && IsPointInViewport(camera, renderer.bounds.center);
+        }
+
+        private bool IsPeeperVeryClose(EnemyCandidate candidate, string monsterName, float distance)
+        {
+            if (monsterName != "Peeper" || distance > Math.Max(maxDistance.Value, peeperMaxDistance.Value)) return false;
+
+            Component enemy = candidate.Root.GetComponent("Enemy") ?? candidate.Component;
+            object enemyParent = ReadMember(enemy, "EnemyParent");
+            object playerVeryClose = ReadMember(enemyParent, "playerVeryClose");
+            return playerVeryClose is bool isVeryClose && isVeryClose;
         }
 
         private bool IsPointInViewport(Camera camera, Vector3 point)

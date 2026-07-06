@@ -1,6 +1,6 @@
 {
   "name": "RepoMonsterBridge",
-  "version_number": "0.2.1",
+  "version_number": "0.2.52",
   "website_url": "",
   "description": "Shows encountered R.E.P.O. monsters inside the game and can optionally send them to the stream overlay server.",
   "dependencies": []

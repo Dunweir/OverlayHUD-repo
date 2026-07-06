@@ -2,7 +2,7 @@
 
 Small BepInEx plugin source for sending encountered R.E.P.O. enemies to the local stream overlay.
 
-The plugin does not reveal the whole level list. It scans from the active camera and sends a monster only when an enemy-like Unity object is in view, close enough, and optionally has line of sight.
+The plugin does not reveal the whole level list. It scans from the active camera and sends a monster only when an enemy-like Unity object is in view, close enough, and optionally has line of sight. Peeper has an extra distance limit only while the game marks it as very close to the player.
 
 ## Overlay Endpoint
 
@@ -41,4 +41,4 @@ The server listens on all local network interfaces by default. From the gaming P
 http://192.168.1.198:8787/api/monster-seen
 ```
 
-After first launch, BepInEx creates a config file where distance, cooldown, endpoint, and line-of-sight behavior can be tuned.
+After first launch, BepInEx creates a config file where distance, Peeper distance, cooldown, endpoint, and line-of-sight behavior can be tuned.

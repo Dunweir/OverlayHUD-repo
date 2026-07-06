@@ -2,6 +2,8 @@
 
 Sends encountered R.E.P.O. monsters to the overlay server.
 
+Peeper uses a separate detection distance only while the game marks it as very close to the player.
+
 Default endpoint:
 
 ```text
