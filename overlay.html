@@ -860,7 +860,9 @@
         function renderTimer(state) {
             const seconds = OverlayApp.getTimerSeconds(state);
             const timerText = OverlayApp.formatTime(seconds);
-            timer.classList.toggle("is-long", seconds >= 3600);
+            const isLongTimer = seconds >= 3600;
+            timer.classList.toggle("is-long", isLongTimer);
+            overlayContainer.classList.toggle("is-timer-long", isLongTimer);
             if (timerText !== lastTimerText) {
                 timer.textContent = timerText;
                 lastTimerText = timerText;

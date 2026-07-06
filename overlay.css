@@ -231,6 +231,10 @@ body {
     padding-left: 8px;
 }
 
+.overlay-container.hide-level-badge:not(.hide-level-timer).is-timer-long .level-badge {
+    max-width: 122px;
+}
+
 .overlay-container.hide-level-timer:not(.hide-level-badge) .level-badge {
     max-width: 220px;
 }
@@ -469,9 +473,11 @@ body {
 }
 
 .overlay-container.hide-level-badge:not(.hide-level-timer) .timer.is-long {
-    width: 94px;
-    min-width: 94px;
-    max-width: 94px;
+    justify-content: center;
+    width: 96px;
+    min-width: 96px;
+    max-width: 96px;
+    text-align: center;
 }
 
 .overlay-container.align-center .timer {
