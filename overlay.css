@@ -338,10 +338,10 @@ body {
     transform: translateY(0);
     visibility: visible;
     transform-origin: left top;
-    transition: max-height var(--overlay-layout-duration) var(--overlay-reveal-ease),
-        margin-bottom var(--overlay-layout-duration) var(--overlay-reveal-ease),
-        opacity var(--overlay-reveal-duration) ease,
+    transition: opacity var(--overlay-reveal-duration) ease,
         transform var(--overlay-reveal-duration) var(--overlay-reveal-ease),
+        max-height 0s linear 0s,
+        margin-bottom 0s linear 0s,
         visibility 0s linear 0s;
 }
 
@@ -369,7 +369,7 @@ body {
     overflow: hidden;
     transform: translateY(var(--overlay-hidden-y)) scale(var(--overlay-hidden-scale));
     visibility: hidden;
-    transition-delay: 0s, 0s, 0s, 0s, var(--overlay-reveal-duration);
+    transition-delay: 0s, 0s, var(--overlay-reveal-duration), var(--overlay-reveal-duration), var(--overlay-reveal-duration);
 }
 
 .upgrade-tooltip {

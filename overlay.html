@@ -192,6 +192,7 @@
         let currentLanguage = "ru";
         let topbarInlineCleanupTimer = 0;
         let topbarInlineCleanupVersion = 0;
+        let layoutReclampTimer = 0;
         const monsterImageLoads = new Map();
         const upgradeElements = new Map();
         const viewportScale = {
@@ -448,6 +449,26 @@
         function applySavedPositions() {
             positionElement(overlayContainer, "overlay", getSavedPosition("overlay"));
             positionElement(overlayHoverControls, "controls", getSavedPosition("controls"));
+        }
+
+        function reclampPositionedElement(element) {
+            if (!element.classList.contains("is-positioned")) return;
+            const left = parseFloat(element.style.getPropertyValue("--overlay-left"));
+            const top = parseFloat(element.style.getPropertyValue("--overlay-top"));
+            if (!Number.isFinite(left) || !Number.isFinite(top)) return;
+
+            const clamped = clampPosition(element, left, top);
+            element.style.setProperty("--overlay-left", `${Math.round(clamped.left)}px`);
+            element.style.setProperty("--overlay-top", `${Math.round(clamped.top)}px`);
+        }
+
+        function scheduleLayoutReclamp() {
+            window.clearTimeout(layoutReclampTimer);
+            layoutReclampTimer = window.setTimeout(() => {
+                applySavedPositions();
+                reclampPositionedElement(overlayContainer);
+                reclampPositionedElement(overlayHoverControls);
+            }, 330);
         }
 
         function getPositionLayoutKey(state) {
@@ -866,7 +887,10 @@
             if (timerText !== lastTimerText) {
                 timer.textContent = timerText;
                 lastTimerText = timerText;
-                if (!latestState || latestState.upgradesVisible) requestAnimationFrame(updateTopbarLayout);
+                const isTopbarTransitionHeld = overlayContainer.classList.contains("is-topbar-inline")
+                    && latestState
+                    && (!latestState.upgradesVisible || (!latestState.levelBadgeVisible && !latestState.timerVisible));
+                if ((!latestState || latestState.upgradesVisible) && !isTopbarTransitionHeld) requestAnimationFrame(updateTopbarLayout);
             }
         }
 
@@ -919,11 +943,18 @@
         }
 
         function render(state) {
+            const previousState = latestState;
             const keepInlineUntilUpgradesHidden = overlayContainer.classList.contains("is-topbar-inline") && !state.upgradesVisible;
             const keepInlineUntilHeaderHidden = overlayContainer.classList.contains("is-topbar-inline")
                 && state.upgradesVisible
                 && !state.levelBadgeVisible
                 && !state.timerVisible;
+            const majorVisibilityChanged = Boolean(previousState && (
+                previousState.upgradesVisible !== state.upgradesVisible
+                || previousState.monsterIconsVisible !== state.monsterIconsVisible
+                || previousState.levelBadgeVisible !== state.levelBadgeVisible
+                || previousState.timerVisible !== state.timerVisible
+            ));
             if (state.upgradesVisible) {
                 topbarInlineCleanupVersion++;
                 window.clearTimeout(topbarInlineCleanupTimer);
@@ -1032,6 +1063,7 @@
                 scheduleTopbarInlineCleanup((currentState) => currentState.upgradesVisible && !currentState.levelBadgeVisible && !currentState.timerVisible);
             }
             applySavedPositionsWhenLayoutChanges(state);
+            if (majorVisibilityChanged) scheduleLayoutReclamp();
         }
 
         applyViewportScale();
