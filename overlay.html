@@ -860,6 +860,7 @@
         function renderTimer(state) {
             const seconds = OverlayApp.getTimerSeconds(state);
             const timerText = OverlayApp.formatTime(seconds);
+            timer.classList.toggle("is-long", seconds >= 3600);
             if (timerText !== lastTimerText) {
                 timer.textContent = timerText;
                 lastTimerText = timerText;
@@ -877,7 +878,7 @@
             return overlayContainer.clientWidth - (parseFloat(styles.paddingLeft) || 0) - (parseFloat(styles.paddingRight) || 0);
         }
 
-        function scheduleTopbarInlineCleanup(predicate, delay = 460) {
+        function scheduleTopbarInlineCleanup(predicate, delay = 300) {
             const cleanupVersion = ++topbarInlineCleanupVersion;
             window.clearTimeout(topbarInlineCleanupTimer);
             topbarInlineCleanupTimer = window.setTimeout(() => {
@@ -1024,9 +1025,9 @@
 
             updateTopbarLayout({ keepInlineUntilUpgradesHidden, keepInlineUntilHeaderHidden });
             if (keepInlineUntilUpgradesHidden) {
-                scheduleTopbarInlineCleanup((currentState) => !currentState.upgradesVisible, 460);
+                scheduleTopbarInlineCleanup((currentState) => !currentState.upgradesVisible);
             } else if (keepInlineUntilHeaderHidden) {
-                scheduleTopbarInlineCleanup((currentState) => currentState.upgradesVisible && !currentState.levelBadgeVisible && !currentState.timerVisible, 280);
+                scheduleTopbarInlineCleanup((currentState) => currentState.upgradesVisible && !currentState.levelBadgeVisible && !currentState.timerVisible);
             }
             applySavedPositionsWhenLayoutChanges(state);
         }
