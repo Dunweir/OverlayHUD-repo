@@ -151,6 +151,9 @@ const defaultOverlayState = {
     mapValueGoal: null
 };
 
+const respawnReductionFlashThresholdSeconds = 2.5;
+const respawnReductionFlashDurationMs = 1100;
+
 function normalizeOverlayState(rawState) {
     if (!rawState) return null;
 
@@ -480,20 +483,25 @@ function updateMonsterStatuses(rawStatuses) {
                     : null
             }
             : { health: null, maxHealth: null };
+        const clearFlashPatch = { respawnFlashAt: null, respawnFlashUntil: null, respawnFlashAmount: null };
         if (sourceStatuses.some((status) => status.alive)) {
-            return { ...slot, ...healthPatch, alive: true, respawnEndsAt: null, respawnDuration: null };
+            return { ...slot, ...healthPatch, ...clearFlashPatch, alive: true, respawnEndsAt: null, respawnDuration: null };
         }
 
         const remainingValues = sourceStatuses
             .map((status) => status.respawnRemaining)
             .filter((remaining) => remaining > 0);
         if (remainingValues.length === 0) {
-            return { ...slot, ...healthPatch, alive: false, respawnEndsAt: null, respawnDuration: null };
+            return { ...slot, ...healthPatch, ...clearFlashPatch, alive: false, respawnEndsAt: null, respawnDuration: null };
         }
 
         const remaining = Math.min(...remainingValues);
         const existingEnd = Number(slot.respawnEndsAt);
         const projectedRemaining = Number.isFinite(existingEnd) ? Math.max(0, (existingEnd - now) / 1000) : null;
+        const suddenReduction = slot.alive === false && projectedRemaining != null
+            ? projectedRemaining - remaining
+            : 0;
+        const hasRespawnReductionFlash = suddenReduction >= respawnReductionFlashThresholdSeconds;
         const keepExistingEnd = slot.alive === false
             && projectedRemaining != null
             && Math.abs(projectedRemaining - remaining) < 1.5;
@@ -502,8 +510,21 @@ function updateMonsterStatuses(rawStatuses) {
         const respawnDuration = slot.alive === false && Number.isFinite(previousDuration)
             ? Math.max(previousDuration, remaining)
             : remaining;
+        const flashPatch = hasRespawnReductionFlash
+            ? {
+                respawnFlashAt: now,
+                respawnFlashUntil: now + respawnReductionFlashDurationMs,
+                respawnFlashAmount: Math.max(1, Math.round(suddenReduction))
+            }
+            : Number(slot.respawnFlashUntil) > now
+                ? {
+                    respawnFlashAt: slot.respawnFlashAt,
+                    respawnFlashUntil: slot.respawnFlashUntil,
+                    respawnFlashAmount: slot.respawnFlashAmount
+                }
+                : { respawnFlashAt: null, respawnFlashUntil: null, respawnFlashAmount: null };
 
-        return { ...slot, ...healthPatch, alive: false, respawnEndsAt, respawnDuration };
+        return { ...slot, ...healthPatch, ...flashPatch, alive: false, respawnEndsAt, respawnDuration };
     });
 
     overlayState = { ...state, roster };

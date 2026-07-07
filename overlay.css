@@ -720,6 +720,10 @@ body {
     transform: translateY(0) scale(1);
 }
 
+.monster-square.is-cooldown-reduced .monster-cooldown-time {
+    animation: monster-cooldown-reduced 1.05s ease-out both;
+}
+
 .overlay-container.hide-respawn-timer .monster-cooldown-time {
     opacity: 0;
     transform: translateY(-3px) scale(0.9);
@@ -978,6 +982,33 @@ body {
     }
 }
 
+@keyframes monster-cooldown-reduced {
+    0% {
+        background: rgba(68, 0, 0, 0.92);
+        color: #fff;
+        text-shadow: none;
+        transform: translateY(0) scale(1);
+    }
+    16% {
+        background: rgba(188, 11, 10, 0.96);
+        color: #fff1ef;
+        text-shadow: none;
+        transform: translateY(-1px) scale(1.14);
+    }
+    54% {
+        background: rgba(143, 9, 8, 0.9);
+        color: #ffe2de;
+        text-shadow: none;
+        transform: translateY(0) scale(1.04);
+    }
+    100% {
+        background: rgba(0, 0, 0, 0.52);
+        color: #fff;
+        text-shadow: 0 1px 3px #000;
+        transform: translateY(0) scale(1);
+    }
+}
+
 @media (prefers-reduced-motion: reduce) {
     .overlay-container {
         transition: none;
@@ -1004,6 +1035,7 @@ body {
     .monster-square.is-revealing .monster-count,
     .monster-square.is-revealing .strength-required,
     .monster-square.is-damaged::after,
+    .monster-square.is-cooldown-reduced .monster-cooldown-time,
     .monster-damage-pop {
         animation: none;
     }

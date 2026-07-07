@@ -651,8 +651,10 @@
             square.dataset.imagePending = "";
             square.dataset.monsterHealthKey = "";
             square.dataset.monsterHealthValue = "";
+            square.dataset.respawnFlashKey = "";
             square.classList.remove("is-revealing");
             square.classList.remove("is-damaged");
+            square.classList.remove("is-cooldown-reduced");
             clearMonsterCooldown(square);
             square.querySelectorAll(".monster-reveal-image, .monster-damage-pop").forEach((element) => element.remove());
             const img = square.firstElementChild;
@@ -752,8 +754,25 @@
             square.dataset.cooldownActive = "false";
             square.dataset.respawnEndsAt = "";
             square.dataset.respawnDuration = "";
+            square.classList.remove("is-cooldown-reduced");
             const time = square.querySelector(".monster-cooldown-time");
             if (time) time.textContent = "";
+        }
+
+        function updateMonsterCooldownFeedback(square, status, monsterKey) {
+            const flashAt = Number(status?.respawnFlashAt);
+            const flashUntil = Number(status?.respawnFlashUntil);
+            if (!Number.isFinite(flashAt) || !Number.isFinite(flashUntil) || flashUntil <= Date.now()) return;
+
+            const flashKey = `${monsterKey}:${flashAt}`;
+            if (square.dataset.respawnFlashKey === flashKey) return;
+            square.dataset.respawnFlashKey = flashKey;
+            square.classList.remove("is-cooldown-reduced");
+            void square.offsetWidth;
+            square.classList.add("is-cooldown-reduced");
+            setTimeout(() => {
+                if (square.dataset.respawnFlashKey === flashKey) square.classList.remove("is-cooldown-reduced");
+            }, 1120);
         }
 
         function configureMonsterCooldown(square, status) {
@@ -845,6 +864,7 @@
             updateMonsterTooltip(square, monster, status);
             updateMonsterHealthBar(square, status);
             updateMonsterDamageFeedback(square, status, monsterKey);
+            updateMonsterCooldownFeedback(square, status, monsterKey);
 
             if (shouldReveal) {
                 preloadMonsterImage(monster.image).then(() => {
