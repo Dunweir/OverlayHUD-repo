@@ -1,6 +1,6 @@
 {
   "name": "RepoMonsterBridge",
-  "version_number": "0.2.56",
+  "version_number": "0.2.57",
   "website_url": "",
   "description": "Sends R.E.P.O. monsters, level state, upgrades, and respawn cooldowns to the stream overlay server.",
   "dependencies": []

@@ -16,7 +16,7 @@ using UnityEngine;
 
 namespace RepoMonsterBridge
 {
-    [BepInPlugin("local.overlay.repo_monster_bridge", "REPO Monster Bridge", "0.2.56")]
+    [BepInPlugin("local.overlay.repo_monster_bridge", "REPO Monster Bridge", "0.2.57")]
     public sealed class Plugin : BaseUnityPlugin
     {
         private static Plugin instance;
@@ -680,25 +680,14 @@ namespace RepoMonsterBridge
             foreach (Component enemyParent in GetKnownEnemyParentsSnapshot())
             {
                 if (enemyParent == null) continue;
-                GameObject root = GetEnemyRoot(enemyParent);
-                int parentId = enemyParent.GetInstanceID();
-                int sourceId;
-                if (root != null)
-                {
-                    sourceId = root.GetInstanceID();
-                    sourceIdsByEnemyParent[parentId] = sourceId;
-                }
-                else if (!sourceIdsByEnemyParent.TryGetValue(parentId, out sourceId))
-                {
-                    continue;
-                }
+                AddStatusCandidate(statusCandidates, enemyParent);
+            }
 
-                statusCandidates[sourceId] = new EnemyCandidate
-                {
-                    Component = enemyParent,
-                    Root = root,
-                    Center = Vector3.zero
-                };
+            foreach (Component enemyParent in FindSpawnedEnemiesFromDirector())
+            {
+                if (enemyParent == null) continue;
+                RegisterEnemyParent(enemyParent);
+                AddStatusCandidate(statusCandidates, enemyParent);
             }
 
             var sourceIds = new List<int>(statusCandidates.Keys);
@@ -763,24 +752,42 @@ namespace RepoMonsterBridge
             Component enemyParent = GetEnemyParent(candidate);
             if (enemyParent == null) return false;
 
-            bool timerModAvailable;
-            if (TryGetTimerModRespawnStatus(enemyParent, out alive, out remaining, out timerModAvailable))
-            {
-                return true;
-            }
-            if (timerModAvailable)
-            {
-                alive = true;
-                remaining = 0f;
-                return true;
-            }
-
             object timerValue = ReadMember(enemyParent, "DespawnedTimer");
             if (!TryConvertFloat(timerValue, out remaining)) return false;
 
             remaining = Math.Max(0f, remaining);
-            alive = remaining <= 0.000001f;
+            alive = ReadEnemySpawned(enemyParent);
             return true;
+        }
+
+        private void AddStatusCandidate(Dictionary<int, EnemyCandidate> statusCandidates, Component enemyParent)
+        {
+            GameObject root = GetEnemyRoot(enemyParent);
+            int parentId = enemyParent.GetInstanceID();
+            int sourceId;
+            if (root != null)
+            {
+                sourceId = root.GetInstanceID();
+                sourceIdsByEnemyParent[parentId] = sourceId;
+            }
+            else if (!sourceIdsByEnemyParent.TryGetValue(parentId, out sourceId))
+            {
+                return;
+            }
+
+            statusCandidates[sourceId] = new EnemyCandidate
+            {
+                Component = enemyParent,
+                Root = root,
+                Center = Vector3.zero
+            };
+        }
+
+        private static bool ReadEnemySpawned(Component enemyParent)
+        {
+            object spawnedValue = ReadMember(enemyParent, "Spawned");
+            if (spawnedValue is bool spawned) return spawned;
+            return enemyParent.gameObject != null && enemyParent.gameObject.activeInHierarchy;
         }
 
         private static bool TryGetEnemyHealth(EnemyCandidate candidate, out float health, out float maxHealth)
@@ -870,127 +877,6 @@ namespace RepoMonsterBridge
 
             value = 0f;
             return false;
-        }
-
-        private static bool TryGetTimerModRespawnStatus(Component enemyParent, out bool alive, out float remaining, out bool timerModAvailable)
-        {
-            alive = true;
-            remaining = 0f;
-            timerModAvailable = false;
-
-            if (!TryGetEnemyViewId(enemyParent, out int viewId)) return false;
-
-            Type timerUiType = Type.GetType("TimerPlugin.EnemyListUI, TimerPlugin");
-            if (timerUiType == null) return false;
-
-            foreach (IDictionary timers in GetTimerModEnemyDictionaries(timerUiType))
-            {
-                timerModAvailable = true;
-                if (!TryReadDictionaryTimer(timers, viewId, out remaining)) continue;
-
-                remaining = Math.Max(0f, remaining);
-                alive = remaining <= 0.000001f;
-                return true;
-            }
-
-            return false;
-        }
-
-        private static IEnumerable<IDictionary> GetTimerModEnemyDictionaries(Type timerUiType)
-        {
-            object staticTimers = ReadMember(timerUiType, "Enemies") ?? ReadMember(timerUiType, "_enemies");
-            if (staticTimers is IDictionary staticDictionary) yield return staticDictionary;
-
-            UnityEngine.Object[] timerUis;
-            try
-            {
-                timerUis = Resources.FindObjectsOfTypeAll(timerUiType);
-            }
-            catch
-            {
-                yield break;
-            }
-
-            foreach (UnityEngine.Object timerUi in timerUis)
-            {
-                object timers = ReadMember(timerUi, "Enemies") ?? ReadMember(timerUi, "_enemies");
-                if (timers is IDictionary dictionary) yield return dictionary;
-            }
-        }
-
-        private static bool TryReadDictionaryTimer(IDictionary dictionary, int viewId, out float remaining)
-        {
-            remaining = 0f;
-            object value = null;
-
-            if (dictionary.Contains(viewId))
-            {
-                value = dictionary[viewId];
-            }
-            else if (dictionary.Contains(viewId.ToString(CultureInfo.InvariantCulture)))
-            {
-                value = dictionary[viewId.ToString(CultureInfo.InvariantCulture)];
-            }
-            else
-            {
-                foreach (DictionaryEntry entry in dictionary)
-                {
-                    if (KeysMatchViewId(entry.Key, viewId))
-                    {
-                        value = entry.Value;
-                        break;
-                    }
-                }
-            }
-
-            if (value == null) return false;
-            return TryConvertTimerValue(value, out remaining);
-        }
-
-        private static bool KeysMatchViewId(object key, int viewId)
-        {
-            if (key == null) return false;
-            try
-            {
-                return Convert.ToInt32(key, CultureInfo.InvariantCulture) == viewId;
-            }
-            catch
-            {
-                return string.Equals(key.ToString(), viewId.ToString(CultureInfo.InvariantCulture), StringComparison.Ordinal);
-            }
-        }
-
-        private static bool TryConvertTimerValue(object value, out float remaining)
-        {
-            if (TryConvertFloat(value, out remaining)) return true;
-
-            object timerValue = ReadMember(value, "DespawnedTimer")
-                ?? ReadMember(value, "despawnedTimer")
-                ?? ReadMember(value, "Remaining")
-                ?? ReadMember(value, "remaining")
-                ?? ReadMember(value, "RespawnTime")
-                ?? ReadMember(value, "respawnTime");
-            return TryConvertFloat(timerValue, out remaining);
-        }
-
-        private static bool TryGetEnemyViewId(Component enemyParent, out int viewId)
-        {
-            viewId = 0;
-            object photonView = InvokeNoArgMethod(enemyParent, "GetPhotonView")
-                ?? ReadMember(enemyParent, "photonViewRef")
-                ?? enemyParent.GetComponent("PhotonView");
-            object viewIdValue = ReadMember(photonView, "ViewID") ?? ReadMember(photonView, "viewID");
-            if (viewIdValue == null) return false;
-
-            try
-            {
-                viewId = Convert.ToInt32(viewIdValue, CultureInfo.InvariantCulture);
-                return viewId != 0;
-            }
-            catch
-            {
-                return false;
-            }
         }
 
         private static Component GetEnemyParent(EnemyCandidate candidate)
