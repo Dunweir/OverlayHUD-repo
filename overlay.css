@@ -165,8 +165,14 @@ body {
 }
 
 .map-value-number {
+    display: inline-flex;
+    justify-content: flex-end;
+    width: calc(var(--map-value-number-ch, 2) * 1ch);
     color: #9cffc0;
     font-size: 34px;
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum" 1;
+    transition: width var(--overlay-layout-duration) var(--overlay-reveal-ease);
 }
 
 .overlay-container.hide-map-value .map-value-pill {

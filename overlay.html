@@ -336,6 +336,13 @@
             return `$${rounded.toLocaleString("en-US")}`;
         }
 
+        function getCurrencyWidthCh(value) {
+            const rounded = Math.max(0, Math.round(Number(value) || 0));
+            const digits = String(rounded).length;
+            const separators = Math.floor(Math.max(0, digits - 1) / 3);
+            return 0.9 + digits + separators * 0.4;
+        }
+
         function applyInterfaceLanguage(interfaceLanguage) {
             currentLanguage = interfaceLanguage === "en" ? "en" : "ru";
             document.documentElement.lang = currentLanguage;
@@ -1070,6 +1077,7 @@
 
             levelNumber.textContent = state.level;
             mapValueNumber.textContent = formatCurrency(state.mapValue);
+            mapValueNumber.style.setProperty("--map-value-number-ch", getCurrencyWidthCh(state.mapValue).toFixed(2));
             let visibleUpgradeCount = 0;
             for (const upgrade of upgradeDefinitions) {
                 const element = upgradeElements.get(upgrade.key);
