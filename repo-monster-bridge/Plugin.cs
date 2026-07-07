@@ -16,7 +16,7 @@ using UnityEngine;
 
 namespace RepoMonsterBridge
 {
-    [BepInPlugin("local.overlay.repo_monster_bridge", "REPO Monster Bridge", "0.2.53")]
+    [BepInPlugin("local.overlay.repo_monster_bridge", "REPO Monster Bridge", "0.2.56")]
     public sealed class Plugin : BaseUnityPlugin
     {
         private static Plugin instance;
@@ -362,13 +362,13 @@ namespace RepoMonsterBridge
 
         private static void ValuableDollarValueSetRpcPostfix(object __instance, float value)
         {
-            instance?.AddMapValue(value, "valuable rpc");
+            instance?.RefreshMapValue("valuable rpc");
         }
 
         private static void ValuableDollarValueSetLogicPostfix(object __instance)
         {
             if (!IsMasterClientOrSingleplayer()) return;
-            instance?.AddMapValue(ReadValuableCurrentValue(__instance), "valuable logic");
+            instance?.RefreshMapValue("valuable logic");
         }
 
         private static void PhysGrabObjectBreakPostfix(object __instance, float valueLost, bool _loseValue)
