@@ -13,10 +13,11 @@ using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 
 namespace RepoMonsterBridge
 {
-    [BepInPlugin("local.overlay.repo_monster_bridge", "REPO Monster Bridge", "0.2.57")]
+    [BepInPlugin("local.overlay.repo_monster_bridge", "REPO Monster Bridge", "0.2.65")]
     public sealed class Plugin : BaseUnityPlugin
     {
         private static Plugin instance;
@@ -146,6 +147,8 @@ namespace RepoMonsterBridge
         private float nextMapValueSyncAt;
         private float nextDebugSummaryAt;
         private float nextBroadEnemyDiscoveryAt;
+        private float nextGameplayStateProbeAt;
+        private float nextGameplayProbeDebugAt;
         private float scanPausedUntil;
         private int fallbackLevel = 1;
         private int lastSyncedLevel;
@@ -155,12 +158,14 @@ namespace RepoMonsterBridge
         private string lastStatusFingerprint = "";
         private string pendingRosterFingerprint = "";
         private int rosterStableScans;
+        private int broadEnemyDiscoveryAttempts;
         private bool rosterPublished;
         private bool mapValueDirty;
         private string lastMapValueFingerprint = "";
         private int visibilityProbeIndex;
         private bool gameplayActive;
         private bool? lastTabHeld;
+        private Coroutine pendingGameplayActivation;
 
         private ConfigEntry<string> endpoint;
         private ConfigEntry<string> levelEndpoint;
@@ -178,6 +183,7 @@ namespace RepoMonsterBridge
         private void Awake()
         {
             instance = this;
+            KeepPluginObjectAlive();
             endpoint = Config.Bind("Overlay", "Endpoint", "http://127.0.0.1:8787/api/monster-seen", "Monster endpoint on this PC.");
             levelEndpoint = Config.Bind("Overlay", "LevelEndpoint", "http://127.0.0.1:8787/api/level", "Level sync endpoint on this PC.");
             scanInterval = Config.Bind("Detection", "ScanIntervalSeconds", 1f, "How often visible enemies are scanned.");
@@ -230,6 +236,12 @@ namespace RepoMonsterBridge
                 MethodInfo levelGeneratorGenerateDone = AccessTools.Method("LevelGenerator:GenerateDone");
                 MethodInfo levelGeneratorStartRoomGeneration = AccessTools.Method("LevelGenerator:StartRoomGeneration");
                 MethodInfo runManagerChangeLevel = AccessTools.Method("RunManager:ChangeLevel");
+                MethodInfo runManagerUpdate = AccessTools.Method("RunManager:Update");
+                MethodInfo roundDirectorUpdate = AccessTools.Method("RoundDirector:Update");
+                MethodInfo enemyDirectorUpdate = AccessTools.Method("EnemyDirector:Update");
+                MethodInfo levelUiUpdate = AccessTools.Method("LevelUI:Update");
+                MethodInfo mapToolControllerUpdate = AccessTools.Method("MapToolController:Update");
+                MethodInfo steamManagerAwake = AccessTools.Method("SteamManager:Awake");
                 MethodInfo roundDirectorExtractionCompleted = AccessTools.Method("RoundDirector:ExtractionCompleted");
                 MethodInfo valuableDollarValueSetRpc = AccessTools.Method("ValuableObject:DollarValueSetRPC");
                 MethodInfo valuableDollarValueSetLogic = AccessTools.Method("ValuableObject:DollarValueSetLogic");
@@ -239,6 +251,9 @@ namespace RepoMonsterBridge
                 HarmonyMethod levelGenerationStartingPrefix = new HarmonyMethod(typeof(Plugin).GetMethod(nameof(LevelGenerationStartingPrefix), BindingFlags.NonPublic | BindingFlags.Static));
                 HarmonyMethod enemySpawnedPostfix = new HarmonyMethod(typeof(Plugin).GetMethod(nameof(EnemyParentSpawnedPostfix), BindingFlags.NonPublic | BindingFlags.Static));
                 HarmonyMethod levelChangingPrefix = new HarmonyMethod(typeof(Plugin).GetMethod(nameof(LevelChangingPrefix), BindingFlags.NonPublic | BindingFlags.Static));
+                HarmonyMethod levelChangedPostfix = new HarmonyMethod(typeof(Plugin).GetMethod(nameof(LevelChangedPostfix), BindingFlags.NonPublic | BindingFlags.Static));
+                HarmonyMethod gameUpdatePostfix = new HarmonyMethod(typeof(Plugin).GetMethod(nameof(GameUpdatePostfix), BindingFlags.NonPublic | BindingFlags.Static));
+                HarmonyMethod steamManagerAwakePostfix = new HarmonyMethod(typeof(Plugin).GetMethod(nameof(SteamManagerAwakePostfix), BindingFlags.NonPublic | BindingFlags.Static));
                 HarmonyMethod playerUpgradeConsumedPostfix = new HarmonyMethod(typeof(Plugin).GetMethod(nameof(PlayerUpgradeConsumedPostfix), BindingFlags.NonPublic | BindingFlags.Static));
                 HarmonyMethod extractionCompletedPostfix = new HarmonyMethod(typeof(Plugin).GetMethod(nameof(ExtractionCompletedPostfix), BindingFlags.NonPublic | BindingFlags.Static));
                 HarmonyMethod valuableDollarValueSetRpcPostfix = new HarmonyMethod(typeof(Plugin).GetMethod(nameof(ValuableDollarValueSetRpcPostfix), BindingFlags.NonPublic | BindingFlags.Static));
@@ -266,8 +281,44 @@ namespace RepoMonsterBridge
 
                 if (runManagerChangeLevel != null)
                 {
-                    harmony.Patch(runManagerChangeLevel, prefix: levelChangingPrefix);
-                    Logger.LogInfo("Patched RunManager.ChangeLevel for overlay visibility.");
+                    harmony.Patch(runManagerChangeLevel, prefix: levelChangingPrefix, postfix: levelChangedPostfix);
+                    Logger.LogInfo("Patched RunManager.ChangeLevel for overlay visibility and activation.");
+                }
+
+                if (runManagerUpdate != null)
+                {
+                    harmony.Patch(runManagerUpdate, postfix: gameUpdatePostfix);
+                    Logger.LogInfo("Patched RunManager.Update for gameplay state probing.");
+                }
+
+                if (roundDirectorUpdate != null)
+                {
+                    harmony.Patch(roundDirectorUpdate, postfix: gameUpdatePostfix);
+                    Logger.LogInfo("Patched RoundDirector.Update for gameplay state probing.");
+                }
+
+                if (enemyDirectorUpdate != null)
+                {
+                    harmony.Patch(enemyDirectorUpdate, postfix: gameUpdatePostfix);
+                    Logger.LogInfo("Patched EnemyDirector.Update for gameplay state probing.");
+                }
+
+                if (levelUiUpdate != null)
+                {
+                    harmony.Patch(levelUiUpdate, postfix: gameUpdatePostfix);
+                    Logger.LogInfo("Patched LevelUI.Update for gameplay state probing.");
+                }
+
+                if (mapToolControllerUpdate != null)
+                {
+                    harmony.Patch(mapToolControllerUpdate, postfix: gameUpdatePostfix);
+                    Logger.LogInfo("Patched MapToolController.Update for gameplay state probing.");
+                }
+
+                if (steamManagerAwake != null)
+                {
+                    harmony.Patch(steamManagerAwake, postfix: steamManagerAwakePostfix);
+                    Logger.LogInfo("Patched SteamManager.Awake for scene state probing.");
                 }
 
                 if (roundDirectorExtractionCompleted != null)
@@ -315,12 +366,59 @@ namespace RepoMonsterBridge
             {
                 Logger.LogWarning("Failed to patch game updates: " + error.GetType().Name + ": " + error.Message);
             }
+
+            SceneManager.sceneLoaded += OnSceneLoaded;
+        }
+
+        private void KeepPluginObjectAlive()
+        {
+            try
+            {
+                Transform pluginTransform = gameObject.transform;
+                if (pluginTransform.parent != null)
+                {
+                    pluginTransform.parent = null;
+                }
+                gameObject.hideFlags = HideFlags.HideAndDontSave;
+                DontDestroyOnLoad(gameObject);
+            }
+            catch (Exception error)
+            {
+                Logger.LogWarning("Failed to detach plugin object: " + error.GetType().Name + ": " + error.Message);
+            }
         }
 
         private void Update()
         {
             SyncTabStateIfChanged();
+            ProbeGameplayState();
             TickScan();
+        }
+
+        private void ProbeGameplayState()
+        {
+            float now = Time.realtimeSinceStartup;
+            if (now < nextGameplayStateProbeAt) return;
+            nextGameplayStateProbeAt = now + 0.5f;
+
+            bool isGameplayLevel = IsGameplayLevelCandidate(out string details);
+            if (debugLogging.Value && !gameplayActive && now >= nextGameplayProbeDebugAt)
+            {
+                nextGameplayProbeDebugAt = now + 3f;
+                Logger.LogInfo("Gameplay probe waiting (" + details + ").");
+            }
+            if (isGameplayLevel && !gameplayActive)
+            {
+                if (debugLogging.Value)
+                {
+                    Logger.LogInfo("Detected active gameplay level from update probe (" + details + ").");
+                }
+                HandleGameplayDetected("update probe");
+            }
+            else if (!isGameplayLevel && gameplayActive)
+            {
+                HandleLevelChanging();
+            }
         }
 
         private static void LevelGeneratedPostfix()
@@ -336,6 +434,28 @@ namespace RepoMonsterBridge
         private static void LevelChangingPrefix()
         {
             instance?.HandleLevelChanging();
+        }
+
+        private static void LevelChangedPostfix(object __instance)
+        {
+            instance?.HandleLevelChanged(__instance);
+        }
+
+        private static void GameUpdatePostfix()
+        {
+            instance?.TickFromGameUpdate();
+        }
+
+        private static void SteamManagerAwakePostfix(object __instance)
+        {
+            instance?.HandleScenePulse("SteamManager.Awake", __instance as Component);
+        }
+
+        private void TickFromGameUpdate()
+        {
+            SyncTabStateIfChanged();
+            ProbeGameplayState();
+            TickScan();
         }
 
         private static void PlayerUpgradeConsumedPostfix(MethodBase __originalMethod)
@@ -427,25 +547,105 @@ namespace RepoMonsterBridge
 
         private void OnDestroy()
         {
+            SceneManager.sceneLoaded -= OnSceneLoaded;
             harmony?.UnpatchSelf();
             if (instance == this) instance = null;
         }
 
         private void HandleLevelGenerated()
         {
+            HandleGameplayDetected("level generator done");
+        }
+
+        private void HandleLevelChanged(object runManager)
+        {
+            if (debugLogging.Value)
+            {
+                Logger.LogInfo("RunManager.ChangeLevel completed, current level is " + DescribeCurrentLevel(runManager) + ".");
+            }
+            ScheduleGameplayActivation("RunManager.ChangeLevel");
+        }
+
+        private void OnSceneLoaded(Scene scene, LoadSceneMode mode)
+        {
+            if (debugLogging.Value)
+            {
+                Logger.LogInfo("Scene loaded: " + scene.name + " (" + mode + ").");
+            }
+            ScheduleGameplayActivation("scene loaded " + scene.name);
+        }
+
+        private void HandleScenePulse(string reason, Component component)
+        {
+            if (debugLogging.Value)
+            {
+                string componentScene = component != null && component.gameObject != null && component.gameObject.scene.IsValid()
+                    ? component.gameObject.scene.name
+                    : "<none>";
+                Logger.LogInfo(reason + " pulse in scene " + componentScene + ".");
+            }
+            ScheduleGameplayActivation(reason);
+        }
+
+        private void ScheduleGameplayActivation(string reason)
+        {
+            if (pendingGameplayActivation != null)
+            {
+                StopCoroutine(pendingGameplayActivation);
+            }
+            pendingGameplayActivation = StartCoroutine(ActivateGameplayAfterLevelChange(reason));
+        }
+
+        private IEnumerator ActivateGameplayAfterLevelChange(string reason)
+        {
+            for (int attempt = 1; attempt <= 10; attempt++)
+            {
+                yield return new WaitForSecondsRealtime(0.25f);
+                if (HandleGameplayDetected(reason + " attempt " + attempt))
+                {
+                    pendingGameplayActivation = null;
+                    yield break;
+                }
+            }
+
+            if (debugLogging.Value)
+            {
+                IsGameplayLevelCandidate(out string details, true);
+                Logger.LogInfo("Gameplay activation was not confirmed after " + reason + " (" + details + ").");
+            }
+            pendingGameplayActivation = null;
+        }
+
+        private bool HandleGameplayDetected(string reason)
+        {
+            if (!IsGameplayLevelCandidate(out string details, true))
+            {
+                if (debugLogging.Value)
+                {
+                    Logger.LogInfo("Skipped gameplay activation from " + reason + " (" + details + ").");
+                }
+                if (!gameplayActive && sendToWebOverlay.Value) StartCoroutine(PostVisibility(false));
+                return false;
+            }
+
+            if (gameplayActive)
+            {
+                return true;
+            }
+
+            if (debugLogging.Value)
+            {
+                Logger.LogInfo("Activating gameplay overlay from " + reason + " (" + details + ").");
+            }
             ResetSeenMonsters("new level generated");
             RefreshMapValue("level generated");
             mapValueInitial = mapValue;
-            gameplayActive = IsRegularGameplayLevel();
-            if (!gameplayActive)
-            {
-                if (sendToWebOverlay.Value) StartCoroutine(PostVisibility(false));
-                return;
-            }
+            gameplayActive = true;
 
             int level = ResolveCurrentLevel();
             if (level > 0) SyncLevelToOverlay(level);
             MarkMapValueDirty();
+            return true;
         }
 
         private void HandleLevelChanging()
@@ -530,6 +730,7 @@ namespace RepoMonsterBridge
             lastStatusFingerprint = "";
             pendingRosterFingerprint = "";
             rosterStableScans = 0;
+            broadEnemyDiscoveryAttempts = 0;
             rosterPublished = false;
             visibilityProbeIndex = 0;
             scanPausedUntil = Time.realtimeSinceStartup + 2f;
@@ -977,8 +1178,86 @@ namespace RepoMonsterBridge
             object runManager = ReadMember(runManagerType, "instance");
             object currentLevel = ReadMember(runManager, "levelCurrent");
             object levelsValue = ReadMember(runManager, "levels");
-            if (currentLevel == null || !(levelsValue is IList levels)) return false;
-            return levels.Contains(currentLevel);
+            if (currentLevel != null && levelsValue is IList levels && levels.Contains(currentLevel)) return true;
+            if (IsNamedRunLevel(currentLevel)) return true;
+            return IsRunLevel();
+        }
+
+        private static bool IsGameplayLevelCandidate(out string details, bool allowExpensiveFallback = false)
+        {
+            Type runManagerType = AccessTools.TypeByName("RunManager");
+            object runManager = ReadMember(runManagerType, "instance");
+            object currentLevel = ReadMember(runManager, "levelCurrent");
+            object levelsValue = ReadMember(runManager, "levels");
+            bool listedLevel = currentLevel != null && levelsValue is IList levels && levels.Contains(currentLevel);
+            bool namedLevel = IsNamedRunLevel(currentLevel);
+            bool runLevel = IsRunLevel();
+            bool hasLevelGenerator = allowExpensiveFallback && HasActiveLevelGenerator();
+            string activeSceneName = SceneManager.GetActiveScene().name;
+            string activeNamedLevelObject = allowExpensiveFallback ? FindActiveNamedRunLevelObject() : "";
+            details = "current=" + DescribeLevelObject(currentLevel)
+                + ", listed=" + listedLevel
+                + ", named=" + namedLevel
+                + ", semiRunLevel=" + runLevel
+                + ", levelGenerator=" + hasLevelGenerator
+                + ", scene=" + (string.IsNullOrWhiteSpace(activeSceneName) ? "<none>" : activeSceneName)
+                + ", levelObject=" + (string.IsNullOrWhiteSpace(activeNamedLevelObject) ? "<none>" : activeNamedLevelObject);
+            return listedLevel || namedLevel || runLevel || hasLevelGenerator || IsRunLevelName(activeSceneName) || !string.IsNullOrWhiteSpace(activeNamedLevelObject);
+        }
+
+        private static bool HasActiveLevelGenerator()
+        {
+            Type levelGeneratorType = AccessTools.TypeByName("LevelGenerator");
+            if (levelGeneratorType == null) return false;
+            UnityEngine.Object[] generators = Resources.FindObjectsOfTypeAll(levelGeneratorType);
+            for (int index = 0; index < generators.Length; index++)
+            {
+                if (generators[index] is Component component && component.gameObject != null && component.gameObject.scene.IsValid())
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        private static string FindActiveNamedRunLevelObject()
+        {
+            UnityEngine.Object[] gameObjects = Resources.FindObjectsOfTypeAll(typeof(GameObject));
+            for (int index = 0; index < gameObjects.Length; index++)
+            {
+                if (!(gameObjects[index] is GameObject gameObject)) continue;
+                if (!gameObject.scene.IsValid()) continue;
+                if (!IsRunLevelName(gameObject.name)) continue;
+                return gameObject.name;
+            }
+            return "";
+        }
+
+        private static bool IsNamedRunLevel(object currentLevel)
+        {
+            if (currentLevel == null) return false;
+            string levelName = DescribeLevelObject(currentLevel);
+            return IsRunLevelName(levelName);
+        }
+
+        private static bool IsRunLevelName(string levelName)
+        {
+            return !string.IsNullOrWhiteSpace(levelName)
+                && levelName.StartsWith("Level - ", StringComparison.Ordinal)
+                && levelName.IndexOf("Lobby", StringComparison.OrdinalIgnoreCase) < 0
+                && levelName.IndexOf("Menu", StringComparison.OrdinalIgnoreCase) < 0;
+        }
+
+        private static string DescribeCurrentLevel(object runManager)
+        {
+            return DescribeLevelObject(ReadMember(runManager, "levelCurrent"));
+        }
+
+        private static string DescribeLevelObject(object currentLevel)
+        {
+            if (currentLevel == null) return "<null>";
+            if (currentLevel is UnityEngine.Object unityObject) return string.IsNullOrWhiteSpace(unityObject.name) ? unityObject.ToString() : unityObject.name;
+            return currentLevel.ToString();
         }
 
         private static bool IsRunLevel()
@@ -1181,34 +1460,30 @@ namespace RepoMonsterBridge
                 AddEnemyCandidate(result, seenRoots, component);
             }
 
+            foreach (Component component in FindSpawnedEnemiesFromDirector())
+            {
+                AddEnemyCandidate(result, seenRoots, component);
+            }
+
             float now = Time.realtimeSinceStartup;
-            bool runBroadDiscovery = !rosterPublished || now >= nextBroadEnemyDiscoveryAt;
+            bool runBroadDiscovery = !rosterPublished
+                && result.Count == 0
+                && broadEnemyDiscoveryAttempts < 3
+                && now >= nextBroadEnemyDiscoveryAt;
             if (runBroadDiscovery)
             {
-                nextBroadEnemyDiscoveryAt = now + 2f;
-            }
-
-            if (runBroadDiscovery)
-            {
-                foreach (Component component in FindSpawnedEnemiesFromDirector())
-                {
-                    AddEnemyCandidate(result, seenRoots, component);
-                }
-            }
-
-            if (runBroadDiscovery)
-            {
+                broadEnemyDiscoveryAttempts++;
+                nextBroadEnemyDiscoveryAt = now + 5f;
                 foreach (Component component in FindComponentsByTypeName("EnemyParent"))
                 {
                     AddEnemyCandidate(result, seenRoots, component);
                 }
-            }
-
-            if (runBroadDiscovery)
-            {
-                foreach (Component component in FindComponentsByTypeName("Enemy"))
+                if (result.Count == 0)
                 {
-                    AddEnemyCandidate(result, seenRoots, component);
+                    foreach (Component component in FindComponentsByTypeName("Enemy"))
+                    {
+                        AddEnemyCandidate(result, seenRoots, component);
+                    }
                 }
             }
 
@@ -1242,23 +1517,43 @@ namespace RepoMonsterBridge
             }
         }
 
-        private static IEnumerable<Component> FindSpawnedEnemiesFromDirector()
+        private static IEnumerable<Component> FindSpawnedEnemiesFromDirector(bool allowExpensiveFallback = false)
         {
             Type directorType = Type.GetType("EnemyDirector, Assembly-CSharp");
             if (directorType == null) yield break;
 
+            object instance = ReadMember(directorType, "instance");
+            if (instance != null)
+            {
+                foreach (Component component in EnumerateSpawnedEnemies(instance))
+                {
+                    yield return component;
+                }
+                yield break;
+            }
+
+            if (!allowExpensiveFallback) yield break;
+
             UnityEngine.Object[] directors = Resources.FindObjectsOfTypeAll(directorType);
             foreach (UnityEngine.Object director in directors)
             {
-                object spawned = ReadMember(director, "enemiesSpawned");
-                if (!(spawned is IEnumerable enumerable)) continue;
-
-                foreach (object item in enumerable)
+                foreach (Component component in EnumerateSpawnedEnemies(director))
                 {
-                    if (item is Component component)
-                    {
-                        yield return component;
-                    }
+                    yield return component;
+                }
+            }
+        }
+
+        private static IEnumerable<Component> EnumerateSpawnedEnemies(object director)
+        {
+            object spawned = ReadMember(director, "enemiesSpawned");
+            if (!(spawned is IEnumerable enumerable)) yield break;
+
+            foreach (object item in enumerable)
+            {
+                if (item is Component component)
+                {
+                    yield return component;
                 }
             }
         }
