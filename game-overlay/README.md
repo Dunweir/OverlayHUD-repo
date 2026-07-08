@@ -1,4 +1,4 @@
-# R.E.P.O. Game Overlay
+# OverlayHUD
 
 Transparent click-through window that opens the existing web overlay above the game. The local overlay server is built in and starts automatically.
 
@@ -13,7 +13,7 @@ The first launch installs Electron automatically. The default overlay address is
 
 ## Portable build
 
-Run `build-portable.bat`. The ready-to-copy application will appear in `dist\REPOGameOverlay-win32-x64`. It does not require Node.js on the gaming PC.
+Run `build-portable.bat`. The ready-to-copy application will appear in `dist\OverlayHUD-win32-x64`. It does not require Node.js on the gaming PC.
 
 ## Hotkeys
 

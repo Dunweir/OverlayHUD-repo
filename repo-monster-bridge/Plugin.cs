@@ -17,7 +17,7 @@ using UnityEngine.SceneManagement;
 
 namespace RepoMonsterBridge
 {
-    [BepInPlugin("local.overlay.repo_monster_bridge", "REPO Monster Bridge", "0.2.68")]
+    [BepInPlugin("local.overlay.repo_monster_bridge", "OverlayHUD", "0.2.68")]
     public sealed class Plugin : BaseUnityPlugin
     {
         private static Plugin instance;
@@ -202,7 +202,7 @@ namespace RepoMonsterBridge
             }
             if (configChanged) Config.Save();
 
-            Logger.LogInfo("REPO Monster Bridge is running. MonsterEndpoint=" + endpoint.Value + ", LevelEndpoint=" + levelEndpoint.Value + ", Logging=" + debugLogging.Value);
+            Logger.LogInfo("OverlayHUD is running. MonsterEndpoint=" + endpoint.Value + ", LevelEndpoint=" + levelEndpoint.Value + ", Logging=" + debugLogging.Value);
 
             PatchGameUpdates();
         }

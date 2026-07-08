@@ -1,4 +1,4 @@
-# REPO Monster Bridge
+# OverlayHUD
 
 Small BepInEx plugin source for sending encountered R.E.P.O. enemies to the local stream overlay.
 

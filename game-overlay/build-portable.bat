@@ -16,8 +16,8 @@ if errorlevel 1 exit /b 1
 call npm.cmd run package
 if errorlevel 1 exit /b 1
 
-copy /y "overlay-config.json" "dist\REPOGameOverlay-win32-x64\overlay-config.json" >nul
-copy /y "icon.png" "dist\REPOGameOverlay-win32-x64\icon.png" >nul
+copy /y "overlay-config.json" "dist\OverlayHUD-win32-x64\overlay-config.json" >nul
+copy /y "icon.png" "dist\OverlayHUD-win32-x64\icon.png" >nul
 
-echo Portable overlay is ready in dist\REPOGameOverlay-win32-x64
+echo Portable overlay is ready in dist\OverlayHUD-win32-x64
 endlocal

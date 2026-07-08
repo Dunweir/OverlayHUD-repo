@@ -443,7 +443,7 @@ function createTray() {
     const iconPath = fs.existsSync(externalIconPath) ? externalIconPath : path.join(__dirname, "icon.png");
     const icon = nativeImage.createFromPath(iconPath).resize({ width: 16, height: 16 });
     tray = new Tray(icon);
-    tray.setToolTip("R.E.P.O. Game Overlay");
+    tray.setToolTip("OverlayHUD");
     tray.on("double-click", toggleOverlay);
     rebuildTrayMenu();
 }
@@ -459,7 +459,7 @@ if (!app.requestSingleInstanceLock()) {
         try {
             await startLocalServer();
         } catch (error) {
-            dialog.showErrorBox("R.E.P.O. Game Overlay", `Не удалось запустить локальный сервер:\n${error.message}`);
+            dialog.showErrorBox("OverlayHUD", `Не удалось запустить локальный сервер:\n${error.message}`);
             app.quit();
             return;
         }
