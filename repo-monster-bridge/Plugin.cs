@@ -17,7 +17,7 @@ using UnityEngine.SceneManagement;
 
 namespace RepoMonsterBridge
 {
-    [BepInPlugin("local.overlay.repo_monster_bridge", "REPO Monster Bridge", "0.2.65")]
+    [BepInPlugin("local.overlay.repo_monster_bridge", "REPO Monster Bridge", "0.2.68")]
     public sealed class Plugin : BaseUnityPlugin
     {
         private static Plugin instance;
@@ -147,8 +147,6 @@ namespace RepoMonsterBridge
         private float nextMapValueSyncAt;
         private float nextDebugSummaryAt;
         private float nextBroadEnemyDiscoveryAt;
-        private float nextGameplayStateProbeAt;
-        private float nextGameplayProbeDebugAt;
         private float scanPausedUntil;
         private int fallbackLevel = 1;
         private int lastSyncedLevel;
@@ -170,6 +168,7 @@ namespace RepoMonsterBridge
         private ConfigEntry<string> endpoint;
         private ConfigEntry<string> levelEndpoint;
         private ConfigEntry<float> scanInterval;
+        private ConfigEntry<float> statusInterval;
         private ConfigEntry<float> maxDistance;
         private ConfigEntry<float> peeperMaxDistance;
         private ConfigEntry<float> viewportPadding;
@@ -183,7 +182,8 @@ namespace RepoMonsterBridge
             KeepPluginObjectAlive();
             endpoint = Config.Bind("Overlay", "Endpoint", "http://127.0.0.1:8787/api/monster-seen", "Monster endpoint on this PC.");
             levelEndpoint = Config.Bind("Overlay", "LevelEndpoint", "http://127.0.0.1:8787/api/level", "Level sync endpoint on this PC.");
-            scanInterval = Config.Bind("Detection", "ScanIntervalSeconds", 1f, "How often visible enemies are scanned.");
+            scanInterval = Config.Bind("Detection", "ScanIntervalSeconds", 3f, "How often visible enemies are scanned.");
+            statusInterval = Config.Bind("Detection", "StatusIntervalSeconds", 2f, "How often monster health and respawn status are synced after the roster is known.");
             maxDistance = Config.Bind("Detection", "MaxDistance", 45f, "Maximum distance from camera to count an enemy as encountered.");
             peeperMaxDistance = Config.Bind("Detection", "PeeperMaxDistance", 120f, "Maximum distance for Peeper only when the game marks it as very close to the player.");
             viewportPadding = Config.Bind("Detection", "ViewportPadding", 0.03f, "Allowed viewport padding outside the screen edges.");
@@ -205,8 +205,6 @@ namespace RepoMonsterBridge
             Logger.LogInfo("REPO Monster Bridge is running. MonsterEndpoint=" + endpoint.Value + ", LevelEndpoint=" + levelEndpoint.Value + ", Logging=" + debugLogging.Value);
 
             PatchGameUpdates();
-            StartCoroutine(PostVisibility(false));
-            StartCoroutine(PostTabHidden(false));
         }
 
         private void PatchGameUpdates()
@@ -218,12 +216,6 @@ namespace RepoMonsterBridge
                 MethodInfo levelGeneratorGenerateDone = AccessTools.Method("LevelGenerator:GenerateDone");
                 MethodInfo levelGeneratorStartRoomGeneration = AccessTools.Method("LevelGenerator:StartRoomGeneration");
                 MethodInfo runManagerChangeLevel = AccessTools.Method("RunManager:ChangeLevel");
-                MethodInfo runManagerUpdate = AccessTools.Method("RunManager:Update");
-                MethodInfo roundDirectorUpdate = AccessTools.Method("RoundDirector:Update");
-                MethodInfo enemyDirectorUpdate = AccessTools.Method("EnemyDirector:Update");
-                MethodInfo levelUiUpdate = AccessTools.Method("LevelUI:Update");
-                MethodInfo mapToolControllerUpdate = AccessTools.Method("MapToolController:Update");
-                MethodInfo steamManagerAwake = AccessTools.Method("SteamManager:Awake");
                 MethodInfo roundDirectorExtractionCompleted = AccessTools.Method("RoundDirector:ExtractionCompleted");
                 MethodInfo valuableDollarValueSetRpc = AccessTools.Method("ValuableObject:DollarValueSetRPC");
                 MethodInfo valuableDollarValueSetLogic = AccessTools.Method("ValuableObject:DollarValueSetLogic");
@@ -234,8 +226,6 @@ namespace RepoMonsterBridge
                 HarmonyMethod enemySpawnedPostfix = new HarmonyMethod(typeof(Plugin).GetMethod(nameof(EnemyParentSpawnedPostfix), BindingFlags.NonPublic | BindingFlags.Static));
                 HarmonyMethod levelChangingPrefix = new HarmonyMethod(typeof(Plugin).GetMethod(nameof(LevelChangingPrefix), BindingFlags.NonPublic | BindingFlags.Static));
                 HarmonyMethod levelChangedPostfix = new HarmonyMethod(typeof(Plugin).GetMethod(nameof(LevelChangedPostfix), BindingFlags.NonPublic | BindingFlags.Static));
-                HarmonyMethod gameUpdatePostfix = new HarmonyMethod(typeof(Plugin).GetMethod(nameof(GameUpdatePostfix), BindingFlags.NonPublic | BindingFlags.Static));
-                HarmonyMethod steamManagerAwakePostfix = new HarmonyMethod(typeof(Plugin).GetMethod(nameof(SteamManagerAwakePostfix), BindingFlags.NonPublic | BindingFlags.Static));
                 HarmonyMethod playerUpgradeConsumedPostfix = new HarmonyMethod(typeof(Plugin).GetMethod(nameof(PlayerUpgradeConsumedPostfix), BindingFlags.NonPublic | BindingFlags.Static));
                 HarmonyMethod extractionCompletedPostfix = new HarmonyMethod(typeof(Plugin).GetMethod(nameof(ExtractionCompletedPostfix), BindingFlags.NonPublic | BindingFlags.Static));
                 HarmonyMethod valuableDollarValueSetRpcPostfix = new HarmonyMethod(typeof(Plugin).GetMethod(nameof(ValuableDollarValueSetRpcPostfix), BindingFlags.NonPublic | BindingFlags.Static));
@@ -265,42 +255,6 @@ namespace RepoMonsterBridge
                 {
                     harmony.Patch(runManagerChangeLevel, prefix: levelChangingPrefix, postfix: levelChangedPostfix);
                     Logger.LogInfo("Patched RunManager.ChangeLevel for overlay visibility and activation.");
-                }
-
-                if (runManagerUpdate != null)
-                {
-                    harmony.Patch(runManagerUpdate, postfix: gameUpdatePostfix);
-                    Logger.LogInfo("Patched RunManager.Update for gameplay state probing.");
-                }
-
-                if (roundDirectorUpdate != null)
-                {
-                    harmony.Patch(roundDirectorUpdate, postfix: gameUpdatePostfix);
-                    Logger.LogInfo("Patched RoundDirector.Update for gameplay state probing.");
-                }
-
-                if (enemyDirectorUpdate != null)
-                {
-                    harmony.Patch(enemyDirectorUpdate, postfix: gameUpdatePostfix);
-                    Logger.LogInfo("Patched EnemyDirector.Update for gameplay state probing.");
-                }
-
-                if (levelUiUpdate != null)
-                {
-                    harmony.Patch(levelUiUpdate, postfix: gameUpdatePostfix);
-                    Logger.LogInfo("Patched LevelUI.Update for gameplay state probing.");
-                }
-
-                if (mapToolControllerUpdate != null)
-                {
-                    harmony.Patch(mapToolControllerUpdate, postfix: gameUpdatePostfix);
-                    Logger.LogInfo("Patched MapToolController.Update for gameplay state probing.");
-                }
-
-                if (steamManagerAwake != null)
-                {
-                    harmony.Patch(steamManagerAwake, postfix: steamManagerAwakePostfix);
-                    Logger.LogInfo("Patched SteamManager.Awake for scene state probing.");
                 }
 
                 if (roundDirectorExtractionCompleted != null)
@@ -372,35 +326,9 @@ namespace RepoMonsterBridge
 
         private void Update()
         {
+            if (!gameplayActive) return;
             SyncTabStateIfChanged();
-            ProbeGameplayState();
             TickScan();
-        }
-
-        private void ProbeGameplayState()
-        {
-            float now = Time.realtimeSinceStartup;
-            if (now < nextGameplayStateProbeAt) return;
-            nextGameplayStateProbeAt = now + 0.5f;
-
-            bool isGameplayLevel = IsGameplayLevelCandidate(out string details);
-            if (debugLogging.Value && !gameplayActive && now >= nextGameplayProbeDebugAt)
-            {
-                nextGameplayProbeDebugAt = now + 3f;
-                Logger.LogInfo("Gameplay probe waiting (" + details + ").");
-            }
-            if (isGameplayLevel && !gameplayActive)
-            {
-                if (debugLogging.Value)
-                {
-                    Logger.LogInfo("Detected active gameplay level from update probe (" + details + ").");
-                }
-                HandleGameplayDetected("update probe");
-            }
-            else if (!isGameplayLevel && gameplayActive)
-            {
-                HandleLevelChanging();
-            }
         }
 
         private static void LevelGeneratedPostfix()
@@ -421,23 +349,6 @@ namespace RepoMonsterBridge
         private static void LevelChangedPostfix(object __instance)
         {
             instance?.HandleLevelChanged(__instance);
-        }
-
-        private static void GameUpdatePostfix()
-        {
-            instance?.TickFromGameUpdate();
-        }
-
-        private static void SteamManagerAwakePostfix(object __instance)
-        {
-            instance?.HandleScenePulse("SteamManager.Awake", __instance as Component);
-        }
-
-        private void TickFromGameUpdate()
-        {
-            SyncTabStateIfChanged();
-            ProbeGameplayState();
-            TickScan();
         }
 
         private static void PlayerUpgradeConsumedPostfix(MethodBase __originalMethod)
@@ -510,7 +421,7 @@ namespace RepoMonsterBridge
 
             if (rosterPublished && now >= nextStatusSyncAt)
             {
-                nextStatusSyncAt = now + 0.5f;
+                nextStatusSyncAt = now + Math.Max(0.5f, statusInterval.Value);
                 SyncMonsterStatuses(new List<ResolvedEnemyCandidate>());
             }
 
@@ -550,23 +461,9 @@ namespace RepoMonsterBridge
 
         private void OnSceneLoaded(Scene scene, LoadSceneMode mode)
         {
-            if (debugLogging.Value)
-            {
-                Logger.LogInfo("Scene loaded: " + scene.name + " (" + mode + ").");
-            }
-            ScheduleGameplayActivation("scene loaded " + scene.name);
-        }
-
-        private void HandleScenePulse(string reason, Component component)
-        {
-            if (debugLogging.Value)
-            {
-                string componentScene = component != null && component.gameObject != null && component.gameObject.scene.IsValid()
-                    ? component.gameObject.scene.name
-                    : "<none>";
-                Logger.LogInfo(reason + " pulse in scene " + componentScene + ".");
-            }
-            ScheduleGameplayActivation(reason);
+            if (!gameplayActive) return;
+            if (IsRunLevel() || IsRunLevelName(scene.name)) return;
+            HandleLevelChanging();
         }
 
         private void ScheduleGameplayActivation(string reason)
@@ -606,7 +503,7 @@ namespace RepoMonsterBridge
                 {
                     Logger.LogInfo("Skipped gameplay activation from " + reason + " (" + details + ").");
                 }
-                if (!gameplayActive) StartCoroutine(PostVisibility(false));
+                if (gameplayActive) HandleLevelChanging();
                 return false;
             }
 
