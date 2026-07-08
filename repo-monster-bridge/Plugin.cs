@@ -173,11 +173,8 @@ namespace RepoMonsterBridge
         private ConfigEntry<float> maxDistance;
         private ConfigEntry<float> peeperMaxDistance;
         private ConfigEntry<float> viewportPadding;
-        private ConfigEntry<bool> preferGameOnScreen;
         private ConfigEntry<bool> requireLineOfSight;
         private ConfigEntry<bool> debugLogging;
-        private ConfigEntry<bool> testSendOnStart;
-        private ConfigEntry<bool> sendToWebOverlay;
         private Harmony harmony;
 
         private void Awake()
@@ -190,11 +187,8 @@ namespace RepoMonsterBridge
             maxDistance = Config.Bind("Detection", "MaxDistance", 45f, "Maximum distance from camera to count an enemy as encountered.");
             peeperMaxDistance = Config.Bind("Detection", "PeeperMaxDistance", 120f, "Maximum distance for Peeper only when the game marks it as very close to the player.");
             viewportPadding = Config.Bind("Detection", "ViewportPadding", 0.03f, "Allowed viewport padding outside the screen edges.");
-            preferGameOnScreen = Config.Bind("Detection", "PreferGameOnScreen", true, "Use the game's local on-screen state when line of sight is enabled.");
             requireLineOfSight = Config.Bind("Detection", "RequireLineOfSight", false, "Reveal only enemies marked on-screen for the local player by the game.");
             debugLogging = Config.Bind("Debug", "Logging", false, "Write periodic bridge debug logs.");
-            testSendOnStart = Config.Bind("Debug", "TestSendOnStart", false, "Send one Spewer event when the plugin starts. Disable after network testing.");
-            sendToWebOverlay = Config.Bind("Overlay", "SendToWebOverlay", true, "Also send encountered monsters to the HTML/OBS overlay endpoint.");
             bool configChanged = false;
             if (endpoint.Value == "http://192.168.1.198:8787/api/monster-seen")
             {
@@ -206,25 +200,13 @@ namespace RepoMonsterBridge
                 levelEndpoint.Value = "http://127.0.0.1:8787/api/level";
                 configChanged = true;
             }
-            if (!sendToWebOverlay.Value)
-            {
-                sendToWebOverlay.Value = true;
-                configChanged = true;
-            }
             if (configChanged) Config.Save();
 
-            Logger.LogInfo("REPO Monster Bridge is running. MonsterEndpoint=" + endpoint.Value + ", LevelEndpoint=" + levelEndpoint.Value + ", Logging=" + debugLogging.Value + ", TestSendOnStart=" + testSendOnStart.Value + ", SendToWebOverlay=" + sendToWebOverlay.Value);
-            if (testSendOnStart.Value)
-            {
-                StartCoroutine(PostSeenMonster("Spewer", 0));
-            }
+            Logger.LogInfo("REPO Monster Bridge is running. MonsterEndpoint=" + endpoint.Value + ", LevelEndpoint=" + levelEndpoint.Value + ", Logging=" + debugLogging.Value);
 
             PatchGameUpdates();
-            if (sendToWebOverlay.Value)
-            {
-                StartCoroutine(PostVisibility(false));
-                StartCoroutine(PostTabHidden(false));
-            }
+            StartCoroutine(PostVisibility(false));
+            StartCoroutine(PostTabHidden(false));
         }
 
         private void PatchGameUpdates()
@@ -624,7 +606,7 @@ namespace RepoMonsterBridge
                 {
                     Logger.LogInfo("Skipped gameplay activation from " + reason + " (" + details + ").");
                 }
-                if (!gameplayActive && sendToWebOverlay.Value) StartCoroutine(PostVisibility(false));
+                if (!gameplayActive) StartCoroutine(PostVisibility(false));
                 return false;
             }
 
@@ -652,7 +634,7 @@ namespace RepoMonsterBridge
         {
             gameplayActive = false;
             ResetMapValue("level changing");
-            if (sendToWebOverlay.Value) StartCoroutine(PostVisibility(false));
+            StartCoroutine(PostVisibility(false));
         }
 
         private void ResetMapValue(string reason)
@@ -700,7 +682,6 @@ namespace RepoMonsterBridge
         private void SyncMapValueIfChanged()
         {
             mapValueDirty = false;
-            if (!sendToWebOverlay.Value) return;
 
             int value = Math.Max(0, (int)Math.Round(mapValue));
             int initial = Math.Max(0, (int)Math.Round(mapValueInitial));
@@ -803,10 +784,7 @@ namespace RepoMonsterBridge
                 {
                     Logger.LogInfo((revealAll ? "Revealed level monster: " : "Encountered visible monster: ") + monsterName + " from " + candidate.Component.GetType().Name + " / " + candidate.Root.name);
                 }
-                if (sendToWebOverlay.Value)
-                {
-                    StartCoroutine(PostSeenMonster(monsterName, candidate.Root.GetInstanceID()));
-                }
+                StartCoroutine(PostSeenMonster(monsterName, candidate.Root.GetInstanceID()));
             }
             if (pendingEnemies.Count > 0) visibilityProbeIndex = (probeIndex + 1) % pendingEnemies.Count;
             else nextScanAt = Time.realtimeSinceStartup + 5f;
@@ -847,18 +825,15 @@ namespace RepoMonsterBridge
 
             if (nextFingerprint == lastRosterFingerprint) return true;
             lastRosterFingerprint = nextFingerprint;
-            if (sendToWebOverlay.Value)
+            var json = new StringBuilder("{\"monsters\":[");
+            for (int index = 0; index < enemies.Count; index++)
             {
-                var json = new StringBuilder("{\"monsters\":[");
-                for (int index = 0; index < enemies.Count; index++)
-                {
-                    ResolvedEnemyCandidate enemy = enemies[index];
-                    if (index > 0) json.Append(',');
-                    json.Append("{\"id\":").Append(enemy.Candidate.Root.GetInstanceID()).Append(",\"name\":\"").Append(EscapeJson(enemy.MonsterName)).Append("\"}");
-                }
-                json.Append("]}");
-                StartCoroutine(PostMonsterRoster(json.ToString()));
+                ResolvedEnemyCandidate enemy = enemies[index];
+                if (index > 0) json.Append(',');
+                json.Append("{\"id\":").Append(enemy.Candidate.Root.GetInstanceID()).Append(",\"name\":\"").Append(EscapeJson(enemy.MonsterName)).Append("\"}");
             }
+            json.Append("]}");
+            StartCoroutine(PostMonsterRoster(json.ToString()));
             return true;
         }
 
@@ -1368,7 +1343,7 @@ namespace RepoMonsterBridge
             bool tabHeld = Input.GetKey(KeyCode.Tab);
             if (lastTabHeld.HasValue && lastTabHeld.Value == tabHeld) return;
             lastTabHeld = tabHeld;
-            if (sendToWebOverlay.Value) StartCoroutine(PostTabHidden(tabHeld));
+            StartCoroutine(PostTabHidden(tabHeld));
         }
 
         private void SyncPlayerUpgradesIfChanged(HashSet<string> onlyKeys = null)
@@ -1388,7 +1363,7 @@ namespace RepoMonsterBridge
                 json.Append('\"').Append(binding.Key).Append("\":").Append(value.Value);
             }
 
-            if (changedCount == 0 || !sendToWebOverlay.Value) return;
+            if (changedCount == 0) return;
             json.Append("}}");
             StartCoroutine(PostPlayerUpgrades(json.ToString(), changedCount));
         }
@@ -1671,16 +1646,8 @@ namespace RepoMonsterBridge
             float distance = Vector3.Distance(camera.transform.position, center);
             if (distance > maxDistance.Value && !IsPeeperVeryClose(candidate, monsterName, distance)) return false;
 
-            if (preferGameOnScreen.Value)
-            {
-                if (IsGameOnScreen(candidate, refreshGameVisibility)) return true;
-                return IsSmallMonsterFallbackVisible(camera, candidate, monsterName);
-            }
-
-            Vector3 viewport = camera.WorldToViewportPoint(center);
-            float pad = viewportPadding.Value;
-            if (viewport.z <= 0f) return false;
-            return viewport.x >= -pad && viewport.x <= 1f + pad && viewport.y >= -pad && viewport.y <= 1f + pad;
+            if (IsGameOnScreen(candidate, refreshGameVisibility)) return true;
+            return IsSmallMonsterFallbackVisible(camera, candidate, monsterName);
         }
 
         private bool IsSmallMonsterFallbackVisible(Camera camera, EnemyCandidate candidate, string monsterName)
