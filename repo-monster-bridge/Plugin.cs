@@ -17,7 +17,7 @@ using UnityEngine.SceneManagement;
 
 namespace RepoMonsterBridge
 {
-    [BepInPlugin("local.overlay.repo_monster_bridge", "OverlayHUD", "0.2.68")]
+    [BepInPlugin("local.overlay.repo_monster_bridge", "OverlayHUD", "0.2.69")]
     public sealed class Plugin : BaseUnityPlugin
     {
         private static Plugin instance;
@@ -447,7 +447,7 @@ namespace RepoMonsterBridge
 
         private void HandleLevelGenerated()
         {
-            HandleGameplayDetected("level generator done");
+            ScheduleGameplayActivation("level generator done");
         }
 
         private void HandleLevelChanged(object runManager)
@@ -1061,20 +1061,32 @@ namespace RepoMonsterBridge
             object runManager = ReadMember(runManagerType, "instance");
             object currentLevel = ReadMember(runManager, "levelCurrent");
             object levelsValue = ReadMember(runManager, "levels");
-            bool listedLevel = currentLevel != null && levelsValue is IList levels && levels.Contains(currentLevel);
+            string currentLevelName = DescribeLevelObject(currentLevel);
+            bool nonGameplayCurrent = IsNonGameplayLevelName(currentLevelName);
+            bool listedLevel = !nonGameplayCurrent && currentLevel != null && levelsValue is IList levels && levels.Contains(currentLevel);
             bool namedLevel = IsNamedRunLevel(currentLevel);
-            bool runLevel = IsRunLevel();
+            bool runLevel = !nonGameplayCurrent && IsRunLevel();
             bool hasLevelGenerator = allowExpensiveFallback && HasActiveLevelGenerator();
+            bool levelGenerated = IsLevelGenerated();
             string activeSceneName = SceneManager.GetActiveScene().name;
-            string activeNamedLevelObject = allowExpensiveFallback ? FindActiveNamedRunLevelObject() : "";
-            details = "current=" + DescribeLevelObject(currentLevel)
+            bool nonGameplayScene = IsNonGameplayLevelName(activeSceneName);
+            string activeNamedLevelObject = allowExpensiveFallback && !nonGameplayScene ? FindActiveNamedRunLevelObject() : "";
+            if (nonGameplayCurrent || nonGameplayScene)
+            {
+                hasLevelGenerator = false;
+                levelGenerated = false;
+            }
+            details = "current=" + currentLevelName
                 + ", listed=" + listedLevel
                 + ", named=" + namedLevel
                 + ", semiRunLevel=" + runLevel
                 + ", levelGenerator=" + hasLevelGenerator
+                + ", generated=" + levelGenerated
                 + ", scene=" + (string.IsNullOrWhiteSpace(activeSceneName) ? "<none>" : activeSceneName)
                 + ", levelObject=" + (string.IsNullOrWhiteSpace(activeNamedLevelObject) ? "<none>" : activeNamedLevelObject);
-            return listedLevel || namedLevel || runLevel || hasLevelGenerator || IsRunLevelName(activeSceneName) || !string.IsNullOrWhiteSpace(activeNamedLevelObject);
+            if (nonGameplayCurrent || nonGameplayScene) return false;
+            return levelGenerated
+                && (listedLevel || namedLevel || runLevel || hasLevelGenerator || IsRunLevelName(activeSceneName) || !string.IsNullOrWhiteSpace(activeNamedLevelObject));
         }
 
         private static bool HasActiveLevelGenerator()
@@ -1090,6 +1102,14 @@ namespace RepoMonsterBridge
                 }
             }
             return false;
+        }
+
+        private static bool IsLevelGenerated()
+        {
+            Type levelGeneratorType = AccessTools.TypeByName("LevelGenerator");
+            object levelGenerator = ReadMember(levelGeneratorType, "Instance") ?? ReadMember(levelGeneratorType, "instance");
+            object generated = ReadMember(levelGenerator, "Generated");
+            return generated is bool value && value;
         }
 
         private static string FindActiveNamedRunLevelObject()
@@ -1116,8 +1136,15 @@ namespace RepoMonsterBridge
         {
             return !string.IsNullOrWhiteSpace(levelName)
                 && levelName.StartsWith("Level - ", StringComparison.Ordinal)
-                && levelName.IndexOf("Lobby", StringComparison.OrdinalIgnoreCase) < 0
-                && levelName.IndexOf("Menu", StringComparison.OrdinalIgnoreCase) < 0;
+                && !IsNonGameplayLevelName(levelName);
+        }
+
+        private static bool IsNonGameplayLevelName(string levelName)
+        {
+            return !string.IsNullOrWhiteSpace(levelName)
+                && (levelName.IndexOf("Lobby", StringComparison.OrdinalIgnoreCase) >= 0
+                    || levelName.IndexOf("Menu", StringComparison.OrdinalIgnoreCase) >= 0
+                    || levelName.IndexOf("Shop", StringComparison.OrdinalIgnoreCase) >= 0);
         }
 
         private static string DescribeCurrentLevel(object runManager)

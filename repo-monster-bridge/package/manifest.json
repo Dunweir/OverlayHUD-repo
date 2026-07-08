@@ -1,6 +1,6 @@
 {
   "name": "OverlayHUD",
-  "version_number": "0.2.68",
+  "version_number": "0.2.69",
   "website_url": "",
   "description": "Syncs R.E.P.O. monsters, levels, upgrades, and respawn cooldowns with OverlayHUD. Синхронизирует монстров, уровни, улучшения и таймеры респавна с OverlayHUD.",
   "dependencies": [
