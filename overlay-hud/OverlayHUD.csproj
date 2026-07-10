@@ -3,8 +3,8 @@
     <TargetFramework>net472</TargetFramework>
     <LangVersion>latest</LangVersion>
     <Nullable>disable</Nullable>
-    <AssemblyName>RepoMonsterBridge</AssemblyName>
-    <RootNamespace>RepoMonsterBridge</RootNamespace>
+    <AssemblyName>OverlayHUD</AssemblyName>
+    <RootNamespace>OverlayHUD</RootNamespace>
   </PropertyGroup>
 
   <ItemGroup>

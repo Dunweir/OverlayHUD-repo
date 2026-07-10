@@ -15,9 +15,9 @@ using System.Threading.Tasks;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
-namespace RepoMonsterBridge
+namespace OverlayHUD
 {
-    [BepInPlugin("local.overlay.repo_monster_bridge", "OverlayHUD", "0.2.73")]
+    [BepInPlugin("local.overlay.overlay_hud", "OverlayHUD", "0.2.74")]
     public sealed class Plugin : BaseUnityPlugin
     {
         private static Plugin instance;
@@ -213,7 +213,7 @@ namespace RepoMonsterBridge
         {
             try
             {
-                harmony = new Harmony("local.overlay.repo_monster_bridge");
+                harmony = new Harmony("local.overlay.overlay_hud");
                 MethodInfo enemyParentSpawnRpc = AccessTools.Method("EnemyParent:SpawnRPC");
                 MethodInfo levelGeneratorGenerateDone = AccessTools.Method("LevelGenerator:GenerateDone");
                 MethodInfo levelGeneratorStartRoomGeneration = AccessTools.Method("LevelGenerator:StartRoomGeneration");

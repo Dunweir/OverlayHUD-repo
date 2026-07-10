@@ -24,7 +24,7 @@ game-overlay/.electron-cache/
 **/obj/
 
 # Generated mod packages and release archives
-repo-monster-bridge/dist/
-repo-monster-bridge/package/plugins/
-repo-monster-bridge/package-flat/*.dll
-repo-monster-bridge/package-*-flat/
+overlay-hud/dist/
+overlay-hud/package/plugins/
+overlay-hud/package-flat/*.dll
+overlay-hud/package-*-flat/

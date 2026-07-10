@@ -26,9 +26,9 @@ Upgrade synchronization patches each concrete item `Upgrade()` method and reads 
 ## Build Notes
 
 1. Install BepInEx for R.E.P.O. through r2modman/Thunderstore or manually.
-2. Copy the needed DLL references into `../lib/` or change `RepoMonsterBridge.csproj` `HintPath` values to point at your game install.
+2. Copy the needed DLL references into `../lib/` or change `OverlayHUD.csproj` `HintPath` values to point at your game install.
 3. Build with `dotnet build -c Release`.
-4. Copy `bin/Release/net472/RepoMonsterBridge.dll` into the R.E.P.O. BepInEx `plugins` folder.
+4. Copy `bin/Release/net472/OverlayHUD.dll` into the R.E.P.O. BepInEx `plugins` folder.
 5. Start this overlay server before launching/entering a run:
 
 ```powershell
