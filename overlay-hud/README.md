@@ -19,9 +19,9 @@ The server normalizes the name, applies the current level slot limits, skips alr
 
 The bridge also posts per-enemy alive/dead state and `DespawnedTimer` values to `/api/monster-status` by reading the game's current `EnemyDirector.enemiesSpawned` list.
 
-The bridge synchronizes local Strength, Tumble Launch, Range, Sprint Speed, Map Player Count, Tumble Wings, Crouch Rest, Extra Jump, and Tumble Climb upgrades from `StatsManager`.
+The bridge synchronizes local Strength, Tumble Launch, Range, Sprint Speed, Tumble Wings, Crouch Rest, Extra Jump, and Tumble Climb upgrades from `StatsManager`.
 
-Upgrade synchronization patches each concrete item `Upgrade()` method and reads only the changed value, avoiding both recurring polls and a full nine-upgrade scan on consumption. Holding Tab is sent to the overlay as a temporary hide state.
+Upgrade synchronization patches each concrete item `Upgrade()` method and reads only the changed value, avoiding both recurring polls and a full eight-upgrade scan on consumption. Holding Tab is sent to the overlay as a temporary hide state.
 
 ## Build Notes
 

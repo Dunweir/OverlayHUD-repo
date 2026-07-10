@@ -105,7 +105,6 @@ const defaultPlayerUpgrades = {
     tumbleLaunch: 0,
     range: 0,
     sprintSpeed: 0,
-    mapPlayerCount: 0,
     tumbleWings: 0,
     crouchRest: 0,
     extraJump: 0,

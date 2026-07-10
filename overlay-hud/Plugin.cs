@@ -93,7 +93,6 @@ namespace OverlayHUD
             new KeyValuePair<string, string>("tumbleLaunch", "playerUpgradeLaunch"),
             new KeyValuePair<string, string>("range", "playerUpgradeRange"),
             new KeyValuePair<string, string>("sprintSpeed", "playerUpgradeSpeed"),
-            new KeyValuePair<string, string>("mapPlayerCount", "playerUpgradeMapPlayerCount"),
             new KeyValuePair<string, string>("tumbleWings", "playerUpgradeTumbleWings"),
             new KeyValuePair<string, string>("crouchRest", "playerUpgradeCrouchRest"),
             new KeyValuePair<string, string>("extraJump", "playerUpgradeExtraJump"),
@@ -106,7 +105,6 @@ namespace OverlayHUD
             { "ItemUpgradePlayerTumbleLaunch", "tumbleLaunch" },
             { "ItemUpgradePlayerGrabRange", "range" },
             { "ItemUpgradePlayerSprintSpeed", "sprintSpeed" },
-            { "ItemUpgradeMapPlayerCount", "mapPlayerCount" },
             { "ItemUpgradePlayerTumbleWings", "tumbleWings" },
             { "ItemUpgradePlayerCrouchRest", "crouchRest" },
             { "ItemUpgradePlayerExtraJump", "extraJump" },
@@ -2130,7 +2128,6 @@ namespace OverlayHUD
             stateObject = SetJsonNumberProperty(stateObject, "tumbleLaunch", 0);
             stateObject = SetJsonNumberProperty(stateObject, "range", 0);
             stateObject = SetJsonNumberProperty(stateObject, "sprintSpeed", 0);
-            stateObject = SetJsonNumberProperty(stateObject, "mapPlayerCount", 0);
             stateObject = SetJsonNumberProperty(stateObject, "tumbleWings", 0);
             stateObject = SetJsonNumberProperty(stateObject, "crouchRest", 0);
             stateObject = SetJsonNumberProperty(stateObject, "extraJump", 0);

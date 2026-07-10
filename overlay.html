@@ -246,7 +246,6 @@
             { key: "tumbleLaunch", name: "Tumble Launch", image: "assets/upgrades/Tumble_Launch_Upgrade.webp", color: "#58bdff", background: "rgba(32, 151, 235, 0.2)" },
             { key: "range", name: "Range", image: "assets/upgrades/Range_Upgrade.webp", color: "#ff9a3d", background: "rgba(255, 106, 22, 0.2)" },
             { key: "sprintSpeed", name: "Sprint Speed", image: "assets/upgrades/Sprint_Speed_Upgrade.webp", color: "#ffe05a", background: "rgba(229, 179, 16, 0.2)" },
-            { key: "mapPlayerCount", name: "Map Player Count", image: "assets/upgrades/Upgrade_Map-Player-Count_Albedo.webp", color: "#65e887", background: "rgba(29, 165, 73, 0.2)" },
             { key: "tumbleWings", name: "Tumble Wings", image: "assets/upgrades/Tumble_Wings_Upgrade.webp", color: "#58bdff", background: "rgba(32, 151, 235, 0.2)" },
             { key: "crouchRest", name: "Crouch Rest", image: "assets/upgrades/Crouch_Rest_Upgrade.webp", color: "#ffe05a", background: "rgba(229, 179, 16, 0.2)" },
             { key: "extraJump", name: "Extra Jump", image: "assets/upgrades/Extra_Jump_Upgrade.webp", color: "#58bdff", background: "rgba(32, 151, 235, 0.2)" },
@@ -289,7 +288,6 @@
                     tumbleLaunch: "Кувырок: запуск",
                     range: "Дальность",
                     sprintSpeed: "Скорость бега",
-                    mapPlayerCount: "Игроки на карте",
                     tumbleWings: "Кувырок: крылья",
                     crouchRest: "Отдых в приседе",
                     extraJump: "Доп. прыжок",
@@ -332,7 +330,6 @@
                     tumbleLaunch: "Tumble Launch",
                     range: "Range",
                     sprintSpeed: "Sprint Speed",
-                    mapPlayerCount: "Map Player Count",
                     tumbleWings: "Tumble Wings",
                     crouchRest: "Crouch Rest",
                     extraJump: "Extra Jump",
@@ -647,6 +644,20 @@
 
                 upgradeElements.set(upgrade.key, { badge, value, tooltip });
                 upgradeRow.appendChild(badge);
+            }
+        }
+
+        function sortUpgradeRowByValue(state) {
+            const orderedUpgrades = upgradeDefinitions
+                .map((upgrade, index) => ({
+                    upgrade,
+                    index,
+                    value: Number(state[upgrade.key]) || 0
+                }))
+                .sort((left, right) => right.value - left.value || left.index - right.index);
+
+            for (const item of orderedUpgrades) {
+                upgradeRow.appendChild(upgradeElements.get(item.upgrade.key).badge);
             }
         }
 
@@ -1115,6 +1126,7 @@
                 element.badge.classList.toggle("is-zero", value <= 0);
                 if (value > 0) visibleUpgradeCount++;
             }
+            sortUpgradeRowByValue(state);
             upgradeRow.classList.toggle("is-empty", visibleUpgradeCount === 0);
             renderTimer(state);
 
