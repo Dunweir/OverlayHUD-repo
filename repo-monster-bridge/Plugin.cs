@@ -17,7 +17,7 @@ using UnityEngine.SceneManagement;
 
 namespace RepoMonsterBridge
 {
-    [BepInPlugin("local.overlay.repo_monster_bridge", "OverlayHUD", "0.2.69")]
+    [BepInPlugin("local.overlay.repo_monster_bridge", "OverlayHUD", "0.2.73")]
     public sealed class Plugin : BaseUnityPlugin
     {
         private static Plugin instance;
@@ -159,6 +159,8 @@ namespace RepoMonsterBridge
         private int broadEnemyDiscoveryAttempts;
         private bool rosterPublished;
         private bool mapValueDirty;
+        private bool pendingMapValueRefresh;
+        private string pendingMapValueRefreshReason = "";
         private string lastMapValueFingerprint = "";
         private int visibilityProbeIndex;
         private bool gameplayActive;
@@ -375,13 +377,13 @@ namespace RepoMonsterBridge
 
         private static void ValuableDollarValueSetRpcPostfix(object __instance, float value)
         {
-            instance?.RefreshMapValue("valuable rpc");
+            instance?.ScheduleMapValueRefresh("valuable rpc");
         }
 
         private static void ValuableDollarValueSetLogicPostfix(object __instance)
         {
             if (!IsMasterClientOrSingleplayer()) return;
-            instance?.RefreshMapValue("valuable logic");
+            instance?.ScheduleMapValueRefresh("valuable logic");
         }
 
         private static void PhysGrabObjectBreakPostfix(object __instance, float valueLost, bool _loseValue)
@@ -485,11 +487,15 @@ namespace RepoMonsterBridge
                     pendingGameplayActivation = null;
                     yield break;
                 }
+                if (IsNonGameplayContext())
+                {
+                    break;
+                }
             }
 
             if (debugLogging.Value)
             {
-                IsGameplayLevelCandidate(out string details, true);
+                IsGameplayLevelCandidate(out string details);
                 Logger.LogInfo("Gameplay activation was not confirmed after " + reason + " (" + details + ").");
             }
             pendingGameplayActivation = null;
@@ -497,7 +503,7 @@ namespace RepoMonsterBridge
 
         private bool HandleGameplayDetected(string reason)
         {
-            if (!IsGameplayLevelCandidate(out string details, true))
+            if (!IsGameplayLevelCandidate(out string details))
             {
                 if (debugLogging.Value)
                 {
@@ -517,18 +523,20 @@ namespace RepoMonsterBridge
                 Logger.LogInfo("Activating gameplay overlay from " + reason + " (" + details + ").");
             }
             ResetSeenMonsters("new level generated");
-            RefreshMapValue("level generated");
+            mapValue = 0f;
+            mapValueInitial = 0f;
+            lastMapValueFingerprint = "";
             mapValueInitial = mapValue;
             gameplayActive = true;
 
             int level = ResolveCurrentLevel();
             if (level > 0) SyncLevelToOverlay(level);
-            MarkMapValueDirty();
             return true;
         }
 
         private void HandleLevelChanging()
         {
+            if (!gameplayActive) return;
             gameplayActive = false;
             ResetMapValue("level changing");
             StartCoroutine(PostVisibility(false));
@@ -540,6 +548,8 @@ namespace RepoMonsterBridge
             mapValueInitial = 0f;
             lastMapValueFingerprint = "";
             mapValueDirty = false;
+            pendingMapValueRefresh = false;
+            pendingMapValueRefreshReason = "";
             if (debugLogging.Value)
             {
                 Logger.LogInfo("Reset map value: " + reason + ".");
@@ -554,6 +564,14 @@ namespace RepoMonsterBridge
             {
                 Logger.LogInfo("Refreshed map value after " + reason + ": " + mapValue.ToString("0", CultureInfo.InvariantCulture) + ".");
             }
+            MarkMapValueDirty();
+        }
+
+        private void ScheduleMapValueRefresh(string reason)
+        {
+            if (!IsRunLevel()) return;
+            pendingMapValueRefresh = true;
+            pendingMapValueRefreshReason = reason;
             MarkMapValueDirty();
         }
 
@@ -579,6 +597,21 @@ namespace RepoMonsterBridge
         private void SyncMapValueIfChanged()
         {
             mapValueDirty = false;
+            if (pendingMapValueRefresh)
+            {
+                pendingMapValueRefresh = false;
+                mapValue = CalculateMapValue();
+                if (mapValueInitial <= 0f && mapValue > 0f)
+                {
+                    mapValueInitial = mapValue;
+                }
+                if (debugLogging.Value)
+                {
+                    string reason = string.IsNullOrWhiteSpace(pendingMapValueRefreshReason) ? "scheduled refresh" : pendingMapValueRefreshReason;
+                    Logger.LogInfo("Refreshed map value after " + reason + ": " + mapValue.ToString("0", CultureInfo.InvariantCulture) + ".");
+                }
+                pendingMapValueRefreshReason = "";
+            }
 
             int value = Math.Max(0, (int)Math.Round(mapValue));
             int initial = Math.Max(0, (int)Math.Round(mapValueInitial));
@@ -1066,15 +1099,19 @@ namespace RepoMonsterBridge
             bool listedLevel = !nonGameplayCurrent && currentLevel != null && levelsValue is IList levels && levels.Contains(currentLevel);
             bool namedLevel = IsNamedRunLevel(currentLevel);
             bool runLevel = !nonGameplayCurrent && IsRunLevel();
-            bool hasLevelGenerator = allowExpensiveFallback && HasActiveLevelGenerator();
+            bool hasLevelGenerator = false;
             bool levelGenerated = IsLevelGenerated();
             string activeSceneName = SceneManager.GetActiveScene().name;
             bool nonGameplayScene = IsNonGameplayLevelName(activeSceneName);
-            string activeNamedLevelObject = allowExpensiveFallback && !nonGameplayScene ? FindActiveNamedRunLevelObject() : "";
+            string activeNamedLevelObject = "";
             if (nonGameplayCurrent || nonGameplayScene)
             {
-                hasLevelGenerator = false;
                 levelGenerated = false;
+            }
+            else if (allowExpensiveFallback)
+            {
+                hasLevelGenerator = HasActiveLevelGenerator();
+                activeNamedLevelObject = FindActiveNamedRunLevelObject();
             }
             details = "current=" + currentLevelName
                 + ", listed=" + listedLevel
@@ -1144,7 +1181,17 @@ namespace RepoMonsterBridge
             return !string.IsNullOrWhiteSpace(levelName)
                 && (levelName.IndexOf("Lobby", StringComparison.OrdinalIgnoreCase) >= 0
                     || levelName.IndexOf("Menu", StringComparison.OrdinalIgnoreCase) >= 0
-                    || levelName.IndexOf("Shop", StringComparison.OrdinalIgnoreCase) >= 0);
+                    || levelName.IndexOf("Shop", StringComparison.OrdinalIgnoreCase) >= 0
+                    || levelName.IndexOf("Splash", StringComparison.OrdinalIgnoreCase) >= 0);
+        }
+
+        private static bool IsNonGameplayContext()
+        {
+            Type runManagerType = AccessTools.TypeByName("RunManager");
+            object runManager = ReadMember(runManagerType, "instance");
+            string currentLevelName = DescribeLevelObject(ReadMember(runManager, "levelCurrent"));
+            string activeSceneName = SceneManager.GetActiveScene().name;
+            return IsNonGameplayLevelName(currentLevelName) || IsNonGameplayLevelName(activeSceneName);
         }
 
         private static string DescribeCurrentLevel(object runManager)
@@ -1253,7 +1300,11 @@ namespace RepoMonsterBridge
             StartCoroutine(PostLevel(level));
             lastSyncedUpgrades.Clear();
             pendingUpgradeKeys.Clear();
-            SyncPlayerUpgradesIfChanged();
+            for (int index = 0; index < TrackedPlayerUpgrades.Length; index++)
+            {
+                pendingUpgradeKeys.Add(TrackedPlayerUpgrades[index].Key);
+            }
+            nextUpgradeSyncAt = Time.realtimeSinceStartup + 2f;
         }
 
         private void MarkPlayerUpgradeDirty(string stateKey)
