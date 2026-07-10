@@ -233,6 +233,8 @@ const mimeTypes = {
     ".json": "application/json; charset=utf-8",
     ".ttf": "font/ttf",
     ".otf": "font/otf",
+    ".png": "image/png",
+    ".ico": "image/x-icon",
     ".webp": "image/webp"
 };
 
@@ -348,7 +350,7 @@ function createMonsterEntry(monsterName, level, isReplacement, sourceId = null) 
         id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
         level,
         name: monsterName,
-        image: `monsters/${getMonsterFileName(monsterName)}.webp`,
+        image: `assets/monsters/${getMonsterFileName(monsterName)}.webp`,
         count: getMonsterCount(monsterName, level, isReplacement),
         strength: getMonsterStrength(monsterName),
         sourceId

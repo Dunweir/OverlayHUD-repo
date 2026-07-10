@@ -337,7 +337,7 @@ const OverlayApp = (() => {
     }
 
     function getMonsterImage(monsterName) {
-        return `monsters/${getMonsterFileName(monsterName)}.webp`;
+        return `assets/monsters/${getMonsterFileName(monsterName)}.webp`;
     }
 
     function getMonsterCount(monsterName, level, isReplacement = false) {

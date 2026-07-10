@@ -228,15 +228,15 @@
         let activeDrag = null;
         let lastPositionLayoutKey = "";
         const upgradeDefinitions = [
-            { key: "strength", name: "Strength", image: "upgrades/Strength_Upgrade.webp", color: "#ff9a3d", background: "rgba(255, 106, 22, 0.2)" },
-            { key: "tumbleLaunch", name: "Tumble Launch", image: "upgrades/Tumble_Launch_Upgrade.webp", color: "#58bdff", background: "rgba(32, 151, 235, 0.2)" },
-            { key: "range", name: "Range", image: "upgrades/Range_Upgrade.webp", color: "#ff9a3d", background: "rgba(255, 106, 22, 0.2)" },
-            { key: "sprintSpeed", name: "Sprint Speed", image: "upgrades/Sprint_Speed_Upgrade.webp", color: "#ffe05a", background: "rgba(229, 179, 16, 0.2)" },
-            { key: "mapPlayerCount", name: "Map Player Count", image: "upgrades/Upgrade_Map-Player-Count_Albedo.webp", color: "#65e887", background: "rgba(29, 165, 73, 0.2)" },
-            { key: "tumbleWings", name: "Tumble Wings", image: "upgrades/Tumble_Wings_Upgrade.webp", color: "#58bdff", background: "rgba(32, 151, 235, 0.2)" },
-            { key: "crouchRest", name: "Crouch Rest", image: "upgrades/Crouch_Rest_Upgrade.webp", color: "#ffe05a", background: "rgba(229, 179, 16, 0.2)" },
-            { key: "extraJump", name: "Extra Jump", image: "upgrades/Extra_Jump_Upgrade.webp", color: "#58bdff", background: "rgba(32, 151, 235, 0.2)" },
-            { key: "tumbleClimb", name: "Tumble Climb", image: "upgrades/Tumble_Climb_Upgrade.webp", color: "#58bdff", background: "rgba(32, 151, 235, 0.2)" }
+            { key: "strength", name: "Strength", image: "assets/upgrades/Strength_Upgrade.webp", color: "#ff9a3d", background: "rgba(255, 106, 22, 0.2)" },
+            { key: "tumbleLaunch", name: "Tumble Launch", image: "assets/upgrades/Tumble_Launch_Upgrade.webp", color: "#58bdff", background: "rgba(32, 151, 235, 0.2)" },
+            { key: "range", name: "Range", image: "assets/upgrades/Range_Upgrade.webp", color: "#ff9a3d", background: "rgba(255, 106, 22, 0.2)" },
+            { key: "sprintSpeed", name: "Sprint Speed", image: "assets/upgrades/Sprint_Speed_Upgrade.webp", color: "#ffe05a", background: "rgba(229, 179, 16, 0.2)" },
+            { key: "mapPlayerCount", name: "Map Player Count", image: "assets/upgrades/Upgrade_Map-Player-Count_Albedo.webp", color: "#65e887", background: "rgba(29, 165, 73, 0.2)" },
+            { key: "tumbleWings", name: "Tumble Wings", image: "assets/upgrades/Tumble_Wings_Upgrade.webp", color: "#58bdff", background: "rgba(32, 151, 235, 0.2)" },
+            { key: "crouchRest", name: "Crouch Rest", image: "assets/upgrades/Crouch_Rest_Upgrade.webp", color: "#ffe05a", background: "rgba(229, 179, 16, 0.2)" },
+            { key: "extraJump", name: "Extra Jump", image: "assets/upgrades/Extra_Jump_Upgrade.webp", color: "#58bdff", background: "rgba(32, 151, 235, 0.2)" },
+            { key: "tumbleClimb", name: "Tumble Climb", image: "assets/upgrades/Tumble_Climb_Upgrade.webp", color: "#58bdff", background: "rgba(32, 151, 235, 0.2)" }
         ];
         const interfaceText = {
             ru: {
@@ -665,8 +665,8 @@
             clearMonsterCooldown(square);
             square.querySelectorAll(".monster-reveal-image, .monster-damage-pop").forEach((element) => element.remove());
             const img = square.firstElementChild;
-            if (!img.src.includes("monsters/unknown.webp")) {
-                img.src = "monsters/unknown.webp";
+            if (!img.src.includes("assets/monsters/unknown.webp")) {
+                img.src = "assets/monsters/unknown.webp";
             }
             if (img.alt !== "Unknown Monster") {
                 img.alt = "Unknown Monster";
@@ -917,7 +917,7 @@
 
                 const img = document.createElement("img");
                 img.className = "monster-base-image";
-                img.src = "monsters/unknown.webp";
+                img.src = "assets/monsters/unknown.webp";
                 img.alt = "Unknown Monster";
                 square.appendChild(img);
 

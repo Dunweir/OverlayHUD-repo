@@ -439,8 +439,9 @@ function registerShortcuts() {
 }
 
 function createTray() {
-    const externalIconPath = path.join(portableRoot, "icon.png");
-    const iconPath = fs.existsSync(externalIconPath) ? externalIconPath : path.join(__dirname, "icon.png");
+    const iconPath = app.isPackaged
+        ? path.join(process.resourcesPath, "assets", "icons", "icon.png")
+        : path.join(__dirname, "..", "assets", "icons", "icon.png");
     const icon = nativeImage.createFromPath(iconPath).resize({ width: 16, height: 16 });
     tray = new Tray(icon);
     tray.setToolTip("OverlayHUD");
