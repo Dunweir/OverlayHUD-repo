@@ -124,6 +124,7 @@ const defaultOverlayState = {
     upgradesVisible: true,
     upgradeLayout: "stacked",
     mapValueVisible: true,
+    lostValueVisible: true,
     monsterIconsVisible: true,
     levelBadgeVisible: true,
     upgradeTooltipsVisible: true,
@@ -148,7 +149,8 @@ const defaultOverlayState = {
     rosterPending: false,
     mapValue: 0,
     mapValueInitial: 0,
-    mapValueGoal: null
+    mapValueGoal: null,
+    lostValue: 0
 };
 
 const respawnReductionFlashThresholdSeconds = 2.5;
@@ -183,6 +185,7 @@ function normalizeOverlayState(rawState) {
     const mapValue = normalizeCurrencyValue(source.mapValue, defaultOverlayState.mapValue);
     const mapValueInitial = normalizeCurrencyValue(source.mapValueInitial, defaultOverlayState.mapValueInitial);
     const mapValueGoal = normalizeCurrencyValue(source.mapValueGoal, defaultOverlayState.mapValueGoal);
+    const lostValue = normalizeCurrencyValue(source.lostValue, defaultOverlayState.lostValue);
 
     return {
         ...source,
@@ -202,7 +205,8 @@ function normalizeOverlayState(rawState) {
         roster: Array.isArray(source.roster) ? source.roster : [],
         mapValue,
         mapValueInitial,
-        mapValueGoal
+        mapValueGoal,
+        lostValue
     };
 }
 
@@ -262,10 +266,15 @@ function readBody(request) {
 }
 
 function broadcastState() {
-    const data = `data: ${JSON.stringify(overlayState)}\n\n`;
+    const data = `data: ${JSON.stringify(getNormalizedOverlayState())}\n\n`;
     for (const client of clients) {
         client.write(data);
     }
+}
+
+function getNormalizedOverlayState() {
+    overlayState = normalizeOverlayState(overlayState) || { ...defaultOverlayState };
+    return overlayState;
 }
 
 function normalizeMonsterKey(name) {
@@ -553,7 +562,8 @@ function setGameLevel(rawLevel) {
         rosterPending: true,
         mapValue: 0,
         mapValueInitial: 0,
-        mapValueGoal: null
+        mapValueGoal: null,
+        lostValue: 0
     };
 
     return { ok: true, statusCode: 200, payload: { ok: true, level } };
@@ -656,8 +666,10 @@ function setMapValue(rawPayload) {
     const updates = { mapValue };
     const mapValueInitial = normalizeCurrencyValue(rawPayload.initial ?? rawPayload.mapValueInitial, null);
     const mapValueGoal = normalizeCurrencyValue(rawPayload.goal ?? rawPayload.mapValueGoal, null);
+    const lostValue = normalizeCurrencyValue(rawPayload.lost ?? rawPayload.lostValue, null);
     if (mapValueInitial != null) updates.mapValueInitial = mapValueInitial;
     if (mapValueGoal != null) updates.mapValueGoal = mapValueGoal;
+    if (lostValue != null) updates.lostValue = lostValue;
 
     overlayState = {
         ...defaultOverlayState,
@@ -665,7 +677,7 @@ function setMapValue(rawPayload) {
         ...updates
     };
 
-    return { ok: true, statusCode: 200, payload: { ok: true, mapValue: overlayState.mapValue, mapValueInitial: overlayState.mapValueInitial, mapValueGoal: overlayState.mapValueGoal } };
+    return { ok: true, statusCode: 200, payload: { ok: true, mapValue: overlayState.mapValue, mapValueInitial: overlayState.mapValueInitial, mapValueGoal: overlayState.mapValueGoal, lostValue: overlayState.lostValue } };
 }
 
 function serveFile(request, response) {
@@ -698,7 +710,7 @@ function serveFile(request, response) {
 const server = http.createServer(async (request, response) => {
     try {
         if (request.method === "GET" && request.url === "/api/state") {
-            sendJson(response, 200, { state: overlayState });
+            sendJson(response, 200, { state: getNormalizedOverlayState() });
             return;
         }
 

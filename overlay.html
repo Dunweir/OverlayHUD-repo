@@ -103,6 +103,13 @@
                                     <span></span>
                                 </span>
                             </label>
+                            <label class="overlay-toggle-row">
+                                <span data-i18n="lostValue">Lost value</span>
+                                <span class="overlay-toggle-switch">
+                                    <input type="checkbox" id="overlayLostValueToggle">
+                                    <span></span>
+                                </span>
+                            </label>
                         </div>
                     </section>
                     <section class="overlay-toggle-group" aria-labelledby="overlayDetailsGroupTitle">
@@ -165,6 +172,10 @@
                         <span class="map-value-label" data-i18n="mapValueShort">MAP</span>
                         <span class="map-value-number" id="mapValueNumber">$0</span>
                     </div>
+                    <div class="lost-value-pill" id="lostValuePill" aria-live="polite">
+                        <span class="lost-value-label" data-i18n="lostValueShort">LOSS</span>
+                        <span class="lost-value-number" id="lostValueNumber">$0</span>
+                    </div>
                 </div>
                 <div class="upgrade-row" id="upgradeRow" aria-label="Player upgrades"></div>
             </div>
@@ -198,6 +209,7 @@
         const overlayUpgradesToggle = document.getElementById("overlayUpgradesToggle");
         const overlayMonsterIconsToggle = document.getElementById("overlayMonsterIconsToggle");
         const overlayMapValueToggle = document.getElementById("overlayMapValueToggle");
+        const overlayLostValueToggle = document.getElementById("overlayLostValueToggle");
         const overlayLevelBadgeToggle = document.getElementById("overlayLevelBadgeToggle");
         const overlayUpgradeTooltipsToggle = document.getElementById("overlayUpgradeTooltipsToggle");
         const overlayMonsterHealthBarsToggle = document.getElementById("overlayMonsterHealthBarsToggle");
@@ -208,6 +220,8 @@
         const overlayLanguageEnBtn = document.getElementById("overlayLanguageEnBtn");
         const mapValuePill = document.getElementById("mapValuePill");
         const mapValueNumber = document.getElementById("mapValueNumber");
+        const lostValuePill = document.getElementById("lostValuePill");
+        const lostValueNumber = document.getElementById("lostValueNumber");
         let latestState = null;
         let renderedSquareCount = 0;
         let lastTimerText = "";
@@ -254,6 +268,8 @@
                 monsterIcons: "Монстры",
                 mapValue: "Цена карты",
                 mapValueShort: "КАРТА",
+                lostValue: "Потеряно",
+                lostValueShort: "ПОТЕРЯ",
                 levelBadge: "Уровень",
                 tooltips: "Подсказки",
                 healthBar: "ХП полоска",
@@ -295,6 +311,8 @@
                 monsterIcons: "Monsters",
                 mapValue: "Map value",
                 mapValueShort: "MAP",
+                lostValue: "Lost value",
+                lostValueShort: "LOSS",
                 levelBadge: "Level",
                 tooltips: "Tooltips",
                 healthBar: "HP bar",
@@ -522,6 +540,8 @@
                 monsterIconsVisible: state.monsterIconsVisible,
                 mapValueVisible: state.mapValueVisible,
                 mapValue: state.mapValue,
+                lostValueVisible: state.lostValueVisible,
+                lostValue: state.lostValue,
                 levelBadgeVisible: state.levelBadgeVisible,
                 overlayAlignment: state.overlayAlignment,
                 tabHidden: state.tabHidden,
@@ -983,7 +1003,8 @@
             }
 
             const hasMapValue = Boolean(latestState.mapValueVisible && Number(latestState.mapValue) > 0);
-            const hasHeader = Boolean(latestState.levelBadgeVisible || latestState.timerVisible || hasMapValue);
+            const hasLostValue = Boolean(latestState.lostValueVisible && Number(latestState.lostValue) > 0);
+            const hasHeader = Boolean(latestState.levelBadgeVisible || latestState.timerVisible || hasMapValue || hasLostValue);
             const visibleUpgrades = [...upgradeRow.children].filter((element) => !element.classList.contains("is-zero"));
             const hasUpgrades = Boolean(latestState.upgradesVisible && visibleUpgrades.length > 0);
             overlayContainer.classList.toggle("is-topbar-inline", latestState.upgradeLayout === "inline" && hasHeader && hasUpgrades);
@@ -995,11 +1016,15 @@
             const keepInlineUntilHeaderHidden = overlayContainer.classList.contains("is-topbar-inline")
                 && state.upgradesVisible
                 && !state.levelBadgeVisible
-                && !state.timerVisible;
+                && !state.timerVisible
+                && (!state.mapValueVisible || Number(state.mapValue) <= 0)
+                && (!state.lostValueVisible || Number(state.lostValue) <= 0);
             const majorVisibilityChanged = Boolean(previousState && (
                 previousState.upgradesVisible !== state.upgradesVisible
                 || previousState.monsterIconsVisible !== state.monsterIconsVisible
                 || previousState.mapValueVisible !== state.mapValueVisible
+                || previousState.lostValueVisible !== state.lostValueVisible
+                || (Number(previousState.lostValue) > 0) !== (Number(state.lostValue) > 0)
                 || previousState.levelBadgeVisible !== state.levelBadgeVisible
                 || previousState.timerVisible !== state.timerVisible
             ));
@@ -1039,6 +1064,7 @@
             overlayUpgradesToggle.checked = state.upgradesVisible;
             overlayMonsterIconsToggle.checked = state.monsterIconsVisible;
             overlayMapValueToggle.checked = state.mapValueVisible;
+            overlayLostValueToggle.checked = state.lostValueVisible;
             overlayLevelBadgeToggle.checked = state.levelBadgeVisible;
             overlayUpgradeTooltipsToggle.checked = state.upgradeTooltipsVisible;
             overlayMonsterHealthBarsToggle.checked = state.monsterHealthBarsVisible;
@@ -1063,6 +1089,7 @@
             if (!state.upgradesVisible) overlayContainer.classList.add("hide-upgrades");
             if (!state.monsterIconsVisible) overlayContainer.classList.add("hide-monster-icons");
             if (!state.mapValueVisible || Number(state.mapValue) <= 0) overlayContainer.classList.add("hide-map-value");
+            if (!state.lostValueVisible || Number(state.lostValue) <= 0) overlayContainer.classList.add("hide-lost-value");
             if (!state.levelBadgeVisible) overlayContainer.classList.add("hide-level-badge");
             if (!state.upgradeTooltipsVisible) overlayContainer.classList.add("hide-upgrade-tooltips");
             if (!state.upgradeTooltipsVisible) overlayContainer.classList.add("hide-tooltips");
@@ -1078,6 +1105,8 @@
             levelNumber.textContent = state.level;
             mapValueNumber.textContent = formatCurrency(state.mapValue);
             mapValueNumber.style.setProperty("--map-value-number-ch", getCurrencyWidthCh(state.mapValue).toFixed(2));
+            lostValueNumber.textContent = formatCurrency(state.lostValue);
+            lostValueNumber.style.setProperty("--lost-value-number-ch", getCurrencyWidthCh(state.lostValue).toFixed(2));
             let visibleUpgradeCount = 0;
             for (const upgrade of upgradeDefinitions) {
                 const element = upgradeElements.get(upgrade.key);
@@ -1121,7 +1150,11 @@
             if (keepInlineUntilUpgradesHidden) {
                 scheduleTopbarInlineCleanup((currentState) => !currentState.upgradesVisible);
             } else if (keepInlineUntilHeaderHidden) {
-                scheduleTopbarInlineCleanup((currentState) => currentState.upgradesVisible && !currentState.levelBadgeVisible && !currentState.timerVisible);
+                scheduleTopbarInlineCleanup((currentState) => currentState.upgradesVisible
+                    && !currentState.levelBadgeVisible
+                    && !currentState.timerVisible
+                    && (!currentState.mapValueVisible || Number(currentState.mapValue) <= 0)
+                    && (!currentState.lostValueVisible || Number(currentState.lostValue) <= 0));
             }
             applySavedPositionsWhenLayoutChanges(state);
             if (majorVisibilityChanged) scheduleLayoutReclamp();
@@ -1162,6 +1195,7 @@
         overlayUpgradesToggle.addEventListener("change", () => OverlayApp.setUpgradesVisible(overlayUpgradesToggle.checked));
         overlayMonsterIconsToggle.addEventListener("change", () => OverlayApp.setMonsterIconsVisible(overlayMonsterIconsToggle.checked));
         overlayMapValueToggle.addEventListener("change", () => OverlayApp.setMapValueVisible(overlayMapValueToggle.checked));
+        overlayLostValueToggle.addEventListener("change", () => OverlayApp.setLostValueVisible(overlayLostValueToggle.checked));
         overlayLevelBadgeToggle.addEventListener("change", () => OverlayApp.setLevelBadgeVisible(overlayLevelBadgeToggle.checked));
         overlayUpgradeTooltipsToggle.addEventListener("change", () => OverlayApp.setUpgradeTooltipsVisible(overlayUpgradeTooltipsToggle.checked));
         overlayMonsterHealthBarsToggle.addEventListener("change", () => OverlayApp.setMonsterHealthBarsVisible(overlayMonsterHealthBarsToggle.checked));

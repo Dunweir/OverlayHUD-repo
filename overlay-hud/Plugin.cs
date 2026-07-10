@@ -24,6 +24,7 @@ namespace OverlayHUD
         private static readonly List<string> seenMonsters = new List<string>();
         private static readonly List<Component> knownEnemyParents = new List<Component>();
         private static readonly HashSet<int> sentEnemyInstanceIds = new HashSet<int>();
+        private static readonly HashSet<int> valuablesInDollarHaul = new HashSet<int>();
         private static readonly object seenLock = new object();
         private static readonly object enemyLock = new object();
         private static readonly object reflectionCacheLock = new object();
@@ -33,6 +34,7 @@ namespace OverlayHUD
         private static Task networkQueueTail = Task.CompletedTask;
         private static float mapValue;
         private static float mapValueInitial;
+        private static float lostValue;
 
         private static readonly Dictionary<string, string> KnownMonsters = new Dictionary<string, string>
         {
@@ -221,6 +223,10 @@ namespace OverlayHUD
                 MethodInfo roundDirectorExtractionCompleted = AccessTools.Method("RoundDirector:ExtractionCompleted");
                 MethodInfo valuableDollarValueSetRpc = AccessTools.Method("ValuableObject:DollarValueSetRPC");
                 MethodInfo valuableDollarValueSetLogic = AccessTools.Method("ValuableObject:DollarValueSetLogic");
+                MethodInfo valuableDollarHaulAdd = AccessTools.Method("ValuableObject:AddToDollarHaulList");
+                MethodInfo valuableDollarHaulAddRpc = AccessTools.Method("ValuableObject:AddToDollarHaulListRPC");
+                MethodInfo valuableDollarHaulRemove = AccessTools.Method("ValuableObject:RemoveFromDollarHaulList");
+                MethodInfo valuableDollarHaulRemoveRpc = AccessTools.Method("ValuableObject:RemoveFromDollarHaulListRPC");
                 MethodInfo physGrabObjectBreakRpc = AccessTools.Method("PhysGrabObjectImpactDetector:BreakRPC");
                 MethodInfo physGrabObjectDestroyRpc = AccessTools.Method("PhysGrabObject:DestroyPhysGrabObjectRPC");
                 HarmonyMethod levelGeneratedPostfix = new HarmonyMethod(typeof(Plugin).GetMethod(nameof(LevelGeneratedPostfix), BindingFlags.NonPublic | BindingFlags.Static));
@@ -232,6 +238,8 @@ namespace OverlayHUD
                 HarmonyMethod extractionCompletedPostfix = new HarmonyMethod(typeof(Plugin).GetMethod(nameof(ExtractionCompletedPostfix), BindingFlags.NonPublic | BindingFlags.Static));
                 HarmonyMethod valuableDollarValueSetRpcPostfix = new HarmonyMethod(typeof(Plugin).GetMethod(nameof(ValuableDollarValueSetRpcPostfix), BindingFlags.NonPublic | BindingFlags.Static));
                 HarmonyMethod valuableDollarValueSetLogicPostfix = new HarmonyMethod(typeof(Plugin).GetMethod(nameof(ValuableDollarValueSetLogicPostfix), BindingFlags.NonPublic | BindingFlags.Static));
+                HarmonyMethod valuableDollarHaulAddPostfix = new HarmonyMethod(typeof(Plugin).GetMethod(nameof(ValuableDollarHaulAddPostfix), BindingFlags.NonPublic | BindingFlags.Static));
+                HarmonyMethod valuableDollarHaulRemovePostfix = new HarmonyMethod(typeof(Plugin).GetMethod(nameof(ValuableDollarHaulRemovePostfix), BindingFlags.NonPublic | BindingFlags.Static));
                 HarmonyMethod physGrabObjectBreakPostfix = new HarmonyMethod(typeof(Plugin).GetMethod(nameof(PhysGrabObjectBreakPostfix), BindingFlags.NonPublic | BindingFlags.Static));
                 HarmonyMethod physGrabObjectDestroyedPostfix = new HarmonyMethod(typeof(Plugin).GetMethod(nameof(PhysGrabObjectDestroyedPostfix), BindingFlags.NonPublic | BindingFlags.Static));
 
@@ -275,6 +283,30 @@ namespace OverlayHUD
                 {
                     harmony.Patch(valuableDollarValueSetLogic, postfix: valuableDollarValueSetLogicPostfix);
                     Logger.LogInfo("Patched ValuableObject.DollarValueSetLogic for map value tracking.");
+                }
+
+                if (valuableDollarHaulAdd != null)
+                {
+                    harmony.Patch(valuableDollarHaulAdd, postfix: valuableDollarHaulAddPostfix);
+                    Logger.LogInfo("Patched ValuableObject.AddToDollarHaulList for submitted value tracking.");
+                }
+
+                if (valuableDollarHaulAddRpc != null)
+                {
+                    harmony.Patch(valuableDollarHaulAddRpc, postfix: valuableDollarHaulAddPostfix);
+                    Logger.LogInfo("Patched ValuableObject.AddToDollarHaulListRPC for submitted value tracking.");
+                }
+
+                if (valuableDollarHaulRemove != null)
+                {
+                    harmony.Patch(valuableDollarHaulRemove, postfix: valuableDollarHaulRemovePostfix);
+                    Logger.LogInfo("Patched ValuableObject.RemoveFromDollarHaulList for submitted value tracking.");
+                }
+
+                if (valuableDollarHaulRemoveRpc != null)
+                {
+                    harmony.Patch(valuableDollarHaulRemoveRpc, postfix: valuableDollarHaulRemovePostfix);
+                    Logger.LogInfo("Patched ValuableObject.RemoveFromDollarHaulListRPC for submitted value tracking.");
                 }
 
                 if (physGrabObjectBreakRpc != null)
@@ -386,10 +418,21 @@ namespace OverlayHUD
             instance?.ScheduleMapValueRefresh("valuable logic");
         }
 
+        private static void ValuableDollarHaulAddPostfix(object __instance)
+        {
+            TrackDollarHaulValuable(__instance, true);
+        }
+
+        private static void ValuableDollarHaulRemovePostfix(object __instance)
+        {
+            TrackDollarHaulValuable(__instance, false);
+        }
+
         private static void PhysGrabObjectBreakPostfix(object __instance, float valueLost, bool _loseValue)
         {
             if (!_loseValue) return;
             instance?.AddMapValue(-valueLost, "valuable break");
+            instance?.AddLostValue(valueLost, "valuable break");
         }
 
         private static void PhysGrabObjectDestroyedPostfix(object __instance)
@@ -402,6 +445,8 @@ namespace OverlayHUD
             float originalValue = ReadValuableOriginalValue(valuable);
             if (originalValue > 0f && currentValue < originalValue * 0.15f) return;
             instance?.AddMapValue(-currentValue, "valuable destroyed");
+            if (IsValuableInDollarHaul(valuable)) return;
+            instance?.AddLostValue(currentValue, "valuable destroyed");
         }
 
         private void TickScan()
@@ -525,6 +570,8 @@ namespace OverlayHUD
             ResetSeenMonsters("new level generated");
             mapValue = 0f;
             mapValueInitial = 0f;
+            lostValue = 0f;
+            valuablesInDollarHaul.Clear();
             lastMapValueFingerprint = "";
             mapValueInitial = mapValue;
             gameplayActive = true;
@@ -546,6 +593,8 @@ namespace OverlayHUD
         {
             mapValue = 0f;
             mapValueInitial = 0f;
+            lostValue = 0f;
+            valuablesInDollarHaul.Clear();
             lastMapValueFingerprint = "";
             mapValueDirty = false;
             pendingMapValueRefresh = false;
@@ -588,6 +637,19 @@ namespace OverlayHUD
             MarkMapValueDirty();
         }
 
+        private void AddLostValue(float value, string reason)
+        {
+            if (!IsRunLevel()) return;
+            if (float.IsNaN(value) || float.IsInfinity(value) || value < 0.01f) return;
+            lostValue += value;
+            if (debugLogging.Value)
+            {
+                Logger.LogInfo("Updated lost value from " + reason + ": value=" + value.ToString("0.#", CultureInfo.InvariantCulture)
+                    + ", total=" + lostValue.ToString("0", CultureInfo.InvariantCulture) + ".");
+            }
+            MarkMapValueDirty();
+        }
+
         private void MarkMapValueDirty()
         {
             mapValueDirty = true;
@@ -615,11 +677,12 @@ namespace OverlayHUD
 
             int value = Math.Max(0, (int)Math.Round(mapValue));
             int initial = Math.Max(0, (int)Math.Round(mapValueInitial));
+            int lost = Math.Max(0, (int)Math.Round(lostValue));
             int? goal = ResolveExtractionGoal();
-            string fingerprint = value.ToString(CultureInfo.InvariantCulture) + ":" + initial.ToString(CultureInfo.InvariantCulture) + ":" + (goal.HasValue ? goal.Value.ToString(CultureInfo.InvariantCulture) : "");
+            string fingerprint = value.ToString(CultureInfo.InvariantCulture) + ":" + initial.ToString(CultureInfo.InvariantCulture) + ":" + lost.ToString(CultureInfo.InvariantCulture) + ":" + (goal.HasValue ? goal.Value.ToString(CultureInfo.InvariantCulture) : "");
             if (fingerprint == lastMapValueFingerprint) return;
             lastMapValueFingerprint = fingerprint;
-            StartCoroutine(PostMapValue(value, initial, goal));
+            StartCoroutine(PostMapValue(value, initial, lost, goal));
         }
 
         private void ResetSeenMonsters(string reason)
@@ -1274,6 +1337,76 @@ namespace OverlayHUD
             return ReadFloatMember(GetValuableSource(source), "dollarValueOriginal");
         }
 
+        private static void TrackDollarHaulValuable(object source, bool inHaul)
+        {
+            if (!IsRunLevel()) return;
+            int key = GetValuableKey(source);
+            if (key == 0) return;
+            if (inHaul) valuablesInDollarHaul.Add(key);
+            else valuablesInDollarHaul.Remove(key);
+        }
+
+        private static bool IsValuableInDollarHaul(object source)
+        {
+            int key = GetValuableKey(source);
+            if (key != 0 && valuablesInDollarHaul.Contains(key)) return true;
+
+            object roundDirector = ReadMember(AccessTools.TypeByName("RoundDirector"), "instance");
+            if (!(ReadMember(roundDirector, "dollarHaulList") is IEnumerable dollarHaulList)) return false;
+
+            foreach (object item in dollarHaulList)
+            {
+                if (item == null) continue;
+                int itemKey = GetValuableKey(item);
+                if (key != 0 && itemKey == key) return true;
+                if (ReferencesSameUnityObject(source, item)) return true;
+            }
+
+            return false;
+        }
+
+        private static int GetValuableKey(object source)
+        {
+            object valuable = GetValuableSource(source);
+            if (valuable == null) return 0;
+
+            object photonView = ReadMember(valuable, "photonView");
+            int photonViewId = ReadIntMember(photonView, "ViewID");
+            if (photonViewId > 0) return photonViewId;
+
+            if (valuable is UnityEngine.Object unityObject) return unityObject.GetInstanceID();
+            return 0;
+        }
+
+        private static bool ReferencesSameUnityObject(object left, object right)
+        {
+            int leftId = GetUnityObjectId(left);
+            if (leftId == 0) return false;
+
+            if (leftId == GetUnityObjectId(right)) return true;
+
+            Component leftValuable = GetValuableComponent(left);
+            Component rightValuable = GetValuableComponent(right);
+            if (leftValuable != null && rightValuable != null && leftValuable.GetInstanceID() == rightValuable.GetInstanceID()) return true;
+
+            GameObject leftGameObject = GetGameObject(left);
+            GameObject rightGameObject = GetGameObject(right);
+            return leftGameObject != null && rightGameObject != null && leftGameObject.GetInstanceID() == rightGameObject.GetInstanceID();
+        }
+
+        private static int GetUnityObjectId(object source)
+        {
+            if (source is UnityEngine.Object unityObject) return unityObject.GetInstanceID();
+            return 0;
+        }
+
+        private static GameObject GetGameObject(object source)
+        {
+            if (source is GameObject gameObject) return gameObject;
+            if (source is Component component) return component.gameObject;
+            return null;
+        }
+
         private static object GetValuableSource(object source)
         {
             Component valuable = GetValuableComponent(source);
@@ -1291,6 +1424,20 @@ namespace OverlayHUD
             catch
             {
                 return 0f;
+            }
+        }
+
+        private static int ReadIntMember(object source, string memberName)
+        {
+            object value = ReadMember(source, memberName);
+            if (value == null) return 0;
+            try
+            {
+                return Convert.ToInt32(value, CultureInfo.InvariantCulture);
+            }
+            catch
+            {
+                return 0;
             }
         }
 
@@ -1920,11 +2067,12 @@ namespace OverlayHUD
             yield break;
         }
 
-        private IEnumerator PostMapValue(int value, int initial, int? goal)
+        private IEnumerator PostMapValue(int value, int initial, int lost, int? goal)
         {
             string mapValueEndpoint = BuildSiblingEndpoint(levelEndpoint.Value, "/api/map-value");
             string json = "{\"value\":" + value.ToString(CultureInfo.InvariantCulture)
-                + ",\"initial\":" + initial.ToString(CultureInfo.InvariantCulture);
+                + ",\"initial\":" + initial.ToString(CultureInfo.InvariantCulture)
+                + ",\"lost\":" + lost.ToString(CultureInfo.InvariantCulture);
             if (goal.HasValue) json += ",\"goal\":" + goal.Value.ToString(CultureInfo.InvariantCulture);
             json += "}";
 
@@ -1991,6 +2139,7 @@ namespace OverlayHUD
             stateObject = SetJsonNumberProperty(stateObject, "mapValue", 0);
             stateObject = SetJsonNumberProperty(stateObject, "mapValueInitial", 0);
             stateObject = SetJsonRawProperty(stateObject, "mapValueGoal", "null");
+            stateObject = SetJsonNumberProperty(stateObject, "lostValue", 0);
             return stateObject;
         }
 

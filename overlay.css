@@ -124,7 +124,8 @@ body {
     color: #f7fbff;
 }
 
-.map-value-pill {
+.map-value-pill,
+.lost-value-pill {
     display: inline-flex;
     align-items: center;
     gap: 7px;
@@ -152,30 +153,48 @@ body {
     visibility: visible;
 }
 
+.lost-value-pill {
+    background: rgba(225, 70, 70, 0.17);
+    color: #ff9a9a;
+}
+
 .map-value-label,
-.map-value-number {
+.map-value-number,
+.lost-value-label,
+.lost-value-number {
     display: inline-block;
     line-height: 1;
     transform: translateY(var(--teko-visual-y));
 }
 
-.map-value-label {
+.map-value-label,
+.lost-value-label {
     color: rgba(247, 251, 255, 0.72);
     font-size: 22px;
 }
 
-.map-value-number {
+.map-value-number,
+.lost-value-number {
     display: inline-flex;
     justify-content: flex-end;
-    width: calc(var(--map-value-number-ch, 2) * 1ch);
-    color: #9cffc0;
     font-size: 34px;
     font-variant-numeric: tabular-nums;
     font-feature-settings: "tnum" 1;
     transition: width var(--overlay-layout-duration) var(--overlay-reveal-ease);
 }
 
-.overlay-container.hide-map-value .map-value-pill {
+.map-value-number {
+    width: calc(var(--map-value-number-ch, 2) * 1ch);
+    color: #9cffc0;
+}
+
+.lost-value-number {
+    width: calc(var(--lost-value-number-ch, 2) * 1ch);
+    color: #ff9a9a;
+}
+
+.overlay-container.hide-map-value .map-value-pill,
+.overlay-container.hide-lost-value .lost-value-pill {
     max-width: 0;
     min-height: 0;
     margin-left: 0;
@@ -185,7 +204,8 @@ body {
     opacity: 0;
     transform: translateY(var(--overlay-hidden-y)) scale(var(--overlay-hidden-scale));
     visibility: hidden;
-    transition-delay: 0s, 0s, 0s, 0s, 0s, 0s, var(--overlay-reveal-duration);
+    pointer-events: none;
+    transition-delay: 0.08s, 0.08s, 0.08s, 0.08s, 0.08s, 0s, 0s, var(--overlay-reveal-duration);
 }
 
 .overlay-topbar {
@@ -244,7 +264,7 @@ body {
     justify-content: flex-end;
 }
 
-.overlay-container.hide-level-badge.hide-level-timer.hide-map-value .overlay-header {
+.overlay-container.hide-level-badge.hide-level-timer.hide-map-value.hide-lost-value .overlay-header {
     max-height: 0;
     margin-bottom: 0;
     overflow: hidden;
@@ -254,7 +274,8 @@ body {
     transition-delay: 0s, 0s, 0s, 0s, var(--overlay-reveal-duration);
 }
 
-.overlay-container.hide-level-badge.hide-level-timer .map-value-pill {
+.overlay-container.hide-level-badge.hide-level-timer .map-value-pill,
+.overlay-container.hide-level-badge.hide-level-timer.hide-map-value .lost-value-pill {
     margin-left: 0;
 }
 
@@ -1025,6 +1046,7 @@ body {
     .level-core,
     .timer,
     .map-value-pill,
+    .lost-value-pill,
     .upgrade-row,
     .monsters-squares,
     .monster-health-bar,

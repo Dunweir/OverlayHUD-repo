@@ -79,6 +79,7 @@ const OverlayApp = (() => {
         upgradesVisible: true,
         upgradeLayout: "stacked",
         mapValueVisible: true,
+        lostValueVisible: true,
         monsterIconsVisible: true,
         levelBadgeVisible: true,
         upgradeTooltipsVisible: true,
@@ -103,7 +104,8 @@ const OverlayApp = (() => {
         rosterPending: false,
         mapValue: 0,
         mapValueInitial: 0,
-        mapValueGoal: null
+        mapValueGoal: null,
+        lostValue: 0
     };
 
     let state = defaultState;
@@ -147,6 +149,7 @@ const OverlayApp = (() => {
         const mapValue = normalizeCurrencyValue(source.mapValue, defaultState.mapValue);
         const mapValueInitial = normalizeCurrencyValue(source.mapValueInitial, defaultState.mapValueInitial);
         const mapValueGoal = normalizeCurrencyValue(source.mapValueGoal, defaultState.mapValueGoal);
+        const lostValue = normalizeCurrencyValue(source.lostValue, defaultState.lostValue);
         return {
             ...defaultState,
             ...source,
@@ -166,7 +169,8 @@ const OverlayApp = (() => {
             roster: Array.isArray(source.roster) ? source.roster : [],
             mapValue,
             mapValueInitial,
-            mapValueGoal
+            mapValueGoal,
+            lostValue
         };
     }
 
@@ -396,7 +400,8 @@ const OverlayApp = (() => {
                 rosterPending: false,
                 mapValue: 0,
                 mapValueInitial: 0,
-                mapValueGoal: null
+                mapValueGoal: null,
+                lostValue: 0
             };
             return nextState;
         });
@@ -484,6 +489,10 @@ const OverlayApp = (() => {
         updateState((currentState) => ({ ...currentState, mapValueVisible }));
     }
 
+    function setLostValueVisible(lostValueVisible) {
+        updateState((currentState) => ({ ...currentState, lostValueVisible }));
+    }
+
     function setMonsterIconsVisible(monsterIconsVisible) {
         updateState((currentState) => ({ ...currentState, monsterIconsVisible }));
     }
@@ -561,6 +570,7 @@ const OverlayApp = (() => {
         setInterfaceLanguage,
         setLevel,
         setLevelBadgeVisible,
+        setLostValueVisible,
         setMapValueVisible,
         setMonsterIconsVisible,
         setMonsterHealthBarsVisible,
