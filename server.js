@@ -8,6 +8,7 @@ let serverRoot = __dirname;
 const clients = new Set();
 
 let overlayState = null;
+let timestampSession = null;
 
 const monsterConfig = {
     levels: {
@@ -153,6 +154,17 @@ const defaultOverlayState = {
     mapValueInitial: 0,
     mapValueGoal: null,
     lostValue: 0
+};
+
+const levelNameAliases = {
+    swiftbroomacademy: "Wizard",
+    wizard: "Wizard",
+    macjannekstation: "Arctic",
+    arctic: "Arctic",
+    headmanmanor: "Manor",
+    manor: "Manor",
+    museumofhumanarts: "Museum",
+    museum: "Museum"
 };
 
 const respawnReductionFlashThresholdSeconds = 2.5;
@@ -487,6 +499,108 @@ function updateMonsterRoster(rawMonsters) {
     return { ok: true, statusCode: 200, payload: { ok: true, slots: roster.length } };
 }
 
+function getPortableRoot() {
+    return path.basename(serverRoot).toLowerCase() === "resources"
+        ? path.dirname(serverRoot)
+        : serverRoot;
+}
+
+function padTimePart(value) {
+    return String(value).padStart(2, "0");
+}
+
+function createTimestampFilePath() {
+    const now = new Date();
+    const fileName = [
+        now.getFullYear(),
+        padTimePart(now.getMonth() + 1),
+        padTimePart(now.getDate())
+    ].join("-") + "_" + [
+        padTimePart(now.getHours()),
+        padTimePart(now.getMinutes()),
+        padTimePart(now.getSeconds())
+    ].join("-") + ".txt";
+    return path.join(getPortableRoot(), "timestamps", fileName);
+}
+
+function formatLocalClockTime(date = new Date()) {
+    return `${padTimePart(date.getHours())}:${padTimePart(date.getMinutes())}:${padTimePart(date.getSeconds())}`;
+}
+
+function normalizeLevelName(value) {
+    const raw = String(value || "").trim();
+    if (!raw) return "?";
+
+    const compact = raw.replace(/[^a-z0-9]/gi, "").toLowerCase();
+    if (levelNameAliases[compact]) return levelNameAliases[compact];
+
+    for (const [name, levelName] of Object.entries(levelNameAliases)) {
+        if (compact.includes(name)) return levelName;
+    }
+    return "?";
+}
+
+function createTimestampSession() {
+    timestampSession = {
+        filePath: createTimestampFilePath(),
+        lines: [],
+        activeLineIndex: null
+    };
+    return timestampSession;
+}
+
+function getTimestampSession() {
+    if (!timestampSession) return createTimestampSession();
+    return timestampSession;
+}
+
+function writeTimestampSession() {
+    if (!timestampSession) return;
+
+    try {
+        fs.mkdirSync(path.dirname(timestampSession.filePath), { recursive: true });
+        fs.writeFileSync(timestampSession.filePath, `${timestampSession.lines.join("\n")}\n`, "utf8");
+    } catch (error) {
+        console.warn(`Could not write timestamps file: ${error.message}`);
+    }
+}
+
+function formatMonsterTimestampList(monsters) {
+    const totals = new Map();
+    for (const monster of Array.isArray(monsters) ? monsters : []) {
+        const name = String(monster?.name || "").trim();
+        if (!name) continue;
+
+        const count = Number(monster.count);
+        const visibleCount = Number.isFinite(count) && count > 1 ? Math.floor(count) : 1;
+        totals.set(name, (totals.get(name) || 0) + visibleCount);
+    }
+
+    return [...totals.entries()].map(([name, count]) => count > 1 ? `${name} x${count}` : name);
+}
+
+function finalizeActiveTimestampLine() {
+    if (!timestampSession || timestampSession.activeLineIndex == null) return;
+
+    const monsters = formatMonsterTimestampList(overlayState?.monsters);
+    const line = timestampSession.lines[timestampSession.activeLineIndex] || "";
+    timestampSession.lines[timestampSession.activeLineIndex] = monsters.length > 0
+        ? `${line.replace(/\s+\[[^\]]*\]$/, "")} [${monsters.join(", ")}]`
+        : line.replace(/\s+\[[^\]]*\]$/, "");
+    timestampSession.activeLineIndex = null;
+    writeTimestampSession();
+}
+
+function startTimestampLine(level, rawLevelName) {
+    finalizeActiveTimestampLine();
+
+    const session = getTimestampSession();
+    const line = `${formatLocalClockTime()} Уровень ${level} ${normalizeLevelName(rawLevelName)}`;
+    session.lines.push(line);
+    session.activeLineIndex = session.lines.length - 1;
+    writeTimestampSession();
+}
+
 function updateMonsterStatuses(rawStatuses) {
     if (!Array.isArray(rawStatuses)) {
         return { ok: false, statusCode: 422, payload: { error: "Invalid monster statuses" } };
@@ -577,11 +691,13 @@ function updateMonsterStatuses(rawStatuses) {
     return { ok: true, statusCode: 200, payload: { ok: true, updatedSlots } };
 }
 
-function setGameLevel(rawLevel) {
+function setGameLevel(rawLevel, rawLevelName) {
     const level = normalizeLevel(rawLevel);
     if (level == null) {
         return { ok: false, statusCode: 422, payload: { error: "Invalid level", received: rawLevel } };
     }
+
+    startTimestampLine(level, rawLevelName);
 
     overlayState = {
         ...defaultOverlayState,
@@ -608,6 +724,8 @@ function setGameplayVisibility(rawVisible) {
     if (typeof rawVisible !== "boolean") {
         return { ok: false, statusCode: 422, payload: { error: "Invalid visibility", received: rawVisible } };
     }
+
+    if (!rawVisible) finalizeActiveTimestampLine();
 
     overlayState = {
         ...defaultOverlayState,
@@ -790,7 +908,7 @@ const server = http.createServer(async (request, response) => {
         if (request.method === "POST" && request.url === "/api/level") {
             const body = await readBody(request);
             const payload = JSON.parse(body || "{}");
-            const result = setGameLevel(payload.level);
+            const result = setGameLevel(payload.level, payload.levelName || payload.mapName || payload.map || payload.location);
             sendJson(response, result.statusCode, result.payload);
             if (result.ok) {
                 broadcastState();
@@ -907,6 +1025,7 @@ function startOverlayServer(options = {}) {
 }
 
 function stopOverlayServer() {
+    finalizeActiveTimestampLine();
     for (const client of clients) client.end();
     clients.clear();
     if (!server.listening) return Promise.resolve();

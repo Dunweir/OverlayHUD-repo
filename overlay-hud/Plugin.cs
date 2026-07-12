@@ -19,7 +19,7 @@ using UnityEngine.SceneManagement;
 
 namespace OverlayHUD
 {
-    [BepInPlugin("local.overlay.overlay_hud", "OverlayHUD", "0.2.82")]
+    [BepInPlugin("local.overlay.overlay_hud", "OverlayHUD", "0.2.84")]
     public sealed class Plugin : BaseUnityPlugin
     {
         private static Plugin instance;
@@ -740,7 +740,7 @@ namespace OverlayHUD
             gameplayActive = true;
 
             int level = ResolveCurrentLevel();
-            if (level > 0) SyncLevelToOverlay(level);
+            if (level > 0) SyncLevelToOverlay(level, ResolveCurrentLevelName());
             return true;
         }
 
@@ -1604,10 +1604,19 @@ namespace OverlayHUD
             }
         }
 
-        private void SyncLevelToOverlay(int level)
+        private string ResolveCurrentLevelName()
+        {
+            Type runManagerType = AccessTools.TypeByName("RunManager");
+            object runManager = ReadMember(runManagerType, "instance");
+            object currentLevel = ReadMember(runManager, "levelCurrent");
+            string levelName = DescribeLevelObject(currentLevel);
+            return levelName == "<null>" ? "" : levelName;
+        }
+
+        private void SyncLevelToOverlay(int level, string levelName)
         {
             lastSyncedLevel = level;
-            StartCoroutine(PostLevel(level));
+            StartCoroutine(PostLevel(level, levelName));
             lastSyncedUpgrades.Clear();
             pendingUpgradeKeys.Clear();
             for (int index = 0; index < TrackedPlayerUpgrades.Length; index++)
@@ -2145,9 +2154,9 @@ namespace OverlayHUD
             yield break;
         }
 
-        private IEnumerator PostLevel(int level)
+        private IEnumerator PostLevel(int level, string levelName)
         {
-            string json = "{\"level\":" + level + "}";
+            string json = "{\"level\":" + level + ",\"levelName\":\"" + EscapeJson(levelName ?? "") + "\"}";
             string endpointUrl = levelEndpoint.Value;
             Task<string> request = QueueNetworkRequest(() => SendHttpPost(endpointUrl, json));
             while (!request.IsCompleted) yield return null;
