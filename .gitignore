@@ -27,4 +27,17 @@ game-overlay/.electron-cache/
 overlay-hud/dist/
 overlay-hud/package/plugins/
 overlay-hud/package-flat/*.dll
+overlay-hud/package-flat/OverlayHUDApp.zip
+overlay-hud/package-flat/*.pak
+overlay-hud/package-flat/*.bin
+overlay-hud/package-flat/*.dat
+overlay-hud/package-flat/*.html
+overlay-hud/package-flat/LICENSE
+overlay-hud/package-flat/OverlayHUD.exe
+overlay-hud/package-flat/LICENSES.chromium.html
+overlay-hud/package-flat/locales/
+overlay-hud/package-flat/resources/
+overlay-hud/package-flat/overlay-config.json
+overlay-hud/package-flat/version
+overlay-hud/package-flat/vk_swiftshader_icd.json
 overlay-hud/package-*-flat/

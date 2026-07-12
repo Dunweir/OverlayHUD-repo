@@ -4,8 +4,10 @@ using HarmonyLib;
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Globalization;
 using System.IO;
+using System.IO.Compression;
 using System.Net.Sockets;
 using System.Reflection;
 using System.Text;
@@ -17,7 +19,7 @@ using UnityEngine.SceneManagement;
 
 namespace OverlayHUD
 {
-    [BepInPlugin("local.overlay.overlay_hud", "OverlayHUD", "0.2.74")]
+    [BepInPlugin("local.overlay.overlay_hud", "OverlayHUD", "0.2.77")]
     public sealed class Plugin : BaseUnityPlugin
     {
         private static Plugin instance;
@@ -176,7 +178,12 @@ namespace OverlayHUD
         private ConfigEntry<float> viewportPadding;
         private ConfigEntry<bool> requireLineOfSight;
         private ConfigEntry<bool> debugLogging;
+        private ConfigEntry<bool> autoStartOverlayApp;
+        private ConfigEntry<bool> autoCloseOverlayApp;
+        private ConfigEntry<string> overlayAppRelativePath;
+        private ConfigEntry<string> overlayAppArchiveName;
         private Harmony harmony;
+        private Process launchedOverlayProcess;
 
         private void Awake()
         {
@@ -191,6 +198,10 @@ namespace OverlayHUD
             viewportPadding = Config.Bind("Detection", "ViewportPadding", 0.03f, "Allowed viewport padding outside the screen edges.");
             requireLineOfSight = Config.Bind("Detection", "RequireLineOfSight", false, "Reveal only enemies marked on-screen for the local player by the game.");
             debugLogging = Config.Bind("Debug", "Logging", false, "Write periodic bridge debug logs.");
+            autoStartOverlayApp = Config.Bind("OverlayApp", "AutoStart", true, "Start the bundled OverlayHUD desktop app when the game starts.");
+            autoCloseOverlayApp = Config.Bind("OverlayApp", "AutoClose", true, "Close the bundled OverlayHUD desktop app when the game exits.");
+            overlayAppRelativePath = Config.Bind("OverlayApp", "ExecutableRelativePath", Path.Combine("OverlayHUDApp", "OverlayHUD.exe"), "Path to the bundled OverlayHUD executable relative to this plugin DLL.");
+            overlayAppArchiveName = Config.Bind("OverlayApp", "ArchiveName", "OverlayHUDApp.zip", "Bundled OverlayHUD desktop app archive next to this plugin DLL.");
             bool configChanged = false;
             if (endpoint.Value == "http://192.168.1.198:8787/api/monster-seen")
             {
@@ -202,11 +213,156 @@ namespace OverlayHUD
                 levelEndpoint.Value = "http://127.0.0.1:8787/api/level";
                 configChanged = true;
             }
+            if (overlayAppRelativePath.Value == "OverlayHUD.exe" || overlayAppRelativePath.Value == Path.Combine("OverlayHUD-win32-x64", "OverlayHUD.exe"))
+            {
+                overlayAppRelativePath.Value = Path.Combine("OverlayHUDApp", "OverlayHUD.exe");
+                configChanged = true;
+            }
             if (configChanged) Config.Save();
 
             Logger.LogInfo("OverlayHUD is running. MonsterEndpoint=" + endpoint.Value + ", LevelEndpoint=" + levelEndpoint.Value + ", Logging=" + debugLogging.Value);
 
+            StartOverlayAppIfNeeded();
             PatchGameUpdates();
+        }
+
+        private void StartOverlayAppIfNeeded()
+        {
+            if (!autoStartOverlayApp.Value) return;
+
+            try
+            {
+                string exePath = ResolveOverlayAppPath();
+                EnsureOverlayAppExtracted(exePath);
+                if (string.IsNullOrWhiteSpace(exePath) || !File.Exists(exePath))
+                {
+                    Logger.LogWarning("Bundled OverlayHUD executable was not found: " + exePath);
+                    return;
+                }
+
+                string processName = Path.GetFileNameWithoutExtension(exePath);
+                if (IsProcessAlreadyRunning(processName))
+                {
+                    Logger.LogInfo("OverlayHUD desktop app is already running; leaving the existing process alone.");
+                    return;
+                }
+
+                launchedOverlayProcess = Process.Start(new ProcessStartInfo
+                {
+                    FileName = exePath,
+                    WorkingDirectory = Path.GetDirectoryName(exePath),
+                    UseShellExecute = true
+                });
+
+                if (launchedOverlayProcess != null)
+                {
+                    Logger.LogInfo("Started bundled OverlayHUD desktop app: " + exePath);
+                }
+            }
+            catch (Exception error)
+            {
+                Logger.LogWarning("Failed to start bundled OverlayHUD desktop app: " + error.GetType().Name + ": " + error.Message);
+            }
+        }
+
+        private string ResolveOverlayAppPath()
+        {
+            string pluginPath = Assembly.GetExecutingAssembly().Location;
+            string pluginDirectory = string.IsNullOrWhiteSpace(pluginPath)
+                ? Paths.PluginPath
+                : Path.GetDirectoryName(pluginPath);
+            string relativePath = overlayAppRelativePath.Value;
+            return Path.GetFullPath(Path.Combine(pluginDirectory, relativePath));
+        }
+
+        private void EnsureOverlayAppExtracted(string exePath)
+        {
+            if (File.Exists(exePath) && File.Exists(Path.Combine(Path.GetDirectoryName(exePath), "resources", "app.asar"))) return;
+
+            string pluginDirectory = GetPluginDirectory();
+            string archivePath = Path.Combine(pluginDirectory, overlayAppArchiveName.Value);
+            if (!File.Exists(archivePath)) return;
+
+            string targetDirectory = Path.GetDirectoryName(exePath);
+            if (string.IsNullOrWhiteSpace(targetDirectory)) return;
+            if (!IsPathInsideDirectory(pluginDirectory, targetDirectory))
+            {
+                Logger.LogWarning("Refusing to extract bundled OverlayHUD desktop app outside the plugin directory: " + targetDirectory);
+                return;
+            }
+
+            try
+            {
+                if (Directory.Exists(targetDirectory))
+                {
+                    Directory.Delete(targetDirectory, true);
+                }
+
+                Directory.CreateDirectory(targetDirectory);
+                ZipFile.ExtractToDirectory(archivePath, targetDirectory);
+                Logger.LogInfo("Extracted bundled OverlayHUD desktop app to: " + targetDirectory);
+            }
+            catch (Exception error)
+            {
+                Logger.LogWarning("Failed to extract bundled OverlayHUD desktop app: " + error.GetType().Name + ": " + error.Message);
+            }
+        }
+
+        private static bool IsPathInsideDirectory(string parentDirectory, string childPath)
+        {
+            string parent = Path.GetFullPath(parentDirectory).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar) + Path.DirectorySeparatorChar;
+            string child = Path.GetFullPath(childPath).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar) + Path.DirectorySeparatorChar;
+            return child.StartsWith(parent, StringComparison.OrdinalIgnoreCase);
+        }
+
+        private string GetPluginDirectory()
+        {
+            string pluginPath = Assembly.GetExecutingAssembly().Location;
+            return string.IsNullOrWhiteSpace(pluginPath)
+                ? Paths.PluginPath
+                : Path.GetDirectoryName(pluginPath);
+        }
+
+        private static bool IsProcessAlreadyRunning(string processName)
+        {
+            if (string.IsNullOrWhiteSpace(processName)) return false;
+
+            try
+            {
+                Process[] processes = Process.GetProcessesByName(processName);
+                return processes != null && processes.Length > 0;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        private void StopOverlayAppIfNeeded()
+        {
+            if (!autoCloseOverlayApp.Value || launchedOverlayProcess == null) return;
+
+            try
+            {
+                if (launchedOverlayProcess.HasExited) return;
+
+                bool closeRequested = launchedOverlayProcess.CloseMainWindow();
+                if (!closeRequested || !launchedOverlayProcess.WaitForExit(2500))
+                {
+                    launchedOverlayProcess.Kill();
+                    launchedOverlayProcess.WaitForExit(2500);
+                }
+
+                Logger.LogInfo("Closed bundled OverlayHUD desktop app.");
+            }
+            catch (Exception error)
+            {
+                Logger.LogWarning("Failed to close bundled OverlayHUD desktop app: " + error.GetType().Name + ": " + error.Message);
+            }
+            finally
+            {
+                launchedOverlayProcess = null;
+            }
         }
 
         private void PatchGameUpdates()
@@ -487,6 +643,7 @@ namespace OverlayHUD
         {
             SceneManager.sceneLoaded -= OnSceneLoaded;
             harmony?.UnpatchSelf();
+            StopOverlayAppIfNeeded();
             if (instance == this) instance = null;
         }
 
