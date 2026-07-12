@@ -27,7 +27,7 @@ game-overlay/.electron-cache/
 overlay-hud/dist/
 overlay-hud/package/plugins/
 overlay-hud/package-flat/*.dll
-overlay-hud/package-flat/OverlayHUDApp.zip
+overlay-hud/package-flat/OverlayHUD_app.zip
 overlay-hud/package-flat/*.pak
 overlay-hud/package-flat/*.bin
 overlay-hud/package-flat/*.dat

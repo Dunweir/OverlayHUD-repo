@@ -19,7 +19,7 @@ using UnityEngine.SceneManagement;
 
 namespace OverlayHUD
 {
-    [BepInPlugin("local.overlay.overlay_hud", "OverlayHUD", "0.2.77")]
+    [BepInPlugin("local.overlay.overlay_hud", "OverlayHUD", "0.2.78")]
     public sealed class Plugin : BaseUnityPlugin
     {
         private static Plugin instance;
@@ -200,8 +200,8 @@ namespace OverlayHUD
             debugLogging = Config.Bind("Debug", "Logging", false, "Write periodic bridge debug logs.");
             autoStartOverlayApp = Config.Bind("OverlayApp", "AutoStart", true, "Start the bundled OverlayHUD desktop app when the game starts.");
             autoCloseOverlayApp = Config.Bind("OverlayApp", "AutoClose", true, "Close the bundled OverlayHUD desktop app when the game exits.");
-            overlayAppRelativePath = Config.Bind("OverlayApp", "ExecutableRelativePath", Path.Combine("OverlayHUDApp", "OverlayHUD.exe"), "Path to the bundled OverlayHUD executable relative to this plugin DLL.");
-            overlayAppArchiveName = Config.Bind("OverlayApp", "ArchiveName", "OverlayHUDApp.zip", "Bundled OverlayHUD desktop app archive next to this plugin DLL.");
+            overlayAppRelativePath = Config.Bind("OverlayApp", "ExecutableRelativePath", Path.Combine("OverlayHUD_app", "OverlayHUD.exe"), "Path to the bundled OverlayHUD executable relative to this plugin DLL.");
+            overlayAppArchiveName = Config.Bind("OverlayApp", "ArchiveName", "OverlayHUD_app.zip", "Bundled OverlayHUD desktop app archive next to this plugin DLL.");
             bool configChanged = false;
             if (endpoint.Value == "http://192.168.1.198:8787/api/monster-seen")
             {
@@ -213,9 +213,16 @@ namespace OverlayHUD
                 levelEndpoint.Value = "http://127.0.0.1:8787/api/level";
                 configChanged = true;
             }
-            if (overlayAppRelativePath.Value == "OverlayHUD.exe" || overlayAppRelativePath.Value == Path.Combine("OverlayHUD-win32-x64", "OverlayHUD.exe"))
+            if (overlayAppRelativePath.Value == "OverlayHUD.exe"
+                || overlayAppRelativePath.Value == Path.Combine("OverlayHUD-win32-x64", "OverlayHUD.exe")
+                || overlayAppRelativePath.Value == Path.Combine("OverlayHUDApp", "OverlayHUD.exe"))
             {
-                overlayAppRelativePath.Value = Path.Combine("OverlayHUDApp", "OverlayHUD.exe");
+                overlayAppRelativePath.Value = Path.Combine("OverlayHUD_app", "OverlayHUD.exe");
+                configChanged = true;
+            }
+            if (overlayAppArchiveName.Value == "OverlayHUDApp.zip")
+            {
+                overlayAppArchiveName.Value = "OverlayHUD_app.zip";
                 configChanged = true;
             }
             if (configChanged) Config.Save();
