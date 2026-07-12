@@ -46,10 +46,17 @@
                     </div>
                 </div>
                 <div class="overlay-segment-row">
-                    <span>Апгрейды</span>
-                    <div class="overlay-layout-switch" role="group" aria-label="Upgrade layout">
-                        <button type="button" data-upgrade-layout="stacked" aria-label="Show upgrades below header">2 строки</button>
-                        <button type="button" data-upgrade-layout="inline" aria-label="Show upgrades in header row">1 строка</button>
+                    <span data-i18n="compactMode">Компактный режим</span>
+                    <label class="overlay-toggle-switch overlay-compact-switch" aria-label="Compact mode">
+                        <input type="checkbox" id="overlayCompactModeToggle">
+                        <span></span>
+                    </label>
+                </div>
+                <div class="overlay-segment-row">
+                    <span data-i18n="upgradeRows">Апгрейды</span>
+                    <div class="overlay-layout-switch" role="group" aria-label="Upgrade rows">
+                        <button type="button" data-upgrade-rows="single" aria-label="Show upgrades in one row">1 строка</button>
+                        <button type="button" data-upgrade-rows="double" aria-label="Show upgrades in two rows">2 строки</button>
                     </div>
                 </div>
                 <div class="overlay-toggle-list">
@@ -202,7 +209,8 @@
         const overlayHoverOpacitySlider = document.getElementById("overlayHoverOpacitySlider");
         const overlayHoverOpacityValue = document.getElementById("overlayHoverOpacityValue");
         const overlayAlignmentButtons = [...document.querySelectorAll("[data-alignment]")];
-        const overlayUpgradeLayoutButtons = [...document.querySelectorAll("[data-upgrade-layout]")];
+        const overlayCompactModeToggle = document.getElementById("overlayCompactModeToggle");
+        const overlayUpgradeRowsButtons = [...document.querySelectorAll("[data-upgrade-rows]")];
         const overlayDragCorners = [...document.querySelectorAll("[data-drag-target]")];
         const overlayBgToggle = document.getElementById("overlayBgToggle");
         const overlayTimerToggle = document.getElementById("overlayTimerToggle");
@@ -231,6 +239,7 @@
         let layoutReclampTimer = 0;
         const monsterImageLoads = new Map();
         const upgradeElements = new Map();
+        const upgradeLines = [];
         const viewportScale = {
             baseWidth: 1920,
             baseHeight: 1080,
@@ -259,6 +268,8 @@
                 columns: "Колонки",
                 opacity: "Прозрачность",
                 alignment: "Выравнивание",
+                compactMode: "Компактный режим",
+                upgradeRows: "Апгрейды",
                 groupVisibility: "Видимость",
                 groupBlocks: "Блоки",
                 groupDetails: "Детали",
@@ -301,6 +312,8 @@
                 columns: "Columns",
                 opacity: "Opacity",
                 alignment: "Alignment",
+                compactMode: "Compact mode",
+                upgradeRows: "Upgrades",
                 groupVisibility: "Visibility",
                 groupBlocks: "Blocks",
                 groupDetails: "Details",
@@ -383,9 +396,9 @@
                 window.innerWidth / viewportScale.baseWidth,
                 window.innerHeight / viewportScale.baseHeight
             );
-            const sizingState = latestState || { squareSize: 70, columnsCount: 7 };
+            const sizingState = latestState || { squareSize: 70, columnsCount: 11 };
             const squareSize = Number(sizingState.squareSize) || 64;
-            const columnsCount = Number(sizingState.columnsCount) || 7;
+            const columnsCount = Number(sizingState.columnsCount) || 11;
             const gridWidth = columnsCount * squareSize + Math.max(0, columnsCount - 1) * 10;
             const containerWidth = Math.max(310, gridWidth + 30);
             const fitScale = (window.innerWidth - viewportScale.edgeOffset * 2) / containerWidth;
@@ -487,7 +500,10 @@
         }
 
         function positionElement(element, targetName, position) {
+            if (element.classList.contains("is-dragging")) return;
             element.classList.toggle("is-positioned", Boolean(position));
+            element.classList.toggle("is-anchor-center-x", Boolean(position && position.anchorX === "center"));
+            element.classList.toggle("is-anchor-center-y", Boolean(position && position.anchorY === "center"));
             if (!position) {
                 element.style.removeProperty("--overlay-left");
                 element.style.removeProperty("--overlay-top");
@@ -495,8 +511,8 @@
             }
 
             const resolved = resolveAnchoredPosition(element, position);
-            element.style.setProperty("--overlay-left", `${Math.round(resolved.left)}px`);
-            element.style.setProperty("--overlay-top", `${Math.round(resolved.top)}px`);
+            element.style.setProperty("--overlay-left", position.anchorX === "center" ? "50%" : `${Math.round(resolved.left)}px`);
+            element.style.setProperty("--overlay-top", position.anchorY === "center" ? "50%" : `${Math.round(resolved.top)}px`);
         }
 
         function applySavedPositions() {
@@ -506,6 +522,7 @@
 
         function reclampPositionedElement(element) {
             if (!element.classList.contains("is-positioned")) return;
+            if (element.classList.contains("is-anchor-center-x") || element.classList.contains("is-anchor-center-y")) return;
             const left = parseFloat(element.style.getPropertyValue("--overlay-left"));
             const top = parseFloat(element.style.getPropertyValue("--overlay-top"));
             if (!Number.isFinite(left) || !Number.isFinite(top)) return;
@@ -541,6 +558,8 @@
                 lostValue: state.lostValue,
                 levelBadgeVisible: state.levelBadgeVisible,
                 overlayAlignment: state.overlayAlignment,
+                compactModeEnabled: state.compactModeEnabled,
+                upgradeRows: state.upgradeRows,
                 tabHidden: state.tabHidden,
                 overlayPosition: state.overlayPosition,
                 controlsPosition: state.controlsPosition
@@ -575,6 +594,7 @@
                 startTop: startPosition.top
             };
             element.classList.add("is-dragging", "is-positioned");
+            element.classList.remove("is-anchor-center-x", "is-anchor-center-y");
             document.documentElement.dataset.overlayDragging = targetName;
             element.style.setProperty("--overlay-left", `${Math.round(startPosition.left)}px`);
             element.style.setProperty("--overlay-top", `${Math.round(startPosition.top)}px`);
@@ -600,7 +620,7 @@
         function stopOverlayDrag(event) {
             if (!activeDrag || event.pointerId !== activeDrag.pointerId) return;
             const finalPosition = snapPosition(activeDrag.element, activeDrag.element.getBoundingClientRect().left, activeDrag.element.getBoundingClientRect().top);
-            activeDrag.element.classList.remove("is-dragging");
+            const draggedElement = activeDrag.element;
             try {
                 activeDrag.handle.releasePointerCapture(event.pointerId);
             } catch {
@@ -611,6 +631,12 @@
             } else {
                 OverlayApp.setOverlayPosition(finalPosition);
             }
+            draggedElement.classList.remove("is-dragging");
+            draggedElement.style.transition = "none";
+            positionElement(draggedElement, activeDrag.targetName, finalPosition);
+            requestAnimationFrame(() => {
+                draggedElement.style.transition = "";
+            });
             lastPositionLayoutKey = "";
             activeDrag = null;
             delete document.documentElement.dataset.overlayDragging;
@@ -621,6 +647,13 @@
         }
 
         function buildUpgradeRow() {
+            for (let index = 0; index < 2; index++) {
+                const line = document.createElement("div");
+                line.className = `upgrade-line ${index === 0 ? "upgrade-line-primary" : "upgrade-line-secondary"}`;
+                upgradeLines.push(line);
+                upgradeRow.appendChild(line);
+            }
+
             for (const upgrade of upgradeDefinitions) {
                 const badge = document.createElement("div");
                 badge.className = "upgrade-stat";
@@ -643,11 +676,11 @@
                 badge.appendChild(tooltip);
 
                 upgradeElements.set(upgrade.key, { badge, value, tooltip });
-                upgradeRow.appendChild(badge);
+                upgradeLines[0].appendChild(badge);
             }
         }
 
-        function sortUpgradeRowByValue(state) {
+        function layoutUpgradeRow(state) {
             const orderedUpgrades = upgradeDefinitions
                 .map((upgrade, index) => ({
                     upgrade,
@@ -656,8 +689,21 @@
                 }))
                 .sort((left, right) => right.value - left.value || left.index - right.index);
 
+            const visibleItems = orderedUpgrades.filter((item) => item.value > 0);
+            const targetLines = state.upgradeRows === "double"
+                ? [visibleItems.slice(0, 4), visibleItems.slice(4)]
+                : [visibleItems, []];
+
+            for (const line of upgradeLines) line.replaceChildren();
+            for (let lineIndex = 0; lineIndex < targetLines.length; lineIndex++) {
+                for (const item of targetLines[lineIndex]) {
+                    upgradeLines[lineIndex].appendChild(upgradeElements.get(item.upgrade.key).badge);
+                }
+            }
+
             for (const item of orderedUpgrades) {
-                upgradeRow.appendChild(upgradeElements.get(item.upgrade.key).badge);
+                const badge = upgradeElements.get(item.upgrade.key).badge;
+                if (item.value <= 0) upgradeLines[0].appendChild(badge);
             }
         }
 
@@ -1016,9 +1062,9 @@
             const hasMapValue = Boolean(latestState.mapValueVisible && Number(latestState.mapValue) > 0);
             const hasLostValue = Boolean(latestState.lostValueVisible && Number(latestState.lostValue) > 0);
             const hasHeader = Boolean(latestState.levelBadgeVisible || latestState.timerVisible || hasMapValue || hasLostValue);
-            const visibleUpgrades = [...upgradeRow.children].filter((element) => !element.classList.contains("is-zero"));
+            const visibleUpgrades = [...upgradeRow.querySelectorAll(".upgrade-stat")].filter((element) => !element.classList.contains("is-zero"));
             const hasUpgrades = Boolean(latestState.upgradesVisible && visibleUpgrades.length > 0);
-            overlayContainer.classList.toggle("is-topbar-inline", latestState.upgradeLayout === "inline" && hasHeader && hasUpgrades);
+            overlayContainer.classList.toggle("is-topbar-inline", latestState.compactModeEnabled && hasHeader && hasUpgrades);
         }
 
         function render(state) {
@@ -1065,8 +1111,9 @@
                 button.classList.toggle("is-active", isActive);
                 button.setAttribute("aria-pressed", String(isActive));
             });
-            overlayUpgradeLayoutButtons.forEach((button) => {
-                const isActive = button.dataset.upgradeLayout === state.upgradeLayout;
+            overlayCompactModeToggle.checked = state.compactModeEnabled;
+            overlayUpgradeRowsButtons.forEach((button) => {
+                const isActive = button.dataset.upgradeRows === state.upgradeRows;
                 button.classList.toggle("is-active", isActive);
                 button.setAttribute("aria-pressed", String(isActive));
             });
@@ -1092,6 +1139,8 @@
             const keepOverlayDragging = overlayContainer.classList.contains("is-dragging");
             overlayContainer.className = "overlay-container";
             overlayContainer.classList.toggle("is-positioned", keepOverlayPositioned || Boolean(state.overlayPosition));
+            overlayContainer.classList.toggle("is-anchor-center-x", !keepOverlayDragging && Boolean(state.overlayPosition && state.overlayPosition.anchorX === "center"));
+            overlayContainer.classList.toggle("is-anchor-center-y", !keepOverlayDragging && Boolean(state.overlayPosition && state.overlayPosition.anchorY === "center"));
             overlayContainer.classList.toggle("is-dragging", keepOverlayDragging);
             overlayContainer.classList.add(`align-${state.overlayAlignment}`);
             if (keepInlineUntilUpgradesHidden || keepInlineUntilHeaderHidden) overlayContainer.classList.add("is-topbar-inline");
@@ -1109,6 +1158,7 @@
             if (!state.respawnTimerVisible) overlayContainer.classList.add("hide-respawn-timer");
             if (!state.respawnIndicatorVisible) overlayContainer.classList.add("hide-respawn-indicator");
             if (!state.respawnTimerVisible && !state.respawnIndicatorVisible) overlayContainer.classList.add("hide-respawn-status");
+            overlayContainer.classList.toggle("is-upgrade-wrap-double", state.upgradeRows === "double");
             if (state.tabHidden) overlayContainer.classList.add("is-tab-hidden");
             if (overlayShouldBeVisible) overlayContainer.classList.add("is-visible");
             overlayHoverControls.classList.toggle("is-enabled", overlayShouldBeVisible && !state.tabHidden);
@@ -1126,7 +1176,7 @@
                 element.badge.classList.toggle("is-zero", value <= 0);
                 if (value > 0) visibleUpgradeCount++;
             }
-            sortUpgradeRowByValue(state);
+            layoutUpgradeRow(state);
             upgradeRow.classList.toggle("is-empty", visibleUpgradeCount === 0);
             renderTimer(state);
 
@@ -1199,8 +1249,9 @@
         overlayAlignmentButtons.forEach((button) => {
             button.addEventListener("click", () => OverlayApp.setOverlayAlignment(button.dataset.alignment));
         });
-        overlayUpgradeLayoutButtons.forEach((button) => {
-            button.addEventListener("click", () => OverlayApp.setUpgradeLayout(button.dataset.upgradeLayout));
+        overlayCompactModeToggle.addEventListener("change", () => OverlayApp.setCompactModeEnabled(overlayCompactModeToggle.checked));
+        overlayUpgradeRowsButtons.forEach((button) => {
+            button.addEventListener("click", () => OverlayApp.setUpgradeRows(button.dataset.upgradeRows));
         });
         overlayBgToggle.addEventListener("change", () => OverlayApp.setBgEnabled(overlayBgToggle.checked));
         overlayTimerToggle.addEventListener("change", () => OverlayApp.setTimerVisible(overlayTimerToggle.checked));

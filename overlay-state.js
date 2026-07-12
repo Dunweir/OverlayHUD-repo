@@ -74,14 +74,16 @@ const OverlayApp = (() => {
         style: 1,
         interfaceLanguage: "ru",
         bgEnabled: false,
-        timerVisible: false,
+        timerVisible: true,
         upgradesVisible: true,
-        upgradeLayout: "stacked",
+        upgradeLayout: "inline",
+        compactModeEnabled: true,
+        upgradeRows: "double",
         mapValueVisible: true,
         lostValueVisible: true,
         monsterIconsVisible: true,
         levelBadgeVisible: true,
-        upgradeTooltipsVisible: true,
+        upgradeTooltipsVisible: false,
         monsterHealthBarsVisible: true,
         monsterStrengthVisible: true,
         respawnTimerVisible: true,
@@ -89,10 +91,11 @@ const OverlayApp = (() => {
         squareSize: 70,
         upgradeSize: 38,
         overlayScaleVersion: 3,
-        columnsCount: 7,
-        columnsLayoutVersion: 1,
-        overlayAlignment: "left",
-        overlayPosition: null,
+        columnsCount: 11,
+        columnsLayoutVersion: 2,
+        overlayDefaultsVersion: 3,
+        overlayAlignment: "center",
+        overlayPosition: { left: 0, top: 0, anchorX: "center", anchorY: "top" },
         controlsPosition: null,
         hoverOpacity: 50,
         seconds: 0,
@@ -126,25 +129,53 @@ const OverlayApp = (() => {
         const sourceSquareSize = Number(source.squareSize);
         const sourceUpgradeSize = Number(source.upgradeSize);
         const shouldMigrateDefaultSizes = Number(source.overlayScaleVersion) < 3;
+        const sourceOverlayDefaultsVersion = Number(source.overlayDefaultsVersion || 0);
+        const shouldMigrateOverlayDefaults = sourceOverlayDefaultsVersion < 2;
+        const shouldMigrateTooltipDefault = sourceOverlayDefaultsVersion < 3;
         const squareSize = Number.isFinite(sourceSquareSize)
             ? (shouldMigrateDefaultSizes && (sourceSquareSize === 50 || sourceSquareSize === 64) ? defaultState.squareSize : sourceSquareSize)
             : defaultState.squareSize;
         const upgradeSize = Number.isFinite(sourceUpgradeSize)
             ? (shouldMigrateDefaultSizes && sourceUpgradeSize === 32 ? defaultState.upgradeSize : sourceUpgradeSize)
             : defaultState.upgradeSize;
-        const columnsCount = source.columnsLayoutVersion === 1 ? source.columnsCount : defaultState.columnsCount;
+        const sourceColumnsCount = Number(source.columnsCount);
+        const columnsCount = Number.isFinite(sourceColumnsCount)
+            ? (shouldMigrateOverlayDefaults && sourceColumnsCount === 7 ? defaultState.columnsCount : sourceColumnsCount)
+            : defaultState.columnsCount;
         const hoverOpacity = Number.isFinite(Number(source.hoverOpacity))
             ? Math.min(100, Math.max(20, Number(source.hoverOpacity)))
             : defaultState.hoverOpacity;
         const interfaceLanguage = source.interfaceLanguage === "en" ? "en" : defaultState.interfaceLanguage;
-        const overlayAlignment = ["left", "center", "right"].includes(source.overlayAlignment)
+        const normalizedOverlayAlignment = ["left", "center", "right"].includes(source.overlayAlignment)
             ? source.overlayAlignment
             : defaultState.overlayAlignment;
-        const upgradeLayout = ["inline", "stacked"].includes(source.upgradeLayout)
-            ? source.upgradeLayout
-            : defaultState.upgradeLayout;
-        const overlayPosition = normalizePosition(source.overlayPosition);
+        const overlayAlignment = shouldMigrateOverlayDefaults && normalizedOverlayAlignment === "left"
+            ? defaultState.overlayAlignment
+            : normalizedOverlayAlignment;
+        const hasCompactModeEnabled = Object.prototype.hasOwnProperty.call(source, "compactModeEnabled");
+        const normalizedCompactModeEnabled = hasCompactModeEnabled && typeof source.compactModeEnabled === "boolean"
+            ? source.compactModeEnabled
+            : source.upgradeLayout === "inline";
+        const compactModeEnabled = shouldMigrateOverlayDefaults && !normalizedCompactModeEnabled && source.upgradeLayout !== "inline"
+            ? defaultState.compactModeEnabled
+            : normalizedCompactModeEnabled;
+        const normalizedUpgradeRows = ["single", "double"].includes(source.upgradeRows)
+            ? source.upgradeRows
+            : defaultState.upgradeRows;
+        const upgradeRows = shouldMigrateOverlayDefaults && normalizedUpgradeRows === "single"
+            ? defaultState.upgradeRows
+            : normalizedUpgradeRows;
+        const normalizedOverlayPosition = normalizePosition(source.overlayPosition);
+        const overlayPosition = shouldMigrateOverlayDefaults && !normalizedOverlayPosition
+            ? normalizePosition(defaultState.overlayPosition)
+            : normalizedOverlayPosition;
         const controlsPosition = normalizePosition(source.controlsPosition);
+        const timerVisible = shouldMigrateOverlayDefaults && source.timerVisible === false
+            ? defaultState.timerVisible
+            : Boolean(source.timerVisible);
+        const upgradeTooltipsVisible = shouldMigrateTooltipDefault && source.upgradeTooltipsVisible === true
+            ? defaultState.upgradeTooltipsVisible
+            : Boolean(source.upgradeTooltipsVisible);
         const mapValue = normalizeCurrencyValue(source.mapValue, defaultState.mapValue);
         const mapValueInitial = normalizeCurrencyValue(source.mapValueInitial, defaultState.mapValueInitial);
         const mapValueGoal = normalizeCurrencyValue(source.mapValueGoal, defaultState.mapValueGoal);
@@ -158,12 +189,17 @@ const OverlayApp = (() => {
             squareSize,
             upgradeSize,
             columnsCount,
+            overlayDefaultsVersion: defaultState.overlayDefaultsVersion,
             hoverOpacity,
             interfaceLanguage,
             overlayAlignment,
-            upgradeLayout,
+            compactModeEnabled,
+            upgradeLayout: compactModeEnabled ? "inline" : "stacked",
+            upgradeRows,
             overlayPosition,
             controlsPosition,
+            timerVisible,
+            upgradeTooltipsVisible,
             monsters: Array.isArray(source.monsters) ? source.monsters : [],
             roster: Array.isArray(source.roster) ? source.roster : [],
             mapValue,
@@ -480,7 +516,23 @@ const OverlayApp = (() => {
     function setUpgradeLayout(upgradeLayout) {
         updateState((currentState) => ({
             ...currentState,
+            compactModeEnabled: upgradeLayout === "inline",
             upgradeLayout: upgradeLayout === "inline" ? "inline" : "stacked"
+        }));
+    }
+
+    function setCompactModeEnabled(compactModeEnabled) {
+        updateState((currentState) => ({
+            ...currentState,
+            compactModeEnabled: Boolean(compactModeEnabled),
+            upgradeLayout: compactModeEnabled ? "inline" : "stacked"
+        }));
+    }
+
+    function setUpgradeRows(upgradeRows) {
+        updateState((currentState) => ({
+            ...currentState,
+            upgradeRows: upgradeRows === "double" ? "double" : "single"
         }));
     }
 
@@ -563,6 +615,7 @@ const OverlayApp = (() => {
         removeMonster,
         resetTimer,
         setBgEnabled,
+        setCompactModeEnabled,
         setColumnsCount,
         setHoverOpacity,
         setControlsPosition,
@@ -582,6 +635,7 @@ const OverlayApp = (() => {
         setStyle,
         setTimerVisible,
         setUpgradeLayout,
+        setUpgradeRows,
         setUpgradeTooltipsVisible,
         setUpgradeSize,
         setUpgradesVisible,

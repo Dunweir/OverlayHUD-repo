@@ -119,14 +119,16 @@ const defaultOverlayState = {
     style: 1,
     interfaceLanguage: "ru",
     bgEnabled: false,
-    timerVisible: false,
+    timerVisible: true,
     upgradesVisible: true,
-    upgradeLayout: "stacked",
+    upgradeLayout: "inline",
+    compactModeEnabled: true,
+    upgradeRows: "double",
     mapValueVisible: true,
     lostValueVisible: true,
     monsterIconsVisible: true,
     levelBadgeVisible: true,
-    upgradeTooltipsVisible: true,
+    upgradeTooltipsVisible: false,
     monsterHealthBarsVisible: true,
     monsterStrengthVisible: true,
     respawnTimerVisible: true,
@@ -134,10 +136,11 @@ const defaultOverlayState = {
     squareSize: 70,
     upgradeSize: 38,
     overlayScaleVersion: 3,
-    columnsCount: 7,
-    columnsLayoutVersion: 1,
-    overlayAlignment: "left",
-    overlayPosition: null,
+    columnsCount: 11,
+    columnsLayoutVersion: 2,
+    overlayDefaultsVersion: 3,
+    overlayAlignment: "center",
+    overlayPosition: { left: 0, top: 0, anchorX: "center", anchorY: "top" },
     controlsPosition: null,
     hoverOpacity: 50,
     seconds: 0,
@@ -162,25 +165,53 @@ function normalizeOverlayState(rawState) {
     const sourceSquareSize = Number(source.squareSize);
     const sourceUpgradeSize = Number(source.upgradeSize);
     const shouldMigrateDefaultSizes = Number(source.overlayScaleVersion) < 3;
+    const sourceOverlayDefaultsVersion = Number(rawState.overlayDefaultsVersion || 0);
+    const shouldMigrateOverlayDefaults = sourceOverlayDefaultsVersion < 2;
+    const shouldMigrateTooltipDefault = sourceOverlayDefaultsVersion < 3;
     const squareSize = Number.isFinite(sourceSquareSize)
         ? (shouldMigrateDefaultSizes && (sourceSquareSize === 50 || sourceSquareSize === 64) ? defaultOverlayState.squareSize : sourceSquareSize)
         : defaultOverlayState.squareSize;
     const upgradeSize = Number.isFinite(sourceUpgradeSize)
         ? (shouldMigrateDefaultSizes && sourceUpgradeSize === 32 ? defaultOverlayState.upgradeSize : sourceUpgradeSize)
         : defaultOverlayState.upgradeSize;
-    const columnsCount = source.columnsLayoutVersion === 1 ? source.columnsCount : defaultOverlayState.columnsCount;
+    const sourceColumnsCount = Number(source.columnsCount);
+    const columnsCount = Number.isFinite(sourceColumnsCount)
+        ? (shouldMigrateOverlayDefaults && sourceColumnsCount === 7 ? defaultOverlayState.columnsCount : sourceColumnsCount)
+        : defaultOverlayState.columnsCount;
     const hoverOpacity = Number.isFinite(Number(source.hoverOpacity))
         ? Math.min(100, Math.max(20, Number(source.hoverOpacity)))
         : defaultOverlayState.hoverOpacity;
     const interfaceLanguage = source.interfaceLanguage === "en" ? "en" : defaultOverlayState.interfaceLanguage;
-    const overlayAlignment = ["left", "center", "right"].includes(source.overlayAlignment)
+    const normalizedOverlayAlignment = ["left", "center", "right"].includes(source.overlayAlignment)
         ? source.overlayAlignment
         : defaultOverlayState.overlayAlignment;
-    const upgradeLayout = ["inline", "stacked"].includes(source.upgradeLayout)
-        ? source.upgradeLayout
-        : defaultOverlayState.upgradeLayout;
-    const overlayPosition = normalizePosition(source.overlayPosition);
+    const overlayAlignment = shouldMigrateOverlayDefaults && normalizedOverlayAlignment === "left"
+        ? defaultOverlayState.overlayAlignment
+        : normalizedOverlayAlignment;
+    const hasCompactModeEnabled = Object.prototype.hasOwnProperty.call(rawState, "compactModeEnabled");
+    const normalizedCompactModeEnabled = hasCompactModeEnabled && typeof source.compactModeEnabled === "boolean"
+        ? source.compactModeEnabled
+        : source.upgradeLayout === "inline";
+    const compactModeEnabled = shouldMigrateOverlayDefaults && !normalizedCompactModeEnabled && source.upgradeLayout !== "inline"
+        ? defaultOverlayState.compactModeEnabled
+        : normalizedCompactModeEnabled;
+    const normalizedUpgradeRows = ["single", "double"].includes(source.upgradeRows)
+        ? source.upgradeRows
+        : defaultOverlayState.upgradeRows;
+    const upgradeRows = shouldMigrateOverlayDefaults && normalizedUpgradeRows === "single"
+        ? defaultOverlayState.upgradeRows
+        : normalizedUpgradeRows;
+    const normalizedOverlayPosition = normalizePosition(source.overlayPosition);
+    const overlayPosition = shouldMigrateOverlayDefaults && !normalizedOverlayPosition
+        ? normalizePosition(defaultOverlayState.overlayPosition)
+        : normalizedOverlayPosition;
     const controlsPosition = normalizePosition(source.controlsPosition);
+    const timerVisible = shouldMigrateOverlayDefaults && source.timerVisible === false
+        ? defaultOverlayState.timerVisible
+        : Boolean(source.timerVisible);
+    const upgradeTooltipsVisible = shouldMigrateTooltipDefault && source.upgradeTooltipsVisible === true
+        ? defaultOverlayState.upgradeTooltipsVisible
+        : Boolean(source.upgradeTooltipsVisible);
     const mapValue = normalizeCurrencyValue(source.mapValue, defaultOverlayState.mapValue);
     const mapValueInitial = normalizeCurrencyValue(source.mapValueInitial, defaultOverlayState.mapValueInitial);
     const mapValueGoal = normalizeCurrencyValue(source.mapValueGoal, defaultOverlayState.mapValueGoal);
@@ -194,12 +225,17 @@ function normalizeOverlayState(rawState) {
         overlayScaleVersion: defaultOverlayState.overlayScaleVersion,
         columnsCount,
         columnsLayoutVersion: defaultOverlayState.columnsLayoutVersion,
+        overlayDefaultsVersion: defaultOverlayState.overlayDefaultsVersion,
         hoverOpacity,
         interfaceLanguage,
         overlayAlignment,
-        upgradeLayout,
+        compactModeEnabled,
+        upgradeLayout: compactModeEnabled ? "inline" : "stacked",
+        upgradeRows,
         overlayPosition,
         controlsPosition,
+        timerVisible,
+        upgradeTooltipsVisible,
         monsters: Array.isArray(source.monsters) ? source.monsters : [],
         roster: Array.isArray(source.roster) ? source.roster : [],
         mapValue,
