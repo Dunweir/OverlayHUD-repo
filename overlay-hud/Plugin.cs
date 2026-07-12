@@ -19,7 +19,7 @@ using UnityEngine.SceneManagement;
 
 namespace OverlayHUD
 {
-    [BepInPlugin("local.overlay.overlay_hud", "OverlayHUD", "0.2.78")]
+    [BepInPlugin("local.overlay.overlay_hud", "OverlayHUD", "0.2.82")]
     public sealed class Plugin : BaseUnityPlugin
     {
         private static Plugin instance;
@@ -196,7 +196,7 @@ namespace OverlayHUD
             maxDistance = Config.Bind("Detection", "MaxDistance", 45f, "Maximum distance from camera to count an enemy as encountered.");
             peeperMaxDistance = Config.Bind("Detection", "PeeperMaxDistance", 120f, "Maximum distance for Peeper only when the game marks it as very close to the player.");
             viewportPadding = Config.Bind("Detection", "ViewportPadding", 0.03f, "Allowed viewport padding outside the screen edges.");
-            requireLineOfSight = Config.Bind("Detection", "RequireLineOfSight", false, "Reveal only enemies marked on-screen for the local player by the game.");
+            requireLineOfSight = Config.Bind("Detection", "RequireLineOfSight", true, "Reveal only enemies marked on-screen for the local player by the game.");
             debugLogging = Config.Bind("Debug", "Logging", false, "Write periodic bridge debug logs.");
             autoStartOverlayApp = Config.Bind("OverlayApp", "AutoStart", true, "Start the bundled OverlayHUD desktop app when the game starts.");
             autoCloseOverlayApp = Config.Bind("OverlayApp", "AutoClose", true, "Close the bundled OverlayHUD desktop app when the game exits.");
@@ -215,7 +215,8 @@ namespace OverlayHUD
             }
             if (overlayAppRelativePath.Value == "OverlayHUD.exe"
                 || overlayAppRelativePath.Value == Path.Combine("OverlayHUD-win32-x64", "OverlayHUD.exe")
-                || overlayAppRelativePath.Value == Path.Combine("OverlayHUDApp", "OverlayHUD.exe"))
+                || overlayAppRelativePath.Value == Path.Combine("OverlayHUDApp", "OverlayHUD.exe")
+                || overlayAppRelativePath.Value == Path.Combine("OverlayHUD_app", "OverlayHUD-win32-x64", "OverlayHUD.exe"))
             {
                 overlayAppRelativePath.Value = Path.Combine("OverlayHUD_app", "OverlayHUD.exe");
                 configChanged = true;

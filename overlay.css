@@ -1214,7 +1214,7 @@ body {
     z-index: 20;
     display: grid;
     justify-items: end;
-    width: min(430px, calc(100vw - var(--overlay-edge-offset) * 2));
+    width: min(464px, calc(100vw - var(--overlay-edge-offset) * 2));
     padding: 0;
     opacity: 0;
     pointer-events: none;
@@ -1237,8 +1237,10 @@ body {
 }
 
 .overlay-control-panel {
+    position: relative;
+    z-index: 2;
     display: grid;
-    gap: 12px;
+    gap: 13px;
     width: 100%;
     padding: 14px;
     border: 1px solid rgba(255, 255, 255, 0.12);
@@ -1250,6 +1252,17 @@ body {
     transform: translateY(8px) scale(0.98);
     transform-origin: right top;
     transition: opacity 0.16s ease, transform 0.16s ease;
+}
+
+.overlay-control-section {
+    display: grid;
+    min-width: 0;
+    gap: 9px;
+}
+
+.overlay-control-section + .overlay-control-section {
+    padding-top: 12px;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .overlay-hover-controls:hover .overlay-control-panel,
@@ -1369,7 +1382,7 @@ body {
 
 .overlay-segment-row {
     display: grid;
-    grid-template-columns: 116px minmax(0, 1fr);
+    grid-template-columns: 128px minmax(0, 1fr);
     align-items: center;
     gap: 10px;
     color: #eef4f8;
@@ -1379,11 +1392,8 @@ body {
 
 .overlay-segment-row > span {
     min-width: 0;
-    overflow: hidden;
     font-size: 15px;
-    line-height: 1;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    line-height: 1.08;
 }
 
 .overlay-alignment-switch,
@@ -1441,7 +1451,7 @@ body {
 
 .overlay-slider-row {
     display: grid;
-    grid-template-columns: 92px minmax(0, 1fr) 38px;
+    grid-template-columns: 128px minmax(0, 1fr) 42px;
     align-items: center;
     gap: 10px;
     color: #eef4f8;
@@ -1451,11 +1461,8 @@ body {
 
 .overlay-slider-row label {
     min-width: 0;
-    overflow: hidden;
     font-size: 15px;
-    line-height: 1;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    line-height: 1.08;
 }
 
 .overlay-slider-row span {
@@ -1490,23 +1497,6 @@ body {
     outline: 3px solid rgba(255, 178, 0, 0.18);
 }
 
-.overlay-toggle-list {
-    display: grid;
-    gap: 11px;
-    padding-top: 2px;
-}
-
-.overlay-toggle-group {
-    display: grid;
-    min-width: 0;
-    gap: 7px;
-}
-
-.overlay-toggle-group + .overlay-toggle-group {
-    padding-top: 10px;
-    border-top: 1px solid rgba(255, 255, 255, 0.1);
-}
-
 .overlay-toggle-group-title {
     color: #ffcf62;
     font-family: "Roboto", Arial, sans-serif;
@@ -1521,6 +1511,14 @@ body {
     gap: 8px 12px;
 }
 
+.overlay-toggle-group-items-global {
+    gap: 8px 14px;
+}
+
+.overlay-toggle-group-items-single {
+    grid-template-columns: 1fr;
+}
+
 .overlay-toggle-row {
     display: flex;
     align-items: center;
@@ -1530,14 +1528,14 @@ body {
     gap: 8px;
     color: #eef4f8;
     font-family: "Roboto", Arial, sans-serif;
-    font-size: 14px;
+    font-size: 13.5px;
     font-weight: 700;
+    cursor: pointer;
 }
 
 .overlay-toggle-row > span:first-child {
     min-width: 0;
-    overflow: visible;
-    white-space: nowrap;
+    line-height: 1.08;
 }
 
 .overlay-toggle-switch {
@@ -1546,6 +1544,7 @@ body {
     flex: 0 0 auto;
     width: 48px;
     height: 26px;
+    cursor: pointer;
 }
 
 .overlay-toggle-switch input {

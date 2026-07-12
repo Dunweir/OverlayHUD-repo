@@ -10,156 +10,160 @@
     <div class="overlay">
         <div class="overlay-hover-controls" id="overlayHoverControls">
             <div class="overlay-control-panel">
-                <div class="overlay-language-row" aria-label="Interface language">
-                    <span data-i18n="languageLabel">Язык</span>
-                    <div class="overlay-language-switch" role="group" aria-label="Interface language">
-                        <button type="button" id="overlayLanguageRuBtn" data-language="ru">RU</button>
-                        <button type="button" id="overlayLanguageEnBtn" data-language="en">EN</button>
-                    </div>
-                </div>
-                <div class="overlay-slider-row">
-                    <label for="overlaySizeSlider" data-i18n="size">Размер</label>
-                    <input type="range" id="overlaySizeSlider" min="40" max="86" value="64" step="2">
-                    <span id="overlaySizeValue">64</span>
-                </div>
-                <div class="overlay-slider-row">
-                    <label for="overlayUpgradeSizeSlider" data-i18n="upgrades">Апгрейды</label>
-                    <input type="range" id="overlayUpgradeSizeSlider" min="24" max="54" value="32" step="2">
-                    <span id="overlayUpgradeSizeValue">32</span>
-                </div>
-                <div class="overlay-slider-row">
-                    <label for="overlayColumnsSlider" data-i18n="columns">Колонки</label>
-                    <input type="range" id="overlayColumnsSlider" min="4" max="12" value="7" step="1">
-                    <span id="overlayColumnsValue">7</span>
-                </div>
-                <div class="overlay-slider-row">
-                    <label for="overlayHoverOpacitySlider" data-i18n="opacity">Прозрачность</label>
-                    <input type="range" id="overlayHoverOpacitySlider" min="20" max="100" value="50" step="5">
-                    <span id="overlayHoverOpacityValue">50%</span>
-                </div>
-                <div class="overlay-segment-row">
-                    <span data-i18n="alignment">Выравнивание</span>
-                    <div class="overlay-alignment-switch" role="group" aria-label="Overlay alignment">
-                        <button type="button" data-alignment="left" aria-label="Align left">←</button>
-                        <button type="button" data-alignment="center" aria-label="Align center">•</button>
-                        <button type="button" data-alignment="right" aria-label="Align right">→</button>
-                    </div>
-                </div>
-                <div class="overlay-segment-row">
-                    <span data-i18n="compactMode">Компактный режим</span>
-                    <label class="overlay-toggle-switch overlay-compact-switch" aria-label="Compact mode">
-                        <input type="checkbox" id="overlayCompactModeToggle">
-                        <span></span>
-                    </label>
-                </div>
-                <div class="overlay-segment-row">
-                    <span data-i18n="upgradeRows">Апгрейды</span>
-                    <div class="overlay-layout-switch" role="group" aria-label="Upgrade rows">
-                        <button type="button" data-upgrade-rows="single" aria-label="Show upgrades in one row">1 строка</button>
-                        <button type="button" data-upgrade-rows="double" aria-label="Show upgrades in two rows">2 строки</button>
-                    </div>
-                </div>
-                <div class="overlay-toggle-list">
-                    <section class="overlay-toggle-group" aria-labelledby="overlayVisibilityGroupTitle">
-                        <div class="overlay-toggle-group-title" id="overlayVisibilityGroupTitle" data-i18n="groupVisibility">Видимость</div>
-                        <div class="overlay-toggle-group-items">
-                            <label class="overlay-toggle-row">
-                                <span data-i18n="background">Подложка</span>
-                                <span class="overlay-toggle-switch">
-                                    <input type="checkbox" id="overlayBgToggle">
-                                    <span></span>
-                                </span>
-                            </label>
-                            <label class="overlay-toggle-row">
-                                <span data-i18n="levelBadge">Уровень</span>
-                                <span class="overlay-toggle-switch">
-                                    <input type="checkbox" id="overlayLevelBadgeToggle">
-                                    <span></span>
-                                </span>
-                            </label>
-                            <label class="overlay-toggle-row">
-                                <span data-i18n="timer">Таймер</span>
-                                <span class="overlay-toggle-switch">
-                                    <input type="checkbox" id="overlayTimerToggle">
-                                    <span></span>
-                                </span>
-                            </label>
+                <section class="overlay-control-section overlay-control-section-global" aria-labelledby="overlayGlobalGroupTitle">
+                    <div class="overlay-toggle-group-title" id="overlayGlobalGroupTitle" data-i18n="groupGlobal">Глобальные</div>
+                    <div class="overlay-language-row" aria-label="Interface language">
+                        <span data-i18n="languageLabel">Язык</span>
+                        <div class="overlay-language-switch" role="group" aria-label="Interface language">
+                            <button type="button" id="overlayLanguageRuBtn" data-language="ru">RU</button>
+                            <button type="button" id="overlayLanguageEnBtn" data-language="en">EN</button>
                         </div>
-                    </section>
-                    <section class="overlay-toggle-group" aria-labelledby="overlayBlocksGroupTitle">
-                        <div class="overlay-toggle-group-title" id="overlayBlocksGroupTitle" data-i18n="groupBlocks">Блоки</div>
-                        <div class="overlay-toggle-group-items">
-                            <label class="overlay-toggle-row">
-                                <span data-i18n="upgrades">Апгрейды</span>
-                                <span class="overlay-toggle-switch">
-                                    <input type="checkbox" id="overlayUpgradesToggle">
-                                    <span></span>
-                                </span>
-                            </label>
-                            <label class="overlay-toggle-row">
-                                <span data-i18n="monsterIcons">Монстры</span>
-                                <span class="overlay-toggle-switch">
-                                    <input type="checkbox" id="overlayMonsterIconsToggle">
-                                    <span></span>
-                                </span>
-                            </label>
-                            <label class="overlay-toggle-row">
-                                <span data-i18n="mapValue">Map value</span>
-                                <span class="overlay-toggle-switch">
-                                    <input type="checkbox" id="overlayMapValueToggle">
-                                    <span></span>
-                                </span>
-                            </label>
-                            <label class="overlay-toggle-row">
-                                <span data-i18n="lostValue">Lost value</span>
-                                <span class="overlay-toggle-switch">
-                                    <input type="checkbox" id="overlayLostValueToggle">
-                                    <span></span>
-                                </span>
-                            </label>
+                    </div>
+                    <div class="overlay-slider-row">
+                        <label for="overlayHoverOpacitySlider" data-i18n="overlayOpacity">Прозрачность ПУ</label>
+                        <input type="range" id="overlayHoverOpacitySlider" min="20" max="100" value="50" step="5">
+                        <span id="overlayHoverOpacityValue">50%</span>
+                    </div>
+                    <div class="overlay-segment-row">
+                        <span data-i18n="alignment">Выравнивание</span>
+                        <div class="overlay-alignment-switch" role="group" aria-label="Overlay alignment">
+                            <button type="button" data-alignment="left" aria-label="Align left">←</button>
+                            <button type="button" data-alignment="center" aria-label="Align center">•</button>
+                            <button type="button" data-alignment="right" aria-label="Align right">→</button>
                         </div>
-                    </section>
-                    <section class="overlay-toggle-group" aria-labelledby="overlayDetailsGroupTitle">
-                        <div class="overlay-toggle-group-title" id="overlayDetailsGroupTitle" data-i18n="groupDetails">Детали</div>
-                        <div class="overlay-toggle-group-items">
-                            <label class="overlay-toggle-row">
-                                <span data-i18n="tooltips">Подсказки</span>
-                                <span class="overlay-toggle-switch">
-                                    <input type="checkbox" id="overlayUpgradeTooltipsToggle">
-                                    <span></span>
-                                </span>
-                            </label>
-                            <label class="overlay-toggle-row">
-                                <span data-i18n="healthBar">ХП полоска</span>
-                                <span class="overlay-toggle-switch">
-                                    <input type="checkbox" id="overlayMonsterHealthBarsToggle">
-                                    <span></span>
-                                </span>
-                            </label>
-                            <label class="overlay-toggle-row">
-                                <span data-i18n="strength">Сила</span>
-                                <span class="overlay-toggle-switch">
-                                    <input type="checkbox" id="overlayMonsterStrengthToggle">
-                                    <span></span>
-                                </span>
-                            </label>
-                            <label class="overlay-toggle-row">
-                                <span data-i18n="respawnTime">Время респавна</span>
-                                <span class="overlay-toggle-switch">
-                                    <input type="checkbox" id="overlayRespawnTimerToggle">
-                                    <span></span>
-                                </span>
-                            </label>
-                            <label class="overlay-toggle-row">
-                                <span data-i18n="cooldownIndicator">Индикатор КД</span>
-                                <span class="overlay-toggle-switch">
-                                    <input type="checkbox" id="overlayRespawnIndicatorToggle">
-                                    <span></span>
-                                </span>
-                            </label>
+                    </div>
+                    <div class="overlay-toggle-group-items overlay-toggle-group-items-global">
+                        <label class="overlay-toggle-row">
+                            <span data-i18n="compactMode">Компактный режим</span>
+                            <span class="overlay-toggle-switch overlay-compact-switch">
+                                <input type="checkbox" id="overlayCompactModeToggle">
+                                <span></span>
+                            </span>
+                        </label>
+                        <label class="overlay-toggle-row">
+                            <span data-i18n="background">Подложка</span>
+                            <span class="overlay-toggle-switch">
+                                <input type="checkbox" id="overlayBgToggle">
+                                <span></span>
+                            </span>
+                        </label>
+                        <label class="overlay-toggle-row">
+                            <span data-i18n="tooltips">Подсказки</span>
+                            <span class="overlay-toggle-switch">
+                                <input type="checkbox" id="overlayUpgradeTooltipsToggle">
+                                <span></span>
+                            </span>
+                        </label>
+                    </div>
+                </section>
+
+                <section class="overlay-control-section" aria-labelledby="overlayVisibilityGroupTitle">
+                    <div class="overlay-toggle-group-title" id="overlayVisibilityGroupTitle" data-i18n="groupElements">Отображение</div>
+                    <div class="overlay-toggle-group-items">
+                        <label class="overlay-toggle-row">
+                            <span data-i18n="upgrades">Апгрейды</span>
+                            <span class="overlay-toggle-switch">
+                                <input type="checkbox" id="overlayUpgradesToggle">
+                                <span></span>
+                            </span>
+                        </label>
+                        <label class="overlay-toggle-row">
+                            <span data-i18n="monsterIcons">Монстры</span>
+                            <span class="overlay-toggle-switch">
+                                <input type="checkbox" id="overlayMonsterIconsToggle">
+                                <span></span>
+                            </span>
+                        </label>
+                        <label class="overlay-toggle-row">
+                            <span data-i18n="mapValue">Цена карты</span>
+                            <span class="overlay-toggle-switch">
+                                <input type="checkbox" id="overlayMapValueToggle">
+                                <span></span>
+                            </span>
+                        </label>
+                        <label class="overlay-toggle-row">
+                            <span data-i18n="lostValue">Потеряно</span>
+                            <span class="overlay-toggle-switch">
+                                <input type="checkbox" id="overlayLostValueToggle">
+                                <span></span>
+                            </span>
+                        </label>
+                        <label class="overlay-toggle-row">
+                            <span data-i18n="levelBadge">Уровень</span>
+                            <span class="overlay-toggle-switch">
+                                <input type="checkbox" id="overlayLevelBadgeToggle">
+                                <span></span>
+                            </span>
+                        </label>
+                        <label class="overlay-toggle-row">
+                            <span data-i18n="timer">Таймер уровня</span>
+                            <span class="overlay-toggle-switch">
+                                <input type="checkbox" id="overlayTimerToggle">
+                                <span></span>
+                            </span>
+                        </label>
+                    </div>
+                </section>
+
+                <section class="overlay-control-section" aria-labelledby="overlayMonsterGroupTitle">
+                    <div class="overlay-toggle-group-title" id="overlayMonsterGroupTitle" data-i18n="groupMonsters">Монстры</div>
+                    <div class="overlay-slider-row">
+                        <label for="overlaySizeSlider" data-i18n="monsterIconSize">Размер иконок</label>
+                        <input type="range" id="overlaySizeSlider" min="40" max="86" value="64" step="2">
+                        <span id="overlaySizeValue">64</span>
+                    </div>
+                    <div class="overlay-slider-row">
+                        <label for="overlayColumnsSlider" data-i18n="monsterColumns">Монстров в ряд</label>
+                        <input type="range" id="overlayColumnsSlider" min="4" max="12" value="7" step="1">
+                        <span id="overlayColumnsValue">7</span>
+                    </div>
+                    <div class="overlay-toggle-group-items">
+                        <label class="overlay-toggle-row">
+                            <span data-i18n="healthBar">ХП полоска</span>
+                            <span class="overlay-toggle-switch">
+                                <input type="checkbox" id="overlayMonsterHealthBarsToggle">
+                                <span></span>
+                            </span>
+                        </label>
+                        <label class="overlay-toggle-row">
+                            <span data-i18n="strength">Сила</span>
+                            <span class="overlay-toggle-switch">
+                                <input type="checkbox" id="overlayMonsterStrengthToggle">
+                                <span></span>
+                            </span>
+                        </label>
+                        <label class="overlay-toggle-row">
+                            <span data-i18n="respawnTime">Время респавна</span>
+                            <span class="overlay-toggle-switch">
+                                <input type="checkbox" id="overlayRespawnTimerToggle">
+                                <span></span>
+                            </span>
+                        </label>
+                        <label class="overlay-toggle-row">
+                            <span data-i18n="cooldownIndicator">Индикатор КД</span>
+                            <span class="overlay-toggle-switch">
+                                <input type="checkbox" id="overlayRespawnIndicatorToggle">
+                                <span></span>
+                            </span>
+                        </label>
+                    </div>
+                </section>
+
+                <section class="overlay-control-section" aria-labelledby="overlayUpgradesGroupTitle">
+                    <div class="overlay-toggle-group-title" id="overlayUpgradesGroupTitle" data-i18n="groupUpgrades">Апгрейды</div>
+                    <div class="overlay-slider-row">
+                        <label for="overlayUpgradeSizeSlider" data-i18n="upgradeIconSize">Размер иконок</label>
+                        <input type="range" id="overlayUpgradeSizeSlider" min="24" max="54" value="32" step="2">
+                        <span id="overlayUpgradeSizeValue">32</span>
+                    </div>
+                    <div class="overlay-segment-row">
+                        <span data-i18n="upgradeRows">Строки</span>
+                        <div class="overlay-layout-switch" role="group" aria-label="Upgrade rows">
+                            <button type="button" data-upgrade-rows="single" aria-label="Show upgrades in one row" data-i18n="upgradeRowsSingle">1 строка</button>
+                            <button type="button" data-upgrade-rows="double" aria-label="Show upgrades in two rows" data-i18n="upgradeRowsDouble">2 строки</button>
                         </div>
-                    </section>
-                </div>
+                    </div>
+                </section>
             </div>
             <div class="overlay-control-hotspot" id="overlayControlHotspot" aria-hidden="true"></div>
             <div class="overlay-drag-corner overlay-drag-corner-controls" data-drag-target="controls" aria-hidden="true"></div>
@@ -263,25 +267,35 @@
         const interfaceText = {
             ru: {
                 languageLabel: "Язык",
+                groupGlobal: "Глобальные",
+                overlayOpacity: "Прозрачность ПУ",
                 size: "Размер",
                 upgrades: "Апгрейды",
                 columns: "Колонки",
                 opacity: "Прозрачность",
                 alignment: "Выравнивание",
                 compactMode: "Компактный режим",
-                upgradeRows: "Апгрейды",
+                upgradeRows: "Строки",
+                upgradeRowsSingle: "1 строка",
+                upgradeRowsDouble: "2 строки",
                 groupVisibility: "Видимость",
                 groupBlocks: "Блоки",
                 groupDetails: "Детали",
+                groupElements: "Отображение",
+                groupMonsters: "Монстры",
+                groupUpgrades: "Апгрейды",
                 background: "Подложка",
-                timer: "Таймер",
+                timer: "Таймер уровня",
                 monsterIcons: "Монстры",
+                monsterIconSize: "Размер иконок",
+                monsterColumns: "Монстров в ряд",
                 mapValue: "Цена карты",
                 mapValueShort: "КАРТА",
                 lostValue: "Потеряно",
                 lostValueShort: "ПОТЕРЯ",
                 levelBadge: "Уровень",
                 tooltips: "Подсказки",
+                upgradeIconSize: "Размер иконок",
                 healthBar: "ХП полоска",
                 strength: "Сила",
                 respawnTime: "Время респавна",
@@ -307,25 +321,35 @@
             },
             en: {
                 languageLabel: "Language",
+                groupGlobal: "Global",
+                overlayOpacity: "Panel opacity",
                 size: "Size",
                 upgrades: "Upgrades",
                 columns: "Columns",
                 opacity: "Opacity",
                 alignment: "Alignment",
                 compactMode: "Compact mode",
-                upgradeRows: "Upgrades",
+                upgradeRows: "Rows",
+                upgradeRowsSingle: "1 row",
+                upgradeRowsDouble: "2 rows",
                 groupVisibility: "Visibility",
                 groupBlocks: "Blocks",
                 groupDetails: "Details",
+                groupElements: "Display",
+                groupMonsters: "Monsters",
+                groupUpgrades: "Upgrades",
                 background: "Background",
-                timer: "Timer",
+                timer: "Level timer",
                 monsterIcons: "Monsters",
+                monsterIconSize: "Icon size",
+                monsterColumns: "Monsters per row",
                 mapValue: "Map value",
                 mapValueShort: "MAP",
                 lostValue: "Lost value",
                 lostValueShort: "LOSS",
                 levelBadge: "Level",
                 tooltips: "Tooltips",
+                upgradeIconSize: "Icon size",
                 healthBar: "HP bar",
                 strength: "Strength",
                 respawnTime: "Respawn time",
