@@ -19,7 +19,7 @@ using UnityEngine.SceneManagement;
 
 namespace OverlayHUD
 {
-    [BepInPlugin("local.overlay.overlay_hud", "OverlayHUD", "0.2.84")]
+    [BepInPlugin("local.overlay.overlay_hud", "OverlayHUD", "0.2.86")]
     public sealed class Plugin : BaseUnityPlugin
     {
         private static Plugin instance;
@@ -651,6 +651,7 @@ namespace OverlayHUD
         {
             SceneManager.sceneLoaded -= OnSceneLoaded;
             harmony?.UnpatchSelf();
+            if (gameplayActive) HandleLevelChanging();
             StopOverlayAppIfNeeded();
             if (instance == this) instance = null;
         }
@@ -748,6 +749,7 @@ namespace OverlayHUD
         {
             if (!gameplayActive) return;
             gameplayActive = false;
+            SyncMapValueIfChanged();
             ResetMapValue("level changing");
             StartCoroutine(PostVisibility(false));
         }

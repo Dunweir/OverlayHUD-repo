@@ -9,6 +9,7 @@ const clients = new Set();
 
 let overlayState = null;
 let timestampSession = null;
+let activeLevelStats = null;
 
 const monsterConfig = {
     levels: {
@@ -523,8 +524,19 @@ function createTimestampFilePath() {
     return path.join(getPortableRoot(), "timestamps", fileName);
 }
 
+function getStatsFilePath() {
+    return path.join(getPortableRoot(), "stats", "levels.jsonl");
+}
+
 function formatLocalClockTime(date = new Date()) {
     return `${padTimePart(date.getHours())}:${padTimePart(date.getMinutes())}:${padTimePart(date.getSeconds())}`;
+}
+
+function formatDuration(seconds) {
+    const totalSeconds = Math.max(0, Math.round(Number(seconds) || 0));
+    const minutes = Math.floor(totalSeconds / 60);
+    const remainingSeconds = totalSeconds % 60;
+    return `${padTimePart(minutes)}:${padTimePart(remainingSeconds)}`;
 }
 
 function normalizeLevelName(value) {
@@ -566,6 +578,10 @@ function writeTimestampSession() {
 }
 
 function formatMonsterTimestampList(monsters) {
+    return getMonsterTotals(monsters).map(({ name, count }) => count > 1 ? `${name} x${count}` : name);
+}
+
+function getMonsterTotals(monsters) {
     const totals = new Map();
     for (const monster of Array.isArray(monsters) ? monsters : []) {
         const name = String(monster?.name || "").trim();
@@ -576,7 +592,58 @@ function formatMonsterTimestampList(monsters) {
         totals.set(name, (totals.get(name) || 0) + visibleCount);
     }
 
-    return [...totals.entries()].map(([name, count]) => count > 1 ? `${name} x${count}` : name);
+    return [...totals.entries()].map(([name, count]) => ({ name, count }));
+}
+
+function normalizeMoneyValue(value) {
+    const number = Number(value);
+    return Number.isFinite(number) ? Math.max(0, Math.round(number)) : 0;
+}
+
+function startActiveLevelStats(level, rawLevelName) {
+    const now = new Date();
+    activeLevelStats = {
+        level,
+        rawLevelName: String(rawLevelName || ""),
+        levelName: normalizeLevelName(rawLevelName),
+        startedAt: now.toISOString(),
+        startedAtLocal: formatLocalClockTime(now),
+        startedAtMs: now.getTime()
+    };
+}
+
+function finalizeActiveLevelStats() {
+    if (!activeLevelStats) return;
+
+    const now = new Date();
+    const durationSeconds = Math.max(0, Math.round((now.getTime() - activeLevelStats.startedAtMs) / 1000));
+    const monsterTotals = getMonsterTotals(overlayState?.monsters);
+    const record = {
+        schemaVersion: 1,
+        recordedAt: now.toISOString(),
+        levelNumber: activeLevelStats.level,
+        levelName: activeLevelStats.levelName,
+        rawLevelName: activeLevelStats.rawLevelName,
+        startedAt: activeLevelStats.startedAt,
+        startedAtLocal: activeLevelStats.startedAtLocal,
+        endedAt: now.toISOString(),
+        endedAtLocal: formatLocalClockTime(now),
+        durationSeconds,
+        duration: formatDuration(durationSeconds),
+        monsters: monsterTotals.map(({ name, count }) => count > 1 ? `${name} x${count}` : name),
+        monsterCounts: Object.fromEntries(monsterTotals.map(({ name, count }) => [name, count])),
+        lostValue: normalizeMoneyValue(overlayState?.lostValue)
+    };
+
+    try {
+        const statsFilePath = getStatsFilePath();
+        fs.mkdirSync(path.dirname(statsFilePath), { recursive: true });
+        fs.appendFileSync(statsFilePath, `${JSON.stringify(record)}\n`, "utf8");
+    } catch (error) {
+        console.warn(`Could not write level stats file: ${error.message}`);
+    }
+
+    activeLevelStats = null;
 }
 
 function finalizeActiveTimestampLine() {
@@ -697,6 +764,7 @@ function setGameLevel(rawLevel, rawLevelName) {
         return { ok: false, statusCode: 422, payload: { error: "Invalid level", received: rawLevel } };
     }
 
+    finalizeActiveLevelStats();
     startTimestampLine(level, rawLevelName);
 
     overlayState = {
@@ -716,6 +784,7 @@ function setGameLevel(rawLevel, rawLevelName) {
         mapValueGoal: null,
         lostValue: 0
     };
+    startActiveLevelStats(level, rawLevelName);
 
     return { ok: true, statusCode: 200, payload: { ok: true, level } };
 }
@@ -725,7 +794,10 @@ function setGameplayVisibility(rawVisible) {
         return { ok: false, statusCode: 422, payload: { error: "Invalid visibility", received: rawVisible } };
     }
 
-    if (!rawVisible) finalizeActiveTimestampLine();
+    if (!rawVisible) {
+        finalizeActiveTimestampLine();
+        finalizeActiveLevelStats();
+    }
 
     overlayState = {
         ...defaultOverlayState,
@@ -1026,6 +1098,7 @@ function startOverlayServer(options = {}) {
 
 function stopOverlayServer() {
     finalizeActiveTimestampLine();
+    finalizeActiveLevelStats();
     for (const client of clients) client.end();
     clients.clear();
     if (!server.listening) return Promise.resolve();
