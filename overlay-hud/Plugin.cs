@@ -143,6 +143,7 @@ namespace OverlayHUD
         private readonly Dictionary<int, int> sourceIdsByEnemyParent = new Dictionary<int, int>();
         private readonly Dictionary<int, bool> lastAliveBySourceId = new Dictionary<int, bool>();
         private readonly Dictionary<int, string> lastHealthDebugBySourceId = new Dictionary<int, string>();
+        private readonly Dictionary<int, object[]> healthSourcesByRootId = new Dictionary<int, object[]>();
         private float nextScanAt;
         private float nextStatusSyncAt;
         private float nextUpgradeSyncAt;
@@ -865,6 +866,8 @@ namespace OverlayHUD
             resolvedMonsterNames.Clear();
             sourceIdsByEnemyParent.Clear();
             lastAliveBySourceId.Clear();
+            lastHealthDebugBySourceId.Clear();
+            healthSourcesByRootId.Clear();
             lastRosterFingerprint = "";
             lastStatusFingerprint = "";
             pendingRosterFingerprint = "";
@@ -1124,7 +1127,7 @@ namespace OverlayHUD
             return enemyParent.gameObject != null && enemyParent.gameObject.activeInHierarchy;
         }
 
-        private static bool TryGetEnemyHealth(EnemyCandidate candidate, out float health, out float maxHealth)
+        private bool TryGetEnemyHealth(EnemyCandidate candidate, out float health, out float maxHealth)
         {
             health = 0f;
             maxHealth = 0f;
@@ -1159,26 +1162,41 @@ namespace OverlayHUD
             return hasHealth;
         }
 
-        private static IEnumerable<object> GetEnemyHealthSources(EnemyCandidate candidate)
+        private IEnumerable<object> GetEnemyHealthSources(EnemyCandidate candidate)
         {
             if (candidate.Root != null)
             {
-                Component enemyHealth = candidate.Root.GetComponent("EnemyHealth");
-                if (enemyHealth != null) yield return enemyHealth;
-
-                Component[] components = candidate.Root.GetComponentsInChildren<Component>(true);
-                foreach (Component component in components)
+                int rootId = candidate.Root.GetInstanceID();
+                if (!healthSourcesByRootId.TryGetValue(rootId, out object[] cachedSources))
                 {
-                    if (component == null) continue;
-                    string typeName = component.GetType().Name;
-                    if (typeName.IndexOf("Health", StringComparison.OrdinalIgnoreCase) >= 0)
+                    var sources = new List<object>();
+                    Component enemyHealth = candidate.Root.GetComponent("EnemyHealth");
+                    if (enemyHealth != null) sources.Add(enemyHealth);
+
+                    Component[] components = candidate.Root.GetComponentsInChildren<Component>(true);
+                    foreach (Component component in components)
                     {
-                        yield return component;
+                        if (component == null) continue;
+                        string typeName = component.GetType().Name;
+                        if (typeName.IndexOf("Health", StringComparison.OrdinalIgnoreCase) >= 0
+                            || typeName.IndexOf("Damage", StringComparison.OrdinalIgnoreCase) >= 0)
+                        {
+                            sources.Add(component);
+                        }
                     }
+
+                    Component enemy = candidate.Root.GetComponent("Enemy");
+                    if (enemy != null) sources.Add(enemy);
+                    cachedSources = sources.ToArray();
+                    healthSourcesByRootId[rootId] = cachedSources;
                 }
 
-                Component enemy = candidate.Root.GetComponent("Enemy");
-                if (enemy != null) yield return enemy;
+                for (int index = 0; index < cachedSources.Length; index++)
+                {
+                    object source = cachedSources[index];
+                    if (source is UnityEngine.Object unityObject && unityObject == null) continue;
+                    yield return source;
+                }
             }
 
             if (candidate.Component != null) yield return candidate.Component;
@@ -1188,16 +1206,7 @@ namespace OverlayHUD
 
             if (candidate.Root == null) yield break;
 
-            Component[] damageComponents = candidate.Root.GetComponentsInChildren<Component>(true);
-            foreach (Component component in damageComponents)
-            {
-                if (component == null) continue;
-                string typeName = component.GetType().Name;
-                if (typeName.IndexOf("Damage", StringComparison.OrdinalIgnoreCase) >= 0)
-                {
-                    yield return component;
-                }
-            }
+            yield break;
         }
 
         private static bool TryReadFirstFloat(object source, string[] memberNames, out float value)
