@@ -685,11 +685,13 @@ function updateMonsterStatuses(rawStatuses) {
         const remaining = Number(rawStatus.respawnRemaining);
         const health = Number(rawStatus.health);
         const maxHealth = Number(rawStatus.maxHealth);
+        const hasHealth = rawStatus.health != null && Number.isFinite(health);
+        const hasMaxHealth = rawStatus.maxHealth != null && Number.isFinite(maxHealth);
         statuses.set(String(rawStatus.id), {
             alive: rawStatus.alive,
             respawnRemaining: Number.isFinite(remaining) ? Math.max(0, remaining) : 0,
-            health: Number.isFinite(health) ? Math.max(0, health) : null,
-            maxHealth: Number.isFinite(maxHealth) ? Math.max(0, maxHealth) : null
+            health: hasHealth ? Math.max(0, health) : null,
+            maxHealth: hasMaxHealth ? Math.max(0, maxHealth) : null
         });
     }
 
@@ -709,7 +711,7 @@ function updateMonsterStatuses(rawStatuses) {
                     ? healthStatuses.reduce((total, status) => total + (status.maxHealth || 0), 0)
                     : null
             }
-            : { health: null, maxHealth: null };
+            : {};
         const clearFlashPatch = { respawnFlashAt: null, respawnFlashUntil: null, respawnFlashAmount: null };
         if (sourceStatuses.some((status) => status.alive)) {
             return { ...slot, ...healthPatch, ...clearFlashPatch, alive: true, respawnEndsAt: null, respawnDuration: null };

@@ -816,8 +816,6 @@
         function updateMonsterDamageFeedback(square, status, monsterKey) {
             const health = Number(status?.health);
             if (!Number.isFinite(health)) {
-                square.dataset.monsterHealthKey = monsterKey;
-                square.dataset.monsterHealthValue = "";
                 return;
             }
 
