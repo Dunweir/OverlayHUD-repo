@@ -165,7 +165,6 @@ namespace OverlayHUD
         private bool pendingMapValueRefresh;
         private string pendingMapValueRefreshReason = "";
         private string lastMapValueFingerprint = "";
-        private int visibilityProbeIndex;
         private bool gameplayActive;
         private bool? lastTabHeld;
         private Coroutine pendingGameplayActivation;
@@ -174,10 +173,6 @@ namespace OverlayHUD
         private ConfigEntry<string> levelEndpoint;
         private ConfigEntry<float> scanInterval;
         private ConfigEntry<float> statusInterval;
-        private ConfigEntry<float> maxDistance;
-        private ConfigEntry<float> peeperMaxDistance;
-        private ConfigEntry<float> viewportPadding;
-        private ConfigEntry<bool> requireLineOfSight;
         private ConfigEntry<bool> debugLogging;
         private ConfigEntry<bool> autoStartOverlayApp;
         private ConfigEntry<bool> autoCloseOverlayApp;
@@ -192,12 +187,8 @@ namespace OverlayHUD
             KeepPluginObjectAlive();
             endpoint = Config.Bind("Overlay", "Endpoint", "http://127.0.0.1:8787/api/monster-seen", "Monster endpoint on this PC.");
             levelEndpoint = Config.Bind("Overlay", "LevelEndpoint", "http://127.0.0.1:8787/api/level", "Level sync endpoint on this PC.");
-            scanInterval = Config.Bind("Detection", "ScanIntervalSeconds", 3f, "How often visible enemies are scanned.");
+            scanInterval = Config.Bind("Detection", "ScanIntervalSeconds", 3f, "How often nearby enemies are scanned.");
             statusInterval = Config.Bind("Detection", "StatusIntervalSeconds", 2f, "How often monster health and respawn status are synced after the roster is known.");
-            maxDistance = Config.Bind("Detection", "MaxDistance", 45f, "Maximum distance from camera to count an enemy as encountered.");
-            peeperMaxDistance = Config.Bind("Detection", "PeeperMaxDistance", 120f, "Maximum distance for Peeper only when the game marks it as very close to the player.");
-            viewportPadding = Config.Bind("Detection", "ViewportPadding", 0.03f, "Allowed viewport padding outside the screen edges.");
-            requireLineOfSight = Config.Bind("Detection", "RequireLineOfSight", true, "Reveal only enemies marked on-screen for the local player by the game.");
             debugLogging = Config.Bind("Debug", "Logging", false, "Write periodic bridge debug logs.");
             autoStartOverlayApp = Config.Bind("OverlayApp", "AutoStart", true, "Start the bundled OverlayHUD desktop app when the game starts.");
             autoCloseOverlayApp = Config.Bind("OverlayApp", "AutoClose", true, "Close the bundled OverlayHUD desktop app when the game exits.");
@@ -874,7 +865,6 @@ namespace OverlayHUD
             rosterStableScans = 0;
             broadEnemyDiscoveryAttempts = 0;
             rosterPublished = false;
-            visibilityProbeIndex = 0;
             scanPausedUntil = Time.realtimeSinceStartup + 2f;
             nextScanAt = scanPausedUntil;
             nextStatusSyncAt = scanPausedUntil;
@@ -886,9 +876,6 @@ namespace OverlayHUD
 
         private void ScanVisibleEnemies()
         {
-            Camera camera = FindBestCamera();
-            bool revealAll = !requireLineOfSight.Value;
-
             List<EnemyCandidate> found = FindEnemyCandidates();
             var resolvedEnemies = new List<ResolvedEnemyCandidate>();
             int candidates = found.Count;
@@ -929,31 +916,29 @@ namespace OverlayHUD
                 if (!IsEnemySent(resolvedEnemy.Candidate.Root.GetInstanceID())) pendingEnemies.Add(resolvedEnemy);
             }
 
-            int probeIndex = pendingEnemies.Count == 0 ? -1 : visibilityProbeIndex % pendingEnemies.Count;
             for (int index = 0; index < pendingEnemies.Count; index++)
             {
                 ResolvedEnemyCandidate resolvedEnemy = pendingEnemies[index];
                 EnemyCandidate candidate = resolvedEnemy.Candidate;
                 string monsterName = resolvedEnemy.MonsterName;
 
-                if (!revealAll && !IsVisibleEncounter(camera, candidate, monsterName, index == probeIndex)) continue;
+                if (!IsPlayerCloseEncounter(candidate)) continue;
                 visible++;
 
                 if (!TryMarkEnemySent(candidate.Root.GetInstanceID())) continue;
                 MarkMonsterSeen(monsterName, candidate);
                 if (debugLogging.Value)
                 {
-                    Logger.LogInfo((revealAll ? "Revealed level monster: " : "Encountered visible monster: ") + monsterName + " from " + candidate.Component.GetType().Name + " / " + candidate.Root.name);
+                    Logger.LogInfo("Encountered nearby monster: " + monsterName + " from " + candidate.Component.GetType().Name + " / " + candidate.Root.name);
                 }
                 StartCoroutine(PostSeenMonster(monsterName, candidate.Root.GetInstanceID()));
             }
-            if (pendingEnemies.Count > 0) visibilityProbeIndex = (probeIndex + 1) % pendingEnemies.Count;
-            else nextScanAt = Time.realtimeSinceStartup + 5f;
+            if (pendingEnemies.Count == 0) nextScanAt = Time.realtimeSinceStartup + 5f;
 
             if (debugLogging.Value && Time.realtimeSinceStartup >= nextDebugSummaryAt)
             {
                 nextDebugSummaryAt = Time.realtimeSinceStartup + 30f;
-                Logger.LogInfo("Scan summary: camera=" + (camera == null ? "none" : camera.name) + ", candidates=" + candidates + ", resolved=" + resolvedEnemies.Count + ", visible=" + visible);
+                Logger.LogInfo("Scan summary: candidates=" + candidates + ", resolved=" + resolvedEnemies.Count + ", nearby=" + visible + ", pending=" + pendingEnemies.Count);
             }
         }
 
@@ -1942,89 +1927,11 @@ namespace OverlayHUD
             return FindKnownMonster(enemyName);
         }
 
-        private bool IsVisibleEncounter(Camera camera, EnemyCandidate candidate, string monsterName, bool refreshGameVisibility)
+        private static bool IsPlayerCloseEncounter(EnemyCandidate candidate)
         {
-            if (camera == null) return false;
-
-            Transform root = candidate.Root.transform;
-            Vector3 center = candidate.Center;
-            float distance = Vector3.Distance(camera.transform.position, center);
-            if (distance > maxDistance.Value && !IsPeeperVeryClose(candidate, monsterName, distance)) return false;
-
-            if (IsGameOnScreen(candidate, refreshGameVisibility)) return true;
-            return IsSmallMonsterFallbackVisible(camera, candidate, monsterName);
-        }
-
-        private bool IsSmallMonsterFallbackVisible(Camera camera, EnemyCandidate candidate, string monsterName)
-        {
-            if (monsterName != "Peeper" && monsterName != "Headgrab" && monsterName != "Spewer" && monsterName != "Hidden" && monsterName != "Rugrat" && monsterName != "Upscream"
-                && monsterName != "Gnomes" && monsterName != "Tick" && monsterName != "Banger") return false;
-
-            if (IsPeeperVeryClose(candidate, monsterName, Vector3.Distance(camera.transform.position, candidate.Center))) return true;
-
-            float fallbackDistance = Math.Min(maxDistance.Value, 8f);
-            if (Vector3.Distance(camera.transform.position, candidate.Center) > fallbackDistance) return false;
-
-            if (IsPointInViewport(camera, candidate.Center)) return true;
-            Collider collider = candidate.Root.GetComponentInChildren<Collider>();
-            if (collider != null && IsPointInViewport(camera, collider.bounds.center)) return true;
-            Renderer renderer = candidate.Root.GetComponentInChildren<Renderer>();
-            return renderer != null && IsPointInViewport(camera, renderer.bounds.center);
-        }
-
-        private bool IsPeeperVeryClose(EnemyCandidate candidate, string monsterName, float distance)
-        {
-            if (monsterName != "Peeper" || distance > Math.Max(maxDistance.Value, peeperMaxDistance.Value)) return false;
-
-            Component enemy = candidate.Root.GetComponent("Enemy") ?? candidate.Component;
-            object enemyParent = ReadMember(enemy, "EnemyParent");
-            object playerVeryClose = ReadMember(enemyParent, "playerVeryClose");
-            return playerVeryClose is bool isVeryClose && isVeryClose;
-        }
-
-        private bool IsPointInViewport(Camera camera, Vector3 point)
-        {
-            Vector3 viewport = camera.WorldToViewportPoint(point);
-            float pad = viewportPadding.Value;
-            if (viewport.z <= 0f) return false;
-            return viewport.x >= -pad && viewport.x <= 1f + pad && viewport.y >= -pad && viewport.y <= 1f + pad;
-        }
-
-        private static bool IsGameOnScreen(EnemyCandidate candidate, bool refresh)
-        {
-            Component enemy = candidate.Root.GetComponent("Enemy");
-            if (enemy == null && candidate.Component.GetType().Name == "Enemy")
-            {
-                enemy = candidate.Component;
-            }
-            if (enemy == null) return false;
-
-            object onScreen = ReadMember(enemy, "OnScreen");
-            if (onScreen == null) return false;
-
-            object onScreenLocal = ReadMember(onScreen, "OnScreenLocal");
-            if (onScreenLocal is bool value && value) return true;
-
-            object onScreenLocalPrevious = ReadMember(onScreen, "OnScreenLocalPrevious");
-            if (onScreenLocalPrevious is bool previousValue && previousValue) return true;
-            if (!refresh) return false;
-
-            Type playerControllerType = AccessTools.TypeByName("PlayerController");
-            object playerController = ReadMember(playerControllerType, "instance");
-            object playerAvatar = ReadMember(playerController, "playerAvatarScript");
-            if (playerAvatar == null) return false;
-
-            MethodInfo getOnScreen = onScreen.GetType().GetMethod("GetOnScreen", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
-            if (getOnScreen == null) return false;
-            try
-            {
-                object result = getOnScreen.Invoke(onScreen, new[] { playerAvatar });
-                return result is bool refreshedValue && refreshedValue;
-            }
-            catch
-            {
-                return false;
-            }
+            Component enemyParent = GetEnemyParent(candidate);
+            object playerClose = ReadMember(enemyParent, "playerClose");
+            return playerClose is bool isPlayerClose && isPlayerClose;
         }
 
         private static object ReadMember(object source, string memberName)
