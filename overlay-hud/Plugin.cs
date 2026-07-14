@@ -19,7 +19,7 @@ using UnityEngine.SceneManagement;
 
 namespace OverlayHUD
 {
-    [BepInPlugin("local.overlay.overlay_hud", "OverlayHUD", "0.2.91")]
+    [BepInPlugin("local.overlay.overlay_hud", "OverlayHUD", "0.2.93")]
     public sealed class Plugin : BaseUnityPlugin
     {
         private static Plugin instance;
@@ -145,6 +145,7 @@ namespace OverlayHUD
         private readonly Dictionary<int, string> lastHealthDebugBySourceId = new Dictionary<int, string>();
         private readonly Dictionary<int, object[]> healthSourcesByRootId = new Dictionary<int, object[]>();
         private readonly Dictionary<int, string> lastImmediateStatusBySourceId = new Dictionary<int, string>();
+        private readonly Dictionary<int, VisionEnemyCache> visionEnemyCacheByVisionId = new Dictionary<int, VisionEnemyCache>();
         private readonly HashSet<int> pendingVisionEncounterIds = new HashSet<int>();
         private float nextScanAt;
         private float nextStatusSyncAt;
@@ -375,6 +376,7 @@ namespace OverlayHUD
             {
                 harmony = new Harmony("local.overlay.overlay_hud");
                 MethodInfo enemyParentSpawnRpc = AccessTools.Method("EnemyParent:SpawnRPC");
+                MethodInfo enemyParentDespawnRpc = AccessTools.Method("EnemyParent:DespawnRPC");
                 MethodInfo levelGeneratorGenerateDone = AccessTools.Method("LevelGenerator:GenerateDone");
                 MethodInfo levelGeneratorStartRoomGeneration = AccessTools.Method("LevelGenerator:StartRoomGeneration");
                 MethodInfo runManagerChangeLevel = AccessTools.Method("RunManager:ChangeLevel");
@@ -393,6 +395,7 @@ namespace OverlayHUD
                 HarmonyMethod levelGeneratedPostfix = new HarmonyMethod(typeof(Plugin).GetMethod(nameof(LevelGeneratedPostfix), BindingFlags.NonPublic | BindingFlags.Static));
                 HarmonyMethod levelGenerationStartingPrefix = new HarmonyMethod(typeof(Plugin).GetMethod(nameof(LevelGenerationStartingPrefix), BindingFlags.NonPublic | BindingFlags.Static));
                 HarmonyMethod enemySpawnedPostfix = new HarmonyMethod(typeof(Plugin).GetMethod(nameof(EnemyParentSpawnedPostfix), BindingFlags.NonPublic | BindingFlags.Static));
+                HarmonyMethod enemyDespawnedPostfix = new HarmonyMethod(typeof(Plugin).GetMethod(nameof(EnemyParentDespawnedPostfix), BindingFlags.NonPublic | BindingFlags.Static));
                 HarmonyMethod levelChangingPrefix = new HarmonyMethod(typeof(Plugin).GetMethod(nameof(LevelChangingPrefix), BindingFlags.NonPublic | BindingFlags.Static));
                 HarmonyMethod levelChangedPostfix = new HarmonyMethod(typeof(Plugin).GetMethod(nameof(LevelChangedPostfix), BindingFlags.NonPublic | BindingFlags.Static));
                 HarmonyMethod playerUpgradeConsumedPostfix = new HarmonyMethod(typeof(Plugin).GetMethod(nameof(PlayerUpgradeConsumedPostfix), BindingFlags.NonPublic | BindingFlags.Static));
@@ -410,6 +413,12 @@ namespace OverlayHUD
                 {
                     harmony.Patch(enemyParentSpawnRpc, postfix: enemySpawnedPostfix);
                     Logger.LogInfo("Patched EnemyParent.SpawnRPC for enemy registration.");
+                }
+
+                if (enemyParentDespawnRpc != null)
+                {
+                    harmony.Patch(enemyParentDespawnRpc, postfix: enemyDespawnedPostfix);
+                    Logger.LogInfo("Patched EnemyParent.DespawnRPC for immediate status sync.");
                 }
 
                 if (levelGeneratorGenerateDone != null)
@@ -580,6 +589,15 @@ namespace OverlayHUD
             if (__instance is Component component)
             {
                 RegisterEnemyParent(component);
+                instance?.SyncEnemyParentStatusChanged(component);
+            }
+        }
+
+        private static void EnemyParentDespawnedPostfix(object __instance)
+        {
+            if (__instance is Component component)
+            {
+                instance?.SyncEnemyParentStatusChanged(component);
             }
         }
 
@@ -659,7 +677,7 @@ namespace OverlayHUD
 
             if (rosterPublished && now >= nextStatusSyncAt)
             {
-                nextStatusSyncAt = now + Math.Max(0.5f, statusInterval.Value);
+                nextStatusSyncAt = now + Math.Max(5f, statusInterval.Value);
                 SyncMonsterStatuses(new List<ResolvedEnemyCandidate>());
             }
 
@@ -898,6 +916,7 @@ namespace OverlayHUD
             lastHealthDebugBySourceId.Clear();
             healthSourcesByRootId.Clear();
             lastImmediateStatusBySourceId.Clear();
+            visionEnemyCacheByVisionId.Clear();
             pendingVisionEncounterIds.Clear();
             cachedLocalPlayerViewId = int.MinValue;
             lastRosterFingerprint = "";
@@ -1137,16 +1156,18 @@ namespace OverlayHUD
         {
             if (!gameplayActive || enemyHealthSource == null) return;
 
-            Component enemyHealth = enemyHealthSource as Component;
             Component enemy = ReadMember(enemyHealthSource, "enemy") as Component;
             Component enemyParent = ReadMember(enemy, "EnemyParent") as Component;
-            if (enemyParent == null) return;
+            SyncEnemyParentStatusChanged(enemyParent);
+        }
 
+        private void SyncEnemyParentStatusChanged(Component enemyParent)
+        {
+            if (!gameplayActive || enemyParent == null) return;
             GameObject root = GetEnemyRoot(enemyParent);
             if (root == null) return;
 
             int instanceId = root.GetInstanceID();
-            if (!IsEnemySent(instanceId)) return;
 
             var candidate = new EnemyCandidate
             {
@@ -1156,12 +1177,15 @@ namespace OverlayHUD
             };
 
             if (!TryGetEnemyRespawnStatus(candidate, out bool alive, out float remaining)) return;
-            if (!TryGetEnemyHealth(candidate, out float health, out float maxHealth)) return;
+            bool shouldIncludeHealth = IsEnemySent(instanceId);
+            float health = 0f;
+            float maxHealth = 0f;
+            bool hasHealth = shouldIncludeHealth && TryGetEnemyHealth(candidate, out health, out maxHealth);
 
             float roundedRemaining = alive ? 0f : (float)Math.Ceiling(Math.Max(0f, remaining) * 10f) / 10f;
             string remainingText = roundedRemaining.ToString("0.0", CultureInfo.InvariantCulture);
-            string healthText = Math.Max(0f, health).ToString("0.#", CultureInfo.InvariantCulture);
-            string maxHealthText = maxHealth > 0f ? maxHealth.ToString("0.#", CultureInfo.InvariantCulture) : "";
+            string healthText = hasHealth ? Math.Max(0f, health).ToString("0.#", CultureInfo.InvariantCulture) : "";
+            string maxHealthText = hasHealth && maxHealth > 0f ? maxHealth.ToString("0.#", CultureInfo.InvariantCulture) : "";
             string fingerprint = instanceId + ":" + (alive ? "1" : "0") + ":" + remainingText + ":" + healthText + "/" + maxHealthText;
             if (lastImmediateStatusBySourceId.TryGetValue(instanceId, out string previousFingerprint)
                 && previousFingerprint == fingerprint)
@@ -1173,9 +1197,12 @@ namespace OverlayHUD
             var json = new StringBuilder("{\"statuses\":[{\"id\":")
                 .Append(instanceId)
                 .Append(",\"alive\":").Append(alive ? "true" : "false")
-                .Append(",\"respawnRemaining\":").Append(remainingText)
-                .Append(",\"health\":").Append(healthText.Length > 0 ? healthText : "0");
-            if (maxHealthText.Length > 0) json.Append(",\"maxHealth\":").Append(maxHealthText);
+                .Append(",\"respawnRemaining\":").Append(remainingText);
+            if (hasHealth)
+            {
+                json.Append(",\"health\":").Append(healthText.Length > 0 ? healthText : "0");
+                if (maxHealthText.Length > 0) json.Append(",\"maxHealth\":").Append(maxHealthText);
+            }
             json.Append("}]}");
             StartCoroutine(PostMonsterStatuses(json.ToString()));
         }
@@ -2062,11 +2089,9 @@ namespace OverlayHUD
             int localViewId = GetLocalPlayerViewId();
             if (playerId != localViewId) return;
 
-            Component enemy = ReadMember(vision, "Enemy") as Component;
-            Component enemyParent = ReadMember(enemy, "EnemyParent") as Component;
-            if (enemyParent == null) return;
-
-            int instanceId = ResolveEnemyInstanceId(enemyParent);
+            if (!TryGetVisionEnemyCache(vision, out VisionEnemyCache visionEnemy)) return;
+            Component enemyParent = visionEnemy.EnemyParent;
+            int instanceId = visionEnemy.InstanceId;
             if (instanceId == 0 || IsEnemySent(instanceId)) return;
             if (pendingVisionEncounterIds.Contains(instanceId)) return;
 
@@ -2081,6 +2106,35 @@ namespace OverlayHUD
             pendingVisionEncounterIds.Add(instanceId);
             enemyRosterDirty = true;
             nextScanAt = 0f;
+        }
+
+        private bool TryGetVisionEnemyCache(object vision, out VisionEnemyCache visionEnemy)
+        {
+            visionEnemy = default;
+            int visionId = GetUnityObjectId(vision);
+            if (visionId != 0
+                && visionEnemyCacheByVisionId.TryGetValue(visionId, out visionEnemy)
+                && visionEnemy.EnemyParent != null
+                && visionEnemy.InstanceId != 0)
+            {
+                return true;
+            }
+
+            Component enemy = ReadMember(vision, "Enemy") as Component;
+            Component enemyParent = ReadMember(enemy, "EnemyParent") as Component;
+            if (enemyParent == null) return false;
+
+            int instanceId = ResolveEnemyInstanceId(enemyParent);
+            if (instanceId == 0) return false;
+
+            visionEnemy = new VisionEnemyCache
+            {
+                EnemyParent = enemyParent,
+                InstanceId = instanceId
+            };
+
+            if (visionId != 0) visionEnemyCacheByVisionId[visionId] = visionEnemy;
+            return true;
         }
 
         private void TryPublishPendingVisionEncounters(List<ResolvedEnemyCandidate> resolvedEnemies)
@@ -2747,6 +2801,12 @@ namespace OverlayHUD
         {
             public EnemyCandidate Candidate;
             public string MonsterName;
+        }
+
+        private struct VisionEnemyCache
+        {
+            public Component EnemyParent;
+            public int InstanceId;
         }
 
     }
