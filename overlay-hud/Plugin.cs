@@ -19,7 +19,7 @@ using UnityEngine.SceneManagement;
 
 namespace OverlayHUD
 {
-    [BepInPlugin("local.overlay.overlay_hud", "OverlayHUD", "0.2.93")]
+    [BepInPlugin("local.overlay.overlay_hud", "OverlayHUD", "0.2.95")]
     public sealed class Plugin : BaseUnityPlugin
     {
         private static Plugin instance;
@@ -146,7 +146,7 @@ namespace OverlayHUD
         private readonly Dictionary<int, object[]> healthSourcesByRootId = new Dictionary<int, object[]>();
         private readonly Dictionary<int, string> lastImmediateStatusBySourceId = new Dictionary<int, string>();
         private readonly Dictionary<int, VisionEnemyCache> visionEnemyCacheByVisionId = new Dictionary<int, VisionEnemyCache>();
-        private readonly HashSet<int> pendingVisionEncounterIds = new HashSet<int>();
+        private readonly HashSet<int> pendingEncounterIds = new HashSet<int>();
         private float nextScanAt;
         private float nextStatusSyncAt;
         private float nextUpgradeSyncAt;
@@ -377,6 +377,7 @@ namespace OverlayHUD
                 harmony = new Harmony("local.overlay.overlay_hud");
                 MethodInfo enemyParentSpawnRpc = AccessTools.Method("EnemyParent:SpawnRPC");
                 MethodInfo enemyParentDespawnRpc = AccessTools.Method("EnemyParent:DespawnRPC");
+                MethodInfo enemyParentPlayerCloseLogic = AccessTools.Method("EnemyParent:PlayerCloseLogic");
                 MethodInfo levelGeneratorGenerateDone = AccessTools.Method("LevelGenerator:GenerateDone");
                 MethodInfo levelGeneratorStartRoomGeneration = AccessTools.Method("LevelGenerator:StartRoomGeneration");
                 MethodInfo runManagerChangeLevel = AccessTools.Method("RunManager:ChangeLevel");
@@ -396,6 +397,7 @@ namespace OverlayHUD
                 HarmonyMethod levelGenerationStartingPrefix = new HarmonyMethod(typeof(Plugin).GetMethod(nameof(LevelGenerationStartingPrefix), BindingFlags.NonPublic | BindingFlags.Static));
                 HarmonyMethod enemySpawnedPostfix = new HarmonyMethod(typeof(Plugin).GetMethod(nameof(EnemyParentSpawnedPostfix), BindingFlags.NonPublic | BindingFlags.Static));
                 HarmonyMethod enemyDespawnedPostfix = new HarmonyMethod(typeof(Plugin).GetMethod(nameof(EnemyParentDespawnedPostfix), BindingFlags.NonPublic | BindingFlags.Static));
+                HarmonyMethod enemyPlayerCloseLogicPostfix = new HarmonyMethod(typeof(Plugin).GetMethod(nameof(EnemyParentPlayerCloseLogicPostfix), BindingFlags.NonPublic | BindingFlags.Static));
                 HarmonyMethod levelChangingPrefix = new HarmonyMethod(typeof(Plugin).GetMethod(nameof(LevelChangingPrefix), BindingFlags.NonPublic | BindingFlags.Static));
                 HarmonyMethod levelChangedPostfix = new HarmonyMethod(typeof(Plugin).GetMethod(nameof(LevelChangedPostfix), BindingFlags.NonPublic | BindingFlags.Static));
                 HarmonyMethod playerUpgradeConsumedPostfix = new HarmonyMethod(typeof(Plugin).GetMethod(nameof(PlayerUpgradeConsumedPostfix), BindingFlags.NonPublic | BindingFlags.Static));
@@ -419,6 +421,12 @@ namespace OverlayHUD
                 {
                     harmony.Patch(enemyParentDespawnRpc, postfix: enemyDespawnedPostfix);
                     Logger.LogInfo("Patched EnemyParent.DespawnRPC for immediate status sync.");
+                }
+
+                if (enemyParentPlayerCloseLogic != null)
+                {
+                    harmony.Patch(enemyParentPlayerCloseLogic, postfix: enemyPlayerCloseLogicPostfix);
+                    Logger.LogInfo("Patched EnemyParent.PlayerCloseLogic for blind enemy very-close encounters.");
                 }
 
                 if (levelGeneratorGenerateDone != null)
@@ -599,6 +607,12 @@ namespace OverlayHUD
             {
                 instance?.SyncEnemyParentStatusChanged(component);
             }
+        }
+
+        private static void EnemyParentPlayerCloseLogicPostfix(object __instance, ref IEnumerator __result)
+        {
+            if (__result == null || !(__instance is Component enemyParent) || HasEnemyVision(enemyParent)) return;
+            __result = WatchBlindEnemyPlayerClose(__result, enemyParent);
         }
 
         private static void ExtractionCompletedPostfix()
@@ -917,7 +931,7 @@ namespace OverlayHUD
             healthSourcesByRootId.Clear();
             lastImmediateStatusBySourceId.Clear();
             visionEnemyCacheByVisionId.Clear();
-            pendingVisionEncounterIds.Clear();
+            pendingEncounterIds.Clear();
             cachedLocalPlayerViewId = int.MinValue;
             lastRosterFingerprint = "";
             lastStatusFingerprint = "";
@@ -958,7 +972,6 @@ namespace OverlayHUD
                     continue;
                 }
                 resolvedEnemies.Add(new ResolvedEnemyCandidate { Candidate = candidate, MonsterName = monsterName });
-                AttachEnemyOverlayProbe(candidate.Component);
             }
 
             if (resolvedEnemies.Count == 0)
@@ -1871,7 +1884,6 @@ namespace OverlayHUD
                     }
                 }
             }
-            Plugin.instance?.AttachEnemyOverlayProbe(component);
         }
 
         private static List<Component> GetKnownEnemyParentsSnapshot()
@@ -2028,26 +2040,45 @@ namespace OverlayHUD
             return FindKnownMonster(enemyName);
         }
 
-        private void AttachEnemyOverlayProbe(Component component)
+        private bool IsEnemyParentPlayerVeryClose(Component enemyParent)
         {
-            Component enemyParent = component?.GetType().Name == "EnemyParent"
-                ? component
-                : ReadMember(component, "EnemyParent") as Component;
-            if (enemyParent == null) return;
-            if (HasEnemyVision(enemyParent)) return;
-
-            GameObject root = GetEnemyRoot(enemyParent);
-            if (root == null) return;
-
-            EnemyOverlayProbe probe = root.GetComponent<EnemyOverlayProbe>();
-            if (probe == null) probe = root.AddComponent<EnemyOverlayProbe>();
-            probe.Init(this, enemyParent);
+            object playerVeryClose = ReadMember(enemyParent, "playerVeryClose");
+            return playerVeryClose is bool isPlayerVeryClose && isPlayerVeryClose;
         }
 
-        private bool IsEnemyParentPlayerClose(Component enemyParent)
+        private static IEnumerator WatchBlindEnemyPlayerClose(IEnumerator inner, Component enemyParent)
         {
-            object playerClose = ReadMember(enemyParent, "playerClose");
-            return playerClose is bool isPlayerClose && isPlayerClose;
+            bool wasPlayerVeryClose = instance != null && instance.IsEnemyParentPlayerVeryClose(enemyParent);
+            while (inner.MoveNext())
+            {
+                yield return inner.Current;
+
+                Plugin plugin = instance;
+                if (plugin == null || !plugin.gameplayActive || enemyParent == null) continue;
+
+                bool isPlayerVeryClose = plugin.IsEnemyParentPlayerVeryClose(enemyParent);
+                if (isPlayerVeryClose && !wasPlayerVeryClose)
+                {
+                    plugin.HandleBlindEnemyPlayerVeryClose(enemyParent);
+                }
+                wasPlayerVeryClose = isPlayerVeryClose;
+            }
+        }
+
+        private void HandleBlindEnemyPlayerVeryClose(Component enemyParent)
+        {
+            if (enemyParent == null || HasEnemyVision(enemyParent)) return;
+
+            int instanceId = ResolveEnemyInstanceId(enemyParent);
+            if (instanceId == 0 || IsEnemySent(instanceId)) return;
+
+            RegisterEnemyParent(enemyParent);
+            string monsterName = null;
+            if (PublishEnemyParentEncounter(enemyParent, ref instanceId, ref monsterName)) return;
+
+            pendingEncounterIds.Add(instanceId);
+            enemyRosterDirty = true;
+            nextScanAt = 0f;
         }
 
         private bool PublishEnemyParentEncounter(Component enemyParent, ref int instanceId, ref string monsterName)
@@ -2093,17 +2124,17 @@ namespace OverlayHUD
             Component enemyParent = visionEnemy.EnemyParent;
             int instanceId = visionEnemy.InstanceId;
             if (instanceId == 0 || IsEnemySent(instanceId)) return;
-            if (pendingVisionEncounterIds.Contains(instanceId)) return;
+            if (pendingEncounterIds.Contains(instanceId)) return;
 
             RegisterEnemyParent(enemyParent);
             string monsterName = null;
             if (PublishEnemyParentEncounter(enemyParent, ref instanceId, ref monsterName))
             {
-                pendingVisionEncounterIds.Remove(instanceId);
+                pendingEncounterIds.Remove(instanceId);
                 return;
             }
 
-            pendingVisionEncounterIds.Add(instanceId);
+            pendingEncounterIds.Add(instanceId);
             enemyRosterDirty = true;
             nextScanAt = 0f;
         }
@@ -2139,20 +2170,20 @@ namespace OverlayHUD
 
         private void TryPublishPendingVisionEncounters(List<ResolvedEnemyCandidate> resolvedEnemies)
         {
-            if (pendingVisionEncounterIds.Count == 0) return;
+            if (pendingEncounterIds.Count == 0) return;
 
             for (int index = 0; index < resolvedEnemies.Count; index++)
             {
                 ResolvedEnemyCandidate resolvedEnemy = resolvedEnemies[index];
                 int instanceId = resolvedEnemy.Candidate.Root.GetInstanceID();
-                if (!pendingVisionEncounterIds.Contains(instanceId)) continue;
+                if (!pendingEncounterIds.Contains(instanceId)) continue;
 
                 Component enemyParent = GetEnemyParent(resolvedEnemy.Candidate);
                 string monsterName = resolvedEnemy.MonsterName;
                 int publishId = instanceId;
                 if (PublishEnemyParentEncounter(enemyParent, ref publishId, ref monsterName))
                 {
-                    pendingVisionEncounterIds.Remove(instanceId);
+                    pendingEncounterIds.Remove(instanceId);
                 }
             }
         }
@@ -2728,66 +2759,6 @@ namespace OverlayHUD
         private static string EscapeJson(string value)
         {
             return value.Replace("\\", "\\\\").Replace("\"", "\\\"");
-        }
-
-        private sealed class EnemyOverlayProbe : MonoBehaviour
-        {
-            private const float ProbeIntervalSeconds = 0.25f;
-
-            private Plugin owner;
-            private Component enemyParent;
-            private int instanceId;
-            private string monsterName;
-            private float nextProbeAt;
-
-            internal void Init(Plugin plugin, Component parent)
-            {
-                owner = plugin;
-                enemyParent = parent;
-                instanceId = ResolveEnemyInstanceId(parent);
-                monsterName = null;
-                nextProbeAt = 0f;
-                enabled = !HasEnemyVision(parent) && (instanceId == 0 || !IsEnemySent(instanceId));
-            }
-
-            private void Update()
-            {
-                if (owner == null || enemyParent == null)
-                {
-                    enabled = false;
-                    return;
-                }
-
-                if (HasEnemyVision(enemyParent))
-                {
-                    enabled = false;
-                    return;
-                }
-
-                if (!owner.gameplayActive) return;
-                if (instanceId == 0) instanceId = ResolveEnemyInstanceId(enemyParent);
-                if (instanceId != 0 && IsEnemySent(instanceId))
-                {
-                    enabled = false;
-                    return;
-                }
-
-                float now = Time.realtimeSinceStartup;
-                if (now < nextProbeAt) return;
-                nextProbeAt = now + ProbeIntervalSeconds;
-
-                if (!owner.IsEnemyParentPlayerClose(enemyParent)) return;
-                if (owner.PublishEnemyParentEncounter(enemyParent, ref instanceId, ref monsterName))
-                {
-                    enabled = false;
-                }
-            }
-
-            private static int ResolveEnemyInstanceId(Component parent)
-            {
-                GameObject root = parent == null ? null : GetEnemyRoot(parent);
-                return root == null ? 0 : root.GetInstanceID();
-            }
         }
 
         private struct EnemyCandidate
