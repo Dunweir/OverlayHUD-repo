@@ -161,6 +161,7 @@ namespace OverlayHUD
         private int rosterStableScans;
         private int broadEnemyDiscoveryAttempts;
         private bool rosterPublished;
+        private bool enemyRosterDirty;
         private bool mapValueDirty;
         private bool pendingMapValueRefresh;
         private string pendingMapValueRefreshReason = "";
@@ -187,7 +188,7 @@ namespace OverlayHUD
             KeepPluginObjectAlive();
             endpoint = Config.Bind("Overlay", "Endpoint", "http://127.0.0.1:8787/api/monster-seen", "Monster endpoint on this PC.");
             levelEndpoint = Config.Bind("Overlay", "LevelEndpoint", "http://127.0.0.1:8787/api/level", "Level sync endpoint on this PC.");
-            scanInterval = Config.Bind("Detection", "ScanIntervalSeconds", 3f, "How often nearby enemies are scanned.");
+            scanInterval = Config.Bind("Detection", "ScanIntervalSeconds", 3f, "How often pending enemy roster sync is retried.");
             statusInterval = Config.Bind("Detection", "StatusIntervalSeconds", 2f, "How often monster health and respawn status are synced after the roster is known.");
             debugLogging = Config.Bind("Debug", "Logging", false, "Write periodic bridge debug logs.");
             autoStartOverlayApp = Config.Bind("OverlayApp", "AutoStart", true, "Start the bundled OverlayHUD desktop app when the game starts.");
@@ -626,16 +627,17 @@ namespace OverlayHUD
                 SyncMonsterStatuses(new List<ResolvedEnemyCandidate>());
             }
 
+            if (!enemyRosterDirty) return;
             if (now < nextScanAt) return;
             nextScanAt = now + Math.Max(0.05f, scanInterval.Value);
 
             try
             {
-                ScanVisibleEnemies();
+                SyncKnownEnemies();
             }
             catch (Exception error)
             {
-                Logger.LogWarning("Scan failed: " + error.GetType().Name + ": " + error.Message + "\n" + error.StackTrace);
+                Logger.LogWarning("Enemy sync failed: " + error.GetType().Name + ": " + error.Message + "\n" + error.StackTrace);
             }
         }
 
@@ -865,6 +867,7 @@ namespace OverlayHUD
             rosterStableScans = 0;
             broadEnemyDiscoveryAttempts = 0;
             rosterPublished = false;
+            enemyRosterDirty = true;
             scanPausedUntil = Time.realtimeSinceStartup + 2f;
             nextScanAt = scanPausedUntil;
             nextStatusSyncAt = scanPausedUntil;
@@ -874,12 +877,11 @@ namespace OverlayHUD
             Logger.LogInfo("Cleared seen monsters: " + reason + ".");
         }
 
-        private void ScanVisibleEnemies()
+        private void SyncKnownEnemies()
         {
             List<EnemyCandidate> found = FindEnemyCandidates();
             var resolvedEnemies = new List<ResolvedEnemyCandidate>();
             int candidates = found.Count;
-            int visible = 0;
 
             foreach (EnemyCandidate candidate in found)
             {
@@ -898,6 +900,13 @@ namespace OverlayHUD
                     continue;
                 }
                 resolvedEnemies.Add(new ResolvedEnemyCandidate { Candidate = candidate, MonsterName = monsterName });
+                AttachEnemyOverlayProbe(candidate.Component);
+            }
+
+            if (resolvedEnemies.Count == 0)
+            {
+                enemyRosterDirty = false;
+                return;
             }
 
             if (!SyncMonsterRoster(resolvedEnemies))
@@ -910,35 +919,12 @@ namespace OverlayHUD
                 return;
             }
             SyncMonsterStatuses(resolvedEnemies);
-            var pendingEnemies = new List<ResolvedEnemyCandidate>();
-            foreach (ResolvedEnemyCandidate resolvedEnemy in resolvedEnemies)
-            {
-                if (!IsEnemySent(resolvedEnemy.Candidate.Root.GetInstanceID())) pendingEnemies.Add(resolvedEnemy);
-            }
-
-            for (int index = 0; index < pendingEnemies.Count; index++)
-            {
-                ResolvedEnemyCandidate resolvedEnemy = pendingEnemies[index];
-                EnemyCandidate candidate = resolvedEnemy.Candidate;
-                string monsterName = resolvedEnemy.MonsterName;
-
-                if (!IsPlayerCloseEncounter(candidate)) continue;
-                visible++;
-
-                if (!TryMarkEnemySent(candidate.Root.GetInstanceID())) continue;
-                MarkMonsterSeen(monsterName, candidate);
-                if (debugLogging.Value)
-                {
-                    Logger.LogInfo("Encountered nearby monster: " + monsterName + " from " + candidate.Component.GetType().Name + " / " + candidate.Root.name);
-                }
-                StartCoroutine(PostSeenMonster(monsterName, candidate.Root.GetInstanceID()));
-            }
-            if (pendingEnemies.Count == 0) nextScanAt = Time.realtimeSinceStartup + 5f;
+            enemyRosterDirty = false;
 
             if (debugLogging.Value && Time.realtimeSinceStartup >= nextDebugSummaryAt)
             {
                 nextDebugSummaryAt = Time.realtimeSinceStartup + 30f;
-                Logger.LogInfo("Scan summary: candidates=" + candidates + ", resolved=" + resolvedEnemies.Count + ", nearby=" + visible + ", pending=" + pendingEnemies.Count);
+                Logger.LogInfo("Enemy sync summary: candidates=" + candidates + ", resolved=" + resolvedEnemies.Count + ".");
             }
         }
 
@@ -1764,13 +1750,18 @@ namespace OverlayHUD
                 if (!knownEnemyParents.Contains(component))
                 {
                     knownEnemyParents.Add(component);
-                    if (Plugin.instance != null) Plugin.instance.nextScanAt = 0f;
+                    if (Plugin.instance != null)
+                    {
+                        Plugin.instance.enemyRosterDirty = true;
+                        Plugin.instance.nextScanAt = 0f;
+                    }
                     if (Plugin.instance?.debugLogging.Value == true)
                     {
                         Plugin.instance.Logger.LogInfo("Registered spawned enemy parent: " + component.name + ".");
                     }
                 }
             }
+            Plugin.instance?.AttachEnemyOverlayProbe(component);
         }
 
         private static List<Component> GetKnownEnemyParentsSnapshot()
@@ -1927,11 +1918,58 @@ namespace OverlayHUD
             return FindKnownMonster(enemyName);
         }
 
-        private static bool IsPlayerCloseEncounter(EnemyCandidate candidate)
+        private void AttachEnemyOverlayProbe(Component component)
         {
-            Component enemyParent = GetEnemyParent(candidate);
+            Component enemyParent = component?.GetType().Name == "EnemyParent"
+                ? component
+                : ReadMember(component, "EnemyParent") as Component;
+            if (enemyParent == null) return;
+
+            GameObject root = GetEnemyRoot(enemyParent);
+            if (root == null) return;
+
+            EnemyOverlayProbe probe = root.GetComponent<EnemyOverlayProbe>();
+            if (probe == null) probe = root.AddComponent<EnemyOverlayProbe>();
+            probe.Init(this, enemyParent);
+        }
+
+        private bool IsEnemyParentPlayerClose(Component enemyParent)
+        {
             object playerClose = ReadMember(enemyParent, "playerClose");
             return playerClose is bool isPlayerClose && isPlayerClose;
+        }
+
+        private bool PublishEnemyParentEncounter(Component enemyParent, ref int instanceId, ref string monsterName)
+        {
+            if (!rosterPublished) return false;
+            if (enemyParent == null) return false;
+
+            GameObject root = GetEnemyRoot(enemyParent);
+            if (root == null) return false;
+            if (instanceId == 0) instanceId = root.GetInstanceID();
+            if (instanceId == 0 || IsEnemySent(instanceId)) return true;
+
+            if (monsterName == null)
+            {
+                monsterName = ResolveMonsterName(enemyParent);
+                if (monsterName != null) resolvedMonsterNames[instanceId] = monsterName;
+            }
+            if (monsterName == null) return false;
+            if (!TryMarkEnemySent(instanceId)) return true;
+
+            var candidate = new EnemyCandidate
+            {
+                Component = enemyParent,
+                Root = root,
+                Center = GetObjectCenter(root)
+            };
+            MarkMonsterSeen(monsterName, candidate);
+            if (debugLogging.Value)
+            {
+                Logger.LogInfo("Encountered nearby monster: " + monsterName + " from " + enemyParent.GetType().Name + " / " + root.name);
+            }
+            StartCoroutine(PostSeenMonster(monsterName, instanceId));
+            return true;
         }
 
         private static object ReadMember(object source, string memberName)
@@ -2465,6 +2503,60 @@ namespace OverlayHUD
         private static string EscapeJson(string value)
         {
             return value.Replace("\\", "\\\\").Replace("\"", "\\\"");
+        }
+
+        private sealed class EnemyOverlayProbe : MonoBehaviour
+        {
+            private const float ProbeIntervalSeconds = 0.25f;
+
+            private Plugin owner;
+            private Component enemyParent;
+            private int instanceId;
+            private string monsterName;
+            private float nextProbeAt;
+
+            internal void Init(Plugin plugin, Component parent)
+            {
+                owner = plugin;
+                enemyParent = parent;
+                instanceId = ResolveEnemyInstanceId(parent);
+                monsterName = null;
+                nextProbeAt = 0f;
+                enabled = instanceId == 0 || !IsEnemySent(instanceId);
+            }
+
+            private void Update()
+            {
+                if (owner == null || enemyParent == null)
+                {
+                    enabled = false;
+                    return;
+                }
+
+                if (!owner.gameplayActive) return;
+                if (instanceId == 0) instanceId = ResolveEnemyInstanceId(enemyParent);
+                if (instanceId != 0 && IsEnemySent(instanceId))
+                {
+                    enabled = false;
+                    return;
+                }
+
+                float now = Time.realtimeSinceStartup;
+                if (now < nextProbeAt) return;
+                nextProbeAt = now + ProbeIntervalSeconds;
+
+                if (!owner.IsEnemyParentPlayerClose(enemyParent)) return;
+                if (owner.PublishEnemyParentEncounter(enemyParent, ref instanceId, ref monsterName))
+                {
+                    enabled = false;
+                }
+            }
+
+            private static int ResolveEnemyInstanceId(Component parent)
+            {
+                GameObject root = parent == null ? null : GetEnemyRoot(parent);
+                return root == null ? 0 : root.GetInstanceID();
+            }
         }
 
         private struct EnemyCandidate
