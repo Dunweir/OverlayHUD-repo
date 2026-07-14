@@ -19,7 +19,7 @@ using UnityEngine.SceneManagement;
 
 namespace OverlayHUD
 {
-    [BepInPlugin("local.overlay.overlay_hud", "OverlayHUD", "0.2.86")]
+    [BepInPlugin("local.overlay.overlay_hud", "OverlayHUD", "0.2.91")]
     public sealed class Plugin : BaseUnityPlugin
     {
         private static Plugin instance;
@@ -144,6 +144,8 @@ namespace OverlayHUD
         private readonly Dictionary<int, bool> lastAliveBySourceId = new Dictionary<int, bool>();
         private readonly Dictionary<int, string> lastHealthDebugBySourceId = new Dictionary<int, string>();
         private readonly Dictionary<int, object[]> healthSourcesByRootId = new Dictionary<int, object[]>();
+        private readonly Dictionary<int, string> lastImmediateStatusBySourceId = new Dictionary<int, string>();
+        private readonly HashSet<int> pendingVisionEncounterIds = new HashSet<int>();
         private float nextScanAt;
         private float nextStatusSyncAt;
         private float nextUpgradeSyncAt;
@@ -166,6 +168,7 @@ namespace OverlayHUD
         private bool pendingMapValueRefresh;
         private string pendingMapValueRefreshReason = "";
         private string lastMapValueFingerprint = "";
+        private int cachedLocalPlayerViewId = int.MinValue;
         private bool gameplayActive;
         private bool? lastTabHeld;
         private Coroutine pendingGameplayActivation;
@@ -384,6 +387,9 @@ namespace OverlayHUD
                 MethodInfo valuableDollarHaulRemoveRpc = AccessTools.Method("ValuableObject:RemoveFromDollarHaulListRPC");
                 MethodInfo physGrabObjectBreakRpc = AccessTools.Method("PhysGrabObjectImpactDetector:BreakRPC");
                 MethodInfo physGrabObjectDestroyRpc = AccessTools.Method("PhysGrabObject:DestroyPhysGrabObjectRPC");
+                MethodInfo enemyVisionTrigger = AccessTools.Method("EnemyVision:VisionTrigger");
+                MethodInfo enemyHealthHurt = AccessTools.Method("EnemyHealth:Hurt");
+                MethodInfo enemyHealthHurtRpc = AccessTools.Method("EnemyHealth:HurtRPC");
                 HarmonyMethod levelGeneratedPostfix = new HarmonyMethod(typeof(Plugin).GetMethod(nameof(LevelGeneratedPostfix), BindingFlags.NonPublic | BindingFlags.Static));
                 HarmonyMethod levelGenerationStartingPrefix = new HarmonyMethod(typeof(Plugin).GetMethod(nameof(LevelGenerationStartingPrefix), BindingFlags.NonPublic | BindingFlags.Static));
                 HarmonyMethod enemySpawnedPostfix = new HarmonyMethod(typeof(Plugin).GetMethod(nameof(EnemyParentSpawnedPostfix), BindingFlags.NonPublic | BindingFlags.Static));
@@ -397,6 +403,8 @@ namespace OverlayHUD
                 HarmonyMethod valuableDollarHaulRemovePostfix = new HarmonyMethod(typeof(Plugin).GetMethod(nameof(ValuableDollarHaulRemovePostfix), BindingFlags.NonPublic | BindingFlags.Static));
                 HarmonyMethod physGrabObjectBreakPostfix = new HarmonyMethod(typeof(Plugin).GetMethod(nameof(PhysGrabObjectBreakPostfix), BindingFlags.NonPublic | BindingFlags.Static));
                 HarmonyMethod physGrabObjectDestroyedPostfix = new HarmonyMethod(typeof(Plugin).GetMethod(nameof(PhysGrabObjectDestroyedPostfix), BindingFlags.NonPublic | BindingFlags.Static));
+                HarmonyMethod enemyVisionTriggerPostfix = new HarmonyMethod(typeof(Plugin).GetMethod(nameof(EnemyVisionTriggerPostfix), BindingFlags.NonPublic | BindingFlags.Static));
+                HarmonyMethod enemyHealthChangedPostfix = new HarmonyMethod(typeof(Plugin).GetMethod(nameof(EnemyHealthChangedPostfix), BindingFlags.NonPublic | BindingFlags.Static));
 
                 if (enemyParentSpawnRpc != null)
                 {
@@ -474,6 +482,24 @@ namespace OverlayHUD
                 {
                     harmony.Patch(physGrabObjectDestroyRpc, postfix: physGrabObjectDestroyedPostfix);
                     Logger.LogInfo("Patched PhysGrabObject.DestroyPhysGrabObjectRPC for map value removal.");
+                }
+
+                if (enemyVisionTrigger != null)
+                {
+                    harmony.Patch(enemyVisionTrigger, postfix: enemyVisionTriggerPostfix);
+                    Logger.LogInfo("Patched EnemyVision.VisionTrigger for sighted enemy encounters.");
+                }
+
+                if (enemyHealthHurt != null)
+                {
+                    harmony.Patch(enemyHealthHurt, postfix: enemyHealthChangedPostfix);
+                    Logger.LogInfo("Patched EnemyHealth.Hurt for immediate health sync.");
+                }
+
+                if (enemyHealthHurtRpc != null)
+                {
+                    harmony.Patch(enemyHealthHurtRpc, postfix: enemyHealthChangedPostfix);
+                    Logger.LogInfo("Patched EnemyHealth.HurtRPC for immediate health sync.");
                 }
 
                 int patchedUpgradeTypes = 0;
@@ -602,6 +628,16 @@ namespace OverlayHUD
             instance?.AddMapValue(-currentValue, "valuable destroyed");
             if (IsValuableInDollarHaul(valuable)) return;
             instance?.AddLostValue(currentValue, "valuable destroyed");
+        }
+
+        private static void EnemyVisionTriggerPostfix(object __instance, int playerID, object player, bool culled, bool playerNear)
+        {
+            instance?.HandleEnemyVisionTrigger(__instance, playerID);
+        }
+
+        private static void EnemyHealthChangedPostfix(object __instance)
+        {
+            instance?.SyncEnemyHealthChanged(__instance);
         }
 
         private void TickScan()
@@ -861,6 +897,9 @@ namespace OverlayHUD
             lastAliveBySourceId.Clear();
             lastHealthDebugBySourceId.Clear();
             healthSourcesByRootId.Clear();
+            lastImmediateStatusBySourceId.Clear();
+            pendingVisionEncounterIds.Clear();
+            cachedLocalPlayerViewId = int.MinValue;
             lastRosterFingerprint = "";
             lastStatusFingerprint = "";
             pendingRosterFingerprint = "";
@@ -919,6 +958,7 @@ namespace OverlayHUD
                 return;
             }
             SyncMonsterStatuses(resolvedEnemies);
+            TryPublishPendingVisionEncounters(resolvedEnemies);
             enemyRosterDirty = false;
 
             if (debugLogging.Value && Time.realtimeSinceStartup >= nextDebugSummaryAt)
@@ -1005,7 +1045,9 @@ namespace OverlayHUD
                 int instanceId = sourceIds[index];
                 EnemyCandidate candidate = statusCandidates[instanceId];
                 if (!TryGetEnemyRespawnStatus(candidate, out bool alive, out float remaining)) continue;
-                bool hasHealth = TryGetEnemyHealth(candidate, out float health, out float maxHealth);
+                float health = 0f;
+                float maxHealth = 0f;
+                bool hasHealth = IsEnemySent(instanceId) && TryGetEnemyHealth(candidate, out health, out maxHealth);
 
                 if (!lastAliveBySourceId.TryGetValue(instanceId, out bool previousAlive) || previousAlive != alive)
                 {
@@ -1091,6 +1133,53 @@ namespace OverlayHUD
             };
         }
 
+        private void SyncEnemyHealthChanged(object enemyHealthSource)
+        {
+            if (!gameplayActive || enemyHealthSource == null) return;
+
+            Component enemyHealth = enemyHealthSource as Component;
+            Component enemy = ReadMember(enemyHealthSource, "enemy") as Component;
+            Component enemyParent = ReadMember(enemy, "EnemyParent") as Component;
+            if (enemyParent == null) return;
+
+            GameObject root = GetEnemyRoot(enemyParent);
+            if (root == null) return;
+
+            int instanceId = root.GetInstanceID();
+            if (!IsEnemySent(instanceId)) return;
+
+            var candidate = new EnemyCandidate
+            {
+                Component = enemyParent,
+                Root = root,
+                Center = Vector3.zero
+            };
+
+            if (!TryGetEnemyRespawnStatus(candidate, out bool alive, out float remaining)) return;
+            if (!TryGetEnemyHealth(candidate, out float health, out float maxHealth)) return;
+
+            float roundedRemaining = alive ? 0f : (float)Math.Ceiling(Math.Max(0f, remaining) * 10f) / 10f;
+            string remainingText = roundedRemaining.ToString("0.0", CultureInfo.InvariantCulture);
+            string healthText = Math.Max(0f, health).ToString("0.#", CultureInfo.InvariantCulture);
+            string maxHealthText = maxHealth > 0f ? maxHealth.ToString("0.#", CultureInfo.InvariantCulture) : "";
+            string fingerprint = instanceId + ":" + (alive ? "1" : "0") + ":" + remainingText + ":" + healthText + "/" + maxHealthText;
+            if (lastImmediateStatusBySourceId.TryGetValue(instanceId, out string previousFingerprint)
+                && previousFingerprint == fingerprint)
+            {
+                return;
+            }
+            lastImmediateStatusBySourceId[instanceId] = fingerprint;
+
+            var json = new StringBuilder("{\"statuses\":[{\"id\":")
+                .Append(instanceId)
+                .Append(",\"alive\":").Append(alive ? "true" : "false")
+                .Append(",\"respawnRemaining\":").Append(remainingText)
+                .Append(",\"health\":").Append(healthText.Length > 0 ? healthText : "0");
+            if (maxHealthText.Length > 0) json.Append(",\"maxHealth\":").Append(maxHealthText);
+            json.Append("}]}");
+            StartCoroutine(PostMonsterStatuses(json.ToString()));
+        }
+
         private static bool ReadEnemySpawned(Component enemyParent)
         {
             object spawnedValue = ReadMember(enemyParent, "Spawned");
@@ -1141,23 +1230,17 @@ namespace OverlayHUD
                 if (!healthSourcesByRootId.TryGetValue(rootId, out object[] cachedSources))
                 {
                     var sources = new List<object>();
-                    Component enemyHealth = candidate.Root.GetComponent("EnemyHealth");
-                    if (enemyHealth != null) sources.Add(enemyHealth);
+                    Component enemy = candidate.Root.GetComponent("Enemy");
+                    object linkedHealth = ReadMember(enemy, "Health");
+                    if (linkedHealth != null) sources.Add(linkedHealth);
 
-                    Component[] components = candidate.Root.GetComponentsInChildren<Component>(true);
-                    foreach (Component component in components)
+                    Component enemyHealth = candidate.Root.GetComponent("EnemyHealth");
+                    if (enemyHealth != null && !sources.Contains(enemyHealth))
                     {
-                        if (component == null) continue;
-                        string typeName = component.GetType().Name;
-                        if (typeName.IndexOf("Health", StringComparison.OrdinalIgnoreCase) >= 0
-                            || typeName.IndexOf("Damage", StringComparison.OrdinalIgnoreCase) >= 0)
-                        {
-                            sources.Add(component);
-                        }
+                        sources.Add(enemyHealth);
                     }
 
-                    Component enemy = candidate.Root.GetComponent("Enemy");
-                    if (enemy != null) sources.Add(enemy);
+                    if (enemy != null && !sources.Contains(enemy)) sources.Add(enemy);
                     cachedSources = sources.ToArray();
                     healthSourcesByRootId[rootId] = cachedSources;
                 }
@@ -1924,6 +2007,7 @@ namespace OverlayHUD
                 ? component
                 : ReadMember(component, "EnemyParent") as Component;
             if (enemyParent == null) return;
+            if (HasEnemyVision(enemyParent)) return;
 
             GameObject root = GetEnemyRoot(enemyParent);
             if (root == null) return;
@@ -1970,6 +2054,93 @@ namespace OverlayHUD
             }
             StartCoroutine(PostSeenMonster(monsterName, instanceId));
             return true;
+        }
+
+        private void HandleEnemyVisionTrigger(object vision, int playerId)
+        {
+            if (!gameplayActive || vision == null) return;
+            int localViewId = GetLocalPlayerViewId();
+            if (playerId != localViewId) return;
+
+            Component enemy = ReadMember(vision, "Enemy") as Component;
+            Component enemyParent = ReadMember(enemy, "EnemyParent") as Component;
+            if (enemyParent == null) return;
+
+            int instanceId = ResolveEnemyInstanceId(enemyParent);
+            if (instanceId == 0 || IsEnemySent(instanceId)) return;
+            if (pendingVisionEncounterIds.Contains(instanceId)) return;
+
+            RegisterEnemyParent(enemyParent);
+            string monsterName = null;
+            if (PublishEnemyParentEncounter(enemyParent, ref instanceId, ref monsterName))
+            {
+                pendingVisionEncounterIds.Remove(instanceId);
+                return;
+            }
+
+            pendingVisionEncounterIds.Add(instanceId);
+            enemyRosterDirty = true;
+            nextScanAt = 0f;
+        }
+
+        private void TryPublishPendingVisionEncounters(List<ResolvedEnemyCandidate> resolvedEnemies)
+        {
+            if (pendingVisionEncounterIds.Count == 0) return;
+
+            for (int index = 0; index < resolvedEnemies.Count; index++)
+            {
+                ResolvedEnemyCandidate resolvedEnemy = resolvedEnemies[index];
+                int instanceId = resolvedEnemy.Candidate.Root.GetInstanceID();
+                if (!pendingVisionEncounterIds.Contains(instanceId)) continue;
+
+                Component enemyParent = GetEnemyParent(resolvedEnemy.Candidate);
+                string monsterName = resolvedEnemy.MonsterName;
+                int publishId = instanceId;
+                if (PublishEnemyParentEncounter(enemyParent, ref publishId, ref monsterName))
+                {
+                    pendingVisionEncounterIds.Remove(instanceId);
+                }
+            }
+        }
+
+        private static bool HasEnemyVision(Component enemyParent)
+        {
+            Component enemy = ReadMember(enemyParent, "Enemy") as Component;
+            object hasVision = ReadMember(enemy, "HasVision");
+            return hasVision is bool value && value;
+        }
+
+        private static int ResolveEnemyInstanceId(Component enemyParent)
+        {
+            GameObject root = enemyParent == null ? null : GetEnemyRoot(enemyParent);
+            return root == null ? 0 : root.GetInstanceID();
+        }
+
+        private int GetLocalPlayerViewId()
+        {
+            if (cachedLocalPlayerViewId != int.MinValue) return cachedLocalPlayerViewId;
+            cachedLocalPlayerViewId = ResolveLocalPlayerViewId();
+            return cachedLocalPlayerViewId;
+        }
+
+        private static int ResolveLocalPlayerViewId()
+        {
+            object localViewId = InvokeNoArgMethod(AccessTools.TypeByName("SemiFunc"), "PhotonViewIDPlayerAvatarLocal");
+            if (localViewId != null)
+            {
+                try
+                {
+                    return Convert.ToInt32(localViewId, CultureInfo.InvariantCulture);
+                }
+                catch
+                {
+                }
+            }
+
+            object player = InvokeNoArgMethod(AccessTools.TypeByName("SemiFunc"), "PlayerAvatarLocal");
+            if (player == null) player = ReadMember(AccessTools.TypeByName("PlayerAvatar"), "instance");
+            object photonView = ReadMember(player, "photonView");
+            return ReadIntMember(photonView, "ViewID");
         }
 
         private static object ReadMember(object source, string memberName)
@@ -2522,12 +2693,18 @@ namespace OverlayHUD
                 instanceId = ResolveEnemyInstanceId(parent);
                 monsterName = null;
                 nextProbeAt = 0f;
-                enabled = instanceId == 0 || !IsEnemySent(instanceId);
+                enabled = !HasEnemyVision(parent) && (instanceId == 0 || !IsEnemySent(instanceId));
             }
 
             private void Update()
             {
                 if (owner == null || enemyParent == null)
+                {
+                    enabled = false;
+                    return;
+                }
+
+                if (HasEnemyVision(enemyParent))
                 {
                     enabled = false;
                     return;
