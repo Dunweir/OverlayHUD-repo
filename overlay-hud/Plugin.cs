@@ -19,7 +19,7 @@ using UnityEngine.SceneManagement;
 
 namespace OverlayHUD
 {
-    [BepInPlugin("local.overlay.overlay_hud", "OverlayHUD", "0.2.99")]
+    [BepInPlugin("local.overlay.overlay_hud", "OverlayHUD", "0.2.103")]
     public sealed class Plugin : BaseUnityPlugin
     {
         private static Plugin instance;
@@ -178,6 +178,7 @@ namespace OverlayHUD
         private ConfigEntry<string> levelEndpoint;
         private ConfigEntry<float> scanInterval;
         private ConfigEntry<float> statusInterval;
+        private ConfigEntry<bool> preferPlayerVisionDetection;
         private ConfigEntry<bool> debugLogging;
         private ConfigEntry<bool> autoStartOverlayApp;
         private ConfigEntry<bool> autoCloseOverlayApp;
@@ -194,6 +195,7 @@ namespace OverlayHUD
             levelEndpoint = Config.Bind("Overlay", "LevelEndpoint", "http://127.0.0.1:8787/api/level", "Level sync endpoint on this PC.");
             scanInterval = Config.Bind("Detection", "ScanIntervalSeconds", 3f, "How often pending enemy roster sync is retried.");
             statusInterval = Config.Bind("Detection", "StatusIntervalSeconds", 2f, "How often monster health and respawn status are synced after the roster is known.");
+            preferPlayerVisionDetection = Config.Bind("Detection", "PreferPlayerVisionDetection", true, "When enabled, show monsters when the player sees them. When disabled, use the older enemy-vision plus player-very-close detection.");
             debugLogging = Config.Bind("Debug", "Logging", false, "Write periodic bridge debug logs.");
             autoStartOverlayApp = Config.Bind("OverlayApp", "AutoStart", true, "Start the bundled OverlayHUD desktop app when the game starts.");
             autoCloseOverlayApp = Config.Bind("OverlayApp", "AutoClose", true, "Close the bundled OverlayHUD desktop app when the game exits.");
@@ -380,6 +382,7 @@ namespace OverlayHUD
                 MethodInfo enemyParentDisableDecrease = AccessTools.Method("EnemyParent:DisableDecrease");
                 MethodInfo enemyParentDespawnedTimerSet = AccessTools.Method("EnemyParent:DespawnedTimerSet");
                 MethodInfo enemyParentPlayerCloseLogic = AccessTools.Method("EnemyParent:PlayerCloseLogic");
+                MethodInfo enemyOnScreenLogic = AccessTools.Method("EnemyOnScreen:Logic");
                 MethodInfo levelGeneratorGenerateDone = AccessTools.Method("LevelGenerator:GenerateDone");
                 MethodInfo levelGeneratorStartRoomGeneration = AccessTools.Method("LevelGenerator:StartRoomGeneration");
                 MethodInfo runManagerChangeLevel = AccessTools.Method("RunManager:ChangeLevel");
@@ -401,6 +404,7 @@ namespace OverlayHUD
                 HarmonyMethod enemyDespawnedPostfix = new HarmonyMethod(typeof(Plugin).GetMethod(nameof(EnemyParentDespawnedPostfix), BindingFlags.NonPublic | BindingFlags.Static));
                 HarmonyMethod enemyTimerChangedPostfix = new HarmonyMethod(typeof(Plugin).GetMethod(nameof(EnemyParentTimerChangedPostfix), BindingFlags.NonPublic | BindingFlags.Static));
                 HarmonyMethod enemyPlayerCloseLogicPostfix = new HarmonyMethod(typeof(Plugin).GetMethod(nameof(EnemyParentPlayerCloseLogicPostfix), BindingFlags.NonPublic | BindingFlags.Static));
+                HarmonyMethod enemyOnScreenLogicPostfix = new HarmonyMethod(typeof(Plugin).GetMethod(nameof(EnemyOnScreenLogicPostfix), BindingFlags.NonPublic | BindingFlags.Static));
                 HarmonyMethod levelChangingPrefix = new HarmonyMethod(typeof(Plugin).GetMethod(nameof(LevelChangingPrefix), BindingFlags.NonPublic | BindingFlags.Static));
                 HarmonyMethod levelChangedPostfix = new HarmonyMethod(typeof(Plugin).GetMethod(nameof(LevelChangedPostfix), BindingFlags.NonPublic | BindingFlags.Static));
                 HarmonyMethod playerUpgradeConsumedPostfix = new HarmonyMethod(typeof(Plugin).GetMethod(nameof(PlayerUpgradeConsumedPostfix), BindingFlags.NonPublic | BindingFlags.Static));
@@ -442,6 +446,12 @@ namespace OverlayHUD
                 {
                     harmony.Patch(enemyParentPlayerCloseLogic, postfix: enemyPlayerCloseLogicPostfix);
                     Logger.LogInfo("Patched EnemyParent.PlayerCloseLogic for blind enemy very-close encounters.");
+                }
+
+                if (enemyOnScreenLogic != null)
+                {
+                    harmony.Patch(enemyOnScreenLogic, postfix: enemyOnScreenLogicPostfix);
+                    Logger.LogInfo("Patched EnemyOnScreen.Logic for player-visible enemy encounters.");
                 }
 
                 if (levelGeneratorGenerateDone != null)
@@ -620,7 +630,7 @@ namespace OverlayHUD
         {
             if (__instance is Component component)
             {
-                instance?.SyncEnemyParentStatusChanged(component);
+                instance?.ScheduleEnemyParentStatusChanged(component);
             }
         }
 
@@ -636,6 +646,12 @@ namespace OverlayHUD
         {
             if (__result == null || !(__instance is Component enemyParent) || HasEnemyVision(enemyParent)) return;
             __result = WatchBlindEnemyPlayerClose(__result, enemyParent);
+        }
+
+        private static void EnemyOnScreenLogicPostfix(object __instance, ref IEnumerator __result)
+        {
+            if (__result == null || !(__instance is Component enemyOnScreen)) return;
+            __result = WatchEnemyOnScreen(__result, enemyOnScreen);
         }
 
         private static void ExtractionCompletedPostfix()
@@ -1194,6 +1210,18 @@ namespace OverlayHUD
 
             Component enemy = ReadMember(enemyHealthSource, "enemy") as Component;
             Component enemyParent = ReadMember(enemy, "EnemyParent") as Component;
+            SyncEnemyParentStatusChanged(enemyParent);
+        }
+
+        private void ScheduleEnemyParentStatusChanged(Component enemyParent)
+        {
+            if (!gameplayActive || enemyParent == null) return;
+            StartCoroutine(SyncEnemyParentStatusChangedNextFrame(enemyParent));
+        }
+
+        private IEnumerator SyncEnemyParentStatusChangedNextFrame(Component enemyParent)
+        {
+            yield return null;
             SyncEnemyParentStatusChanged(enemyParent);
         }
 
@@ -2097,6 +2125,14 @@ namespace OverlayHUD
             return playerVeryClose is bool isPlayerVeryClose && isPlayerVeryClose;
         }
 
+        private bool IsEnemyOnScreenVisible(Component enemyOnScreen)
+        {
+            object onScreenLocal = ReadMember(enemyOnScreen, "OnScreenLocal");
+            object culledLocal = ReadMember(enemyOnScreen, "CulledLocal");
+            return onScreenLocal is bool isOnScreen && isOnScreen
+                && (!(culledLocal is bool isCulled) || !isCulled);
+        }
+
         private static IEnumerator WatchBlindEnemyPlayerClose(IEnumerator inner, Component enemyParent)
         {
             bool wasPlayerVeryClose = instance != null && instance.IsEnemyParentPlayerVeryClose(enemyParent);
@@ -2106,6 +2142,7 @@ namespace OverlayHUD
 
                 Plugin plugin = instance;
                 if (plugin == null || !plugin.gameplayActive || enemyParent == null) continue;
+                if (plugin.preferPlayerVisionDetection.Value) continue;
 
                 bool isPlayerVeryClose = plugin.IsEnemyParentPlayerVeryClose(enemyParent);
                 if (isPlayerVeryClose && !wasPlayerVeryClose)
@@ -2116,11 +2153,58 @@ namespace OverlayHUD
             }
         }
 
+        private static IEnumerator WatchEnemyOnScreen(IEnumerator inner, Component enemyOnScreen)
+        {
+            Component enemyParent = null;
+            int instanceId = 0;
+            bool encounterHandled = false;
+            while (inner.MoveNext())
+            {
+                yield return inner.Current;
+
+                Plugin plugin = instance;
+                if (plugin == null || !plugin.gameplayActive || enemyOnScreen == null) continue;
+                if (encounterHandled) continue;
+                if (!plugin.preferPlayerVisionDetection.Value) continue;
+
+                if (enemyParent == null) enemyParent = GetEnemyParentFromOnScreen(enemyOnScreen);
+                if (enemyParent == null) continue;
+
+                if (instanceId == 0) instanceId = ResolveEnemyInstanceId(enemyParent);
+                if (instanceId != 0 && IsEnemySent(instanceId))
+                {
+                    encounterHandled = true;
+                    continue;
+                }
+
+                if (!plugin.IsEnemyOnScreenVisible(enemyOnScreen)) continue;
+                plugin.HandleEnemyOnScreenVisible(enemyParent, ref instanceId);
+                if (instanceId != 0 && IsEnemySent(instanceId)) encounterHandled = true;
+            }
+        }
+
         private void HandleBlindEnemyPlayerVeryClose(Component enemyParent)
         {
+            if (preferPlayerVisionDetection.Value) return;
             if (enemyParent == null || HasEnemyVision(enemyParent)) return;
 
             int instanceId = ResolveEnemyInstanceId(enemyParent);
+            if (instanceId == 0 || IsEnemySent(instanceId)) return;
+
+            RegisterEnemyParent(enemyParent);
+            string monsterName = null;
+            if (PublishEnemyParentEncounter(enemyParent, ref instanceId, ref monsterName)) return;
+
+            pendingEncounterIds.Add(instanceId);
+            enemyRosterDirty = true;
+            nextScanAt = 0f;
+        }
+
+        private void HandleEnemyOnScreenVisible(Component enemyParent, ref int instanceId)
+        {
+            if (!preferPlayerVisionDetection.Value) return;
+            if (enemyParent == null) return;
+            if (instanceId == 0) instanceId = ResolveEnemyInstanceId(enemyParent);
             if (instanceId == 0 || IsEnemySent(instanceId)) return;
 
             RegisterEnemyParent(enemyParent);
@@ -2168,6 +2252,7 @@ namespace OverlayHUD
 
         private void HandleEnemyVisionTrigger(object vision, int playerId)
         {
+            if (preferPlayerVisionDetection.Value) return;
             if (!gameplayActive || vision == null) return;
             int localViewId = GetLocalPlayerViewId();
             if (playerId != localViewId) return;
@@ -2245,6 +2330,14 @@ namespace OverlayHUD
             Component enemy = ReadMember(enemyParent, "Enemy") as Component;
             object hasVision = ReadMember(enemy, "HasVision");
             return hasVision is bool value && value;
+        }
+
+        private static Component GetEnemyParentFromOnScreen(Component enemyOnScreen)
+        {
+            if (enemyOnScreen == null) return null;
+            Component enemy = ReadMember(enemyOnScreen, "Enemy") as Component;
+            if (enemy == null) enemy = enemyOnScreen.GetComponent("Enemy");
+            return ReadMember(enemy, "EnemyParent") as Component;
         }
 
         private static int ResolveEnemyInstanceId(Component enemyParent)
