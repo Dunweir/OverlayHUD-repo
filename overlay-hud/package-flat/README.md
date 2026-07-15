@@ -2,7 +2,7 @@
 
 OverlayHUD connects R.E.P.O. to the desktop HUD app. It sends discovered monsters, level changes, player upgrades, and respawn cooldowns so the external HUD can stay in sync with the current run.
 
-Holding Tab temporarily hides the in-game HUD until the key is released. Peeper uses a separate close-range detection distance while the game marks it as very close to the player.
+Holding Tab temporarily hides the in-game HUD until the key is released. PlayerVision detection is used when available, with legacy close/vision fallback for enemies that need it.
 
 ## Russian
 

@@ -19,7 +19,7 @@ using UnityEngine.SceneManagement;
 
 namespace OverlayHUD
 {
-    [BepInPlugin("local.overlay.overlay_hud", "OverlayHUD", "0.2.107")]
+    [BepInPlugin("local.overlay.overlay_hud", "OverlayHUD", "0.2.108")]
     public sealed class Plugin : BaseUnityPlugin
     {
         private static Plugin instance;
@@ -206,7 +206,7 @@ namespace OverlayHUD
             endpoint = Config.Bind("Overlay", "Endpoint", "http://127.0.0.1:8787/api/monster-seen", "Monster endpoint on this PC.");
             levelEndpoint = Config.Bind("Overlay", "LevelEndpoint", "http://127.0.0.1:8787/api/level", "Level sync endpoint on this PC.");
             scanInterval = Config.Bind("Detection", "ScanIntervalSeconds", 3f, "How often pending enemy roster sync is retried.");
-            statusInterval = Config.Bind("Detection", "StatusIntervalSeconds", 2f, "How often monster health and respawn status are synced after the roster is known.");
+            statusInterval = Config.Bind("Detection", "StatusIntervalSeconds", 5f, "How often monster health and respawn status are synced after the roster is known. Values below 5 are raised to 5.");
             preferPlayerVisionDetection = Config.Bind("Detection", "PreferPlayerVisionDetection", true, "When enabled, show monsters when the player sees them. When disabled, use the older enemy-vision plus player-very-close detection.");
             debugLogging = Config.Bind("Debug", "Logging", false, "Write periodic bridge debug logs.");
             autoStartOverlayApp = Config.Bind("OverlayApp", "AutoStart", true, "Start the bundled OverlayHUD desktop app when the game starts.");
@@ -222,6 +222,11 @@ namespace OverlayHUD
             if (levelEndpoint.Value == "http://192.168.1.198:8787/api/level")
             {
                 levelEndpoint.Value = "http://127.0.0.1:8787/api/level";
+                configChanged = true;
+            }
+            if (statusInterval.Value < 5f)
+            {
+                statusInterval.Value = 5f;
                 configChanged = true;
             }
             if (overlayAppRelativePath.Value == "OverlayHUD.exe"
