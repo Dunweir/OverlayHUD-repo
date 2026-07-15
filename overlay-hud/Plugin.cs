@@ -19,7 +19,7 @@ using UnityEngine.SceneManagement;
 
 namespace OverlayHUD
 {
-    [BepInPlugin("local.overlay.overlay_hud", "OverlayHUD", "0.2.105")]
+    [BepInPlugin("local.overlay.overlay_hud", "OverlayHUD", "0.2.107")]
     public sealed class Plugin : BaseUnityPlugin
     {
         private static Plugin instance;
@@ -33,6 +33,8 @@ namespace OverlayHUD
         private static readonly object networkQueueLock = new object();
         private static readonly Dictionary<string, MemberInfo> memberCache = new Dictionary<string, MemberInfo>();
         private static readonly HashSet<string> missingMemberCache = new HashSet<string>();
+        private static readonly Dictionary<string, MethodInfo> noArgMethodCache = new Dictionary<string, MethodInfo>();
+        private static readonly HashSet<string> missingNoArgMethodCache = new HashSet<string>();
         private static Task networkQueueTail = Task.CompletedTask;
         private static float mapValue;
         private static float mapValueInitial;
@@ -113,6 +115,12 @@ namespace OverlayHUD
             { "UpgradePlayerTumbleClimb", "tumbleClimb" }
         };
 
+        private static readonly HashSet<string> PlayerVisionLegacyFallbackMonsters = new HashSet<string>(StringComparer.Ordinal)
+        {
+            "Tick",
+            "Upscream"
+        };
+
         private static readonly string[] CurrentHealthMemberNames =
         {
             "currentHealth",
@@ -145,6 +153,10 @@ namespace OverlayHUD
         private readonly Dictionary<int, string> lastHealthDebugBySourceId = new Dictionary<int, string>();
         private readonly Dictionary<int, object[]> healthSourcesByRootId = new Dictionary<int, object[]>();
         private readonly Dictionary<int, string> lastImmediateStatusBySourceId = new Dictionary<int, string>();
+        private readonly Dictionary<int, string> lastTimerStatusBySourceId = new Dictionary<int, string>();
+        private readonly Dictionary<int, float> lastTimerStatusSentAtBySourceId = new Dictionary<int, float>();
+        private readonly Dictionary<int, bool> enemyHasVisionByParentId = new Dictionary<int, bool>();
+        private readonly Dictionary<int, bool> enemyHasOnScreenByParentId = new Dictionary<int, bool>();
         private readonly Dictionary<int, VisionEnemyCache> visionEnemyCacheByVisionId = new Dictionary<int, VisionEnemyCache>();
         private readonly HashSet<int> pendingEncounterIds = new HashSet<int>();
         private float nextScanAt;
@@ -969,6 +981,10 @@ namespace OverlayHUD
             lastHealthDebugBySourceId.Clear();
             healthSourcesByRootId.Clear();
             lastImmediateStatusBySourceId.Clear();
+            lastTimerStatusBySourceId.Clear();
+            lastTimerStatusSentAtBySourceId.Clear();
+            enemyHasVisionByParentId.Clear();
+            enemyHasOnScreenByParentId.Clear();
             visionEnemyCacheByVisionId.Clear();
             pendingEncounterIds.Clear();
             cachedLocalPlayerViewId = int.MinValue;
@@ -1245,6 +1261,27 @@ namespace OverlayHUD
 
             float roundedRemaining = alive ? 0f : (float)Math.Ceiling(Math.Max(0f, remaining) * 10f) / 10f;
             string remainingText = roundedRemaining.ToString("0.0", CultureInfo.InvariantCulture);
+            string fingerprint = instanceId + ":" + (alive ? "1" : "0") + ":" + remainingText;
+            bool aliveChanged = !lastAliveBySourceId.TryGetValue(instanceId, out bool previousAlive) || previousAlive != alive;
+            if (!aliveChanged
+                && lastTimerStatusBySourceId.TryGetValue(instanceId, out string previousFingerprint)
+                && previousFingerprint == fingerprint)
+            {
+                return;
+            }
+
+            float now = Time.realtimeSinceStartup;
+            if (!aliveChanged
+                && lastTimerStatusSentAtBySourceId.TryGetValue(instanceId, out float lastSentAt)
+                && now - lastSentAt < 0.5f)
+            {
+                return;
+            }
+
+            lastAliveBySourceId[instanceId] = alive;
+            lastTimerStatusBySourceId[instanceId] = fingerprint;
+            lastTimerStatusSentAtBySourceId[instanceId] = now;
+
             var json = new StringBuilder("{\"statuses\":[{\"id\":")
                 .Append(instanceId)
                 .Append(",\"alive\":").Append(alive ? "true" : "false")
@@ -2120,8 +2157,9 @@ namespace OverlayHUD
             return root.transform.position + Vector3.up;
         }
 
-        private string ResolveMonsterName(Component component)
+        private static string ResolveMonsterName(Component component)
         {
+            if (component == null) return null;
             Component enemyParent = null;
             if (component.GetType().Name == "EnemyParent")
             {
@@ -2135,6 +2173,12 @@ namespace OverlayHUD
             if (enemyParent == null) return null;
             string enemyName = ReadMember(enemyParent, "enemyName") as string;
             return FindKnownMonster(enemyName);
+        }
+
+        private static bool ShouldUseLegacyVisionFallback(Component enemyParent)
+        {
+            string monsterName = ResolveMonsterName(enemyParent);
+            return monsterName != null && PlayerVisionLegacyFallbackMonsters.Contains(monsterName);
         }
 
         private bool IsEnemyParentPlayerVeryClose(Component enemyParent)
@@ -2160,7 +2204,9 @@ namespace OverlayHUD
 
                 Plugin plugin = instance;
                 if (plugin == null || !plugin.gameplayActive || enemyParent == null) continue;
-                if (plugin.preferPlayerVisionDetection.Value && HasEnemyOnScreen(enemyParent)) continue;
+                if (plugin.preferPlayerVisionDetection.Value
+                    && HasEnemyOnScreen(enemyParent)
+                    && !ShouldUseLegacyVisionFallback(enemyParent)) continue;
 
                 bool isPlayerVeryClose = plugin.IsEnemyParentPlayerVeryClose(enemyParent);
                 if (isPlayerVeryClose && !wasPlayerVeryClose)
@@ -2203,8 +2249,10 @@ namespace OverlayHUD
 
         private void HandleBlindEnemyPlayerVeryClose(Component enemyParent)
         {
-            if (preferPlayerVisionDetection.Value && HasEnemyOnScreen(enemyParent)) return;
             if (enemyParent == null || HasEnemyVision(enemyParent)) return;
+            if (preferPlayerVisionDetection.Value
+                && HasEnemyOnScreen(enemyParent)
+                && !ShouldUseLegacyVisionFallback(enemyParent)) return;
 
             int instanceId = ResolveEnemyInstanceId(enemyParent);
             if (instanceId == 0 || IsEnemySent(instanceId)) return;
@@ -2276,7 +2324,9 @@ namespace OverlayHUD
 
             if (!TryGetVisionEnemyCache(vision, out VisionEnemyCache visionEnemy)) return;
             Component enemyParent = visionEnemy.EnemyParent;
-            if (preferPlayerVisionDetection.Value && HasEnemyOnScreen(enemyParent)) return;
+            if (preferPlayerVisionDetection.Value
+                && HasEnemyOnScreen(enemyParent)
+                && !ShouldUseLegacyVisionFallback(enemyParent)) return;
             int instanceId = visionEnemy.InstanceId;
             if (instanceId == 0 || IsEnemySent(instanceId)) return;
             if (pendingEncounterIds.Contains(instanceId)) return;
@@ -2345,12 +2395,44 @@ namespace OverlayHUD
 
         private static bool HasEnemyVision(Component enemyParent)
         {
+            if (enemyParent == null) return false;
+            Plugin plugin = instance;
+            if (plugin != null)
+            {
+                int parentId = enemyParent.GetInstanceID();
+                if (plugin.enemyHasVisionByParentId.TryGetValue(parentId, out bool cachedValue)) return cachedValue;
+                bool value = ReadEnemyHasVision(enemyParent);
+                plugin.enemyHasVisionByParentId[parentId] = value;
+                return value;
+            }
+
+            return ReadEnemyHasVision(enemyParent);
+        }
+
+        private static bool ReadEnemyHasVision(Component enemyParent)
+        {
             Component enemy = ReadMember(enemyParent, "Enemy") as Component;
             object hasVision = ReadMember(enemy, "HasVision");
             return hasVision is bool value && value;
         }
 
         private static bool HasEnemyOnScreen(Component enemyParent)
+        {
+            if (enemyParent == null) return false;
+            Plugin plugin = instance;
+            if (plugin != null)
+            {
+                int parentId = enemyParent.GetInstanceID();
+                if (plugin.enemyHasOnScreenByParentId.TryGetValue(parentId, out bool cachedValue)) return cachedValue;
+                bool value = ReadEnemyHasOnScreen(enemyParent);
+                plugin.enemyHasOnScreenByParentId[parentId] = value;
+                return value;
+            }
+
+            return ReadEnemyHasOnScreen(enemyParent);
+        }
+
+        private static bool ReadEnemyHasOnScreen(Component enemyParent)
         {
             Component enemy = ReadMember(enemyParent, "Enemy") as Component;
             object hasOnScreen = ReadMember(enemy, "HasOnScreen");
@@ -2459,7 +2541,25 @@ namespace OverlayHUD
 
             Type type = source as Type ?? source.GetType();
             const BindingFlags flags = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static;
-            MethodInfo method = type.GetMethod(methodName, flags, null, Type.EmptyTypes, null);
+            string cacheKey = type.AssemblyQualifiedName + "\n" + methodName + "()";
+            MethodInfo method;
+
+            lock (reflectionCacheLock)
+            {
+                if (missingNoArgMethodCache.Contains(cacheKey)) return null;
+                noArgMethodCache.TryGetValue(cacheKey, out method);
+            }
+
+            if (method == null)
+            {
+                method = type.GetMethod(methodName, flags, null, Type.EmptyTypes, null);
+                lock (reflectionCacheLock)
+                {
+                    if (method == null) missingNoArgMethodCache.Add(cacheKey);
+                    else noArgMethodCache[cacheKey] = method;
+                }
+            }
+
             if (method == null || (!method.IsStatic && source is Type)) return null;
 
             try
