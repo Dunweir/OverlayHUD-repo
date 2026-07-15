@@ -19,7 +19,7 @@ using UnityEngine.SceneManagement;
 
 namespace OverlayHUD
 {
-    [BepInPlugin("local.overlay.overlay_hud", "OverlayHUD", "0.2.103")]
+    [BepInPlugin("local.overlay.overlay_hud", "OverlayHUD", "0.2.105")]
     public sealed class Plugin : BaseUnityPlugin
     {
         private static Plugin instance;
@@ -101,16 +101,16 @@ namespace OverlayHUD
             new KeyValuePair<string, string>("tumbleClimb", "playerUpgradeTumbleClimb")
         };
 
-        private static readonly Dictionary<string, string> UpgradeStateKeyByItemType = new Dictionary<string, string>
+        private static readonly Dictionary<string, string> UpgradeStateKeyByPunMethod = new Dictionary<string, string>
         {
-            { "ItemUpgradePlayerGrabStrength", "strength" },
-            { "ItemUpgradePlayerTumbleLaunch", "tumbleLaunch" },
-            { "ItemUpgradePlayerGrabRange", "range" },
-            { "ItemUpgradePlayerSprintSpeed", "sprintSpeed" },
-            { "ItemUpgradePlayerTumbleWings", "tumbleWings" },
-            { "ItemUpgradePlayerCrouchRest", "crouchRest" },
-            { "ItemUpgradePlayerExtraJump", "extraJump" },
-            { "ItemUpgradePlayerTumbleClimb", "tumbleClimb" }
+            { "UpgradePlayerGrabStrength", "strength" },
+            { "UpgradePlayerTumbleLaunch", "tumbleLaunch" },
+            { "UpgradePlayerGrabRange", "range" },
+            { "UpgradePlayerSprintSpeed", "sprintSpeed" },
+            { "UpgradePlayerTumbleWings", "tumbleWings" },
+            { "UpgradePlayerCrouchRest", "crouchRest" },
+            { "UpgradePlayerExtraJump", "extraJump" },
+            { "UpgradePlayerTumbleClimb", "tumbleClimb" }
         };
 
         private static readonly string[] CurrentHealthMemberNames =
@@ -407,7 +407,7 @@ namespace OverlayHUD
                 HarmonyMethod enemyOnScreenLogicPostfix = new HarmonyMethod(typeof(Plugin).GetMethod(nameof(EnemyOnScreenLogicPostfix), BindingFlags.NonPublic | BindingFlags.Static));
                 HarmonyMethod levelChangingPrefix = new HarmonyMethod(typeof(Plugin).GetMethod(nameof(LevelChangingPrefix), BindingFlags.NonPublic | BindingFlags.Static));
                 HarmonyMethod levelChangedPostfix = new HarmonyMethod(typeof(Plugin).GetMethod(nameof(LevelChangedPostfix), BindingFlags.NonPublic | BindingFlags.Static));
-                HarmonyMethod playerUpgradeConsumedPostfix = new HarmonyMethod(typeof(Plugin).GetMethod(nameof(PlayerUpgradeConsumedPostfix), BindingFlags.NonPublic | BindingFlags.Static));
+                HarmonyMethod playerUpgradeAppliedPostfix = new HarmonyMethod(typeof(Plugin).GetMethod(nameof(PlayerUpgradeAppliedPostfix), BindingFlags.NonPublic | BindingFlags.Static));
                 HarmonyMethod extractionCompletedPostfix = new HarmonyMethod(typeof(Plugin).GetMethod(nameof(ExtractionCompletedPostfix), BindingFlags.NonPublic | BindingFlags.Static));
                 HarmonyMethod valuableDollarValueSetRpcPostfix = new HarmonyMethod(typeof(Plugin).GetMethod(nameof(ValuableDollarValueSetRpcPostfix), BindingFlags.NonPublic | BindingFlags.Static));
                 HarmonyMethod valuableDollarValueSetLogicPostfix = new HarmonyMethod(typeof(Plugin).GetMethod(nameof(ValuableDollarValueSetLogicPostfix), BindingFlags.NonPublic | BindingFlags.Static));
@@ -545,14 +545,14 @@ namespace OverlayHUD
                 }
 
                 int patchedUpgradeTypes = 0;
-                foreach (string itemTypeName in UpgradeStateKeyByItemType.Keys)
+                foreach (string methodName in UpgradeStateKeyByPunMethod.Keys)
                 {
-                    MethodInfo upgradeMethod = AccessTools.Method(itemTypeName + ":Upgrade");
+                    MethodInfo upgradeMethod = AccessTools.Method("PunManager:" + methodName);
                     if (upgradeMethod == null) continue;
-                    harmony.Patch(upgradeMethod, postfix: playerUpgradeConsumedPostfix);
+                    harmony.Patch(upgradeMethod, postfix: playerUpgradeAppliedPostfix);
                     patchedUpgradeTypes++;
                 }
-                Logger.LogInfo("Patched " + patchedUpgradeTypes + " item upgrade methods for targeted sync.");
+                Logger.LogInfo("Patched " + patchedUpgradeTypes + " PunManager upgrade methods for event-driven sync.");
 
             }
             catch (Exception error)
@@ -608,12 +608,12 @@ namespace OverlayHUD
             instance?.HandleLevelChanged(__instance);
         }
 
-        private static void PlayerUpgradeConsumedPostfix(MethodBase __originalMethod)
+        private static void PlayerUpgradeAppliedPostfix(MethodBase __originalMethod, string _steamID, int __result)
         {
-            string itemTypeName = __originalMethod?.DeclaringType?.Name;
-            if (itemTypeName != null && UpgradeStateKeyByItemType.TryGetValue(itemTypeName, out string stateKey))
+            string methodName = __originalMethod?.Name;
+            if (methodName != null && UpgradeStateKeyByPunMethod.TryGetValue(methodName, out string stateKey))
             {
-                instance?.MarkPlayerUpgradeDirty(stateKey);
+                instance?.SyncPlayerUpgradeValueIfLocal(stateKey, _steamID, __result);
             }
         }
 
@@ -1810,10 +1810,24 @@ namespace OverlayHUD
             nextUpgradeSyncAt = Time.realtimeSinceStartup + 2f;
         }
 
-        private void MarkPlayerUpgradeDirty(string stateKey)
+        private void SyncPlayerUpgradeValueIfLocal(string stateKey, string steamId, int value)
         {
-            pendingUpgradeKeys.Add(stateKey);
-            nextUpgradeSyncAt = Time.realtimeSinceStartup + 0.1f;
+            if (!gameplayActive || string.IsNullOrEmpty(stateKey)) return;
+
+            string localSteamId = ResolveLocalPlayerSteamId();
+            if (!string.IsNullOrEmpty(localSteamId) && !string.Equals(localSteamId, steamId, StringComparison.Ordinal)) return;
+
+            int normalizedValue = Math.Max(0, value);
+            if (lastSyncedUpgrades.TryGetValue(stateKey, out int previousValue) && previousValue == normalizedValue) return;
+
+            pendingUpgradeKeys.Remove(stateKey);
+            lastSyncedUpgrades[stateKey] = normalizedValue;
+            var json = new StringBuilder("{\"upgrades\":{\"")
+                .Append(stateKey)
+                .Append("\":")
+                .Append(normalizedValue)
+                .Append("}}");
+            StartCoroutine(PostPlayerUpgrades(json.ToString(), 1));
         }
 
         private void SyncTabStateIfChanged()
@@ -1853,14 +1867,7 @@ namespace OverlayHUD
             object upgradesValue = ReadMember(statsManager, memberName);
             if (!(upgradesValue is IDictionary upgrades)) return null;
 
-            Type playerControllerType = AccessTools.TypeByName("PlayerController");
-            object playerController = ReadMember(playerControllerType, "instance");
-            string steamId = ReadMember(playerController, "playerSteamID") as string;
-            if (string.IsNullOrEmpty(steamId))
-            {
-                object playerAvatar = ReadMember(playerController, "playerAvatarScript");
-                steamId = ReadMember(playerAvatar, "steamID") as string;
-            }
+            string steamId = ResolveLocalPlayerSteamId();
 
             object value = !string.IsNullOrEmpty(steamId) && upgrades.Contains(steamId) ? upgrades[steamId] : null;
             if (value == null && upgrades.Count == 1)
@@ -1881,6 +1888,17 @@ namespace OverlayHUD
             {
                 return null;
             }
+        }
+
+        private static string ResolveLocalPlayerSteamId()
+        {
+            Type playerControllerType = AccessTools.TypeByName("PlayerController");
+            object playerController = ReadMember(playerControllerType, "instance");
+            string steamId = ReadMember(playerController, "playerSteamID") as string;
+            if (!string.IsNullOrEmpty(steamId)) return steamId;
+
+            object playerAvatar = ReadMember(playerController, "playerAvatarScript");
+            return ReadMember(playerAvatar, "steamID") as string;
         }
 
         private static Camera FindBestCamera()
@@ -2142,7 +2160,7 @@ namespace OverlayHUD
 
                 Plugin plugin = instance;
                 if (plugin == null || !plugin.gameplayActive || enemyParent == null) continue;
-                if (plugin.preferPlayerVisionDetection.Value) continue;
+                if (plugin.preferPlayerVisionDetection.Value && HasEnemyOnScreen(enemyParent)) continue;
 
                 bool isPlayerVeryClose = plugin.IsEnemyParentPlayerVeryClose(enemyParent);
                 if (isPlayerVeryClose && !wasPlayerVeryClose)
@@ -2185,7 +2203,7 @@ namespace OverlayHUD
 
         private void HandleBlindEnemyPlayerVeryClose(Component enemyParent)
         {
-            if (preferPlayerVisionDetection.Value) return;
+            if (preferPlayerVisionDetection.Value && HasEnemyOnScreen(enemyParent)) return;
             if (enemyParent == null || HasEnemyVision(enemyParent)) return;
 
             int instanceId = ResolveEnemyInstanceId(enemyParent);
@@ -2252,13 +2270,13 @@ namespace OverlayHUD
 
         private void HandleEnemyVisionTrigger(object vision, int playerId)
         {
-            if (preferPlayerVisionDetection.Value) return;
             if (!gameplayActive || vision == null) return;
             int localViewId = GetLocalPlayerViewId();
             if (playerId != localViewId) return;
 
             if (!TryGetVisionEnemyCache(vision, out VisionEnemyCache visionEnemy)) return;
             Component enemyParent = visionEnemy.EnemyParent;
+            if (preferPlayerVisionDetection.Value && HasEnemyOnScreen(enemyParent)) return;
             int instanceId = visionEnemy.InstanceId;
             if (instanceId == 0 || IsEnemySent(instanceId)) return;
             if (pendingEncounterIds.Contains(instanceId)) return;
@@ -2330,6 +2348,14 @@ namespace OverlayHUD
             Component enemy = ReadMember(enemyParent, "Enemy") as Component;
             object hasVision = ReadMember(enemy, "HasVision");
             return hasVision is bool value && value;
+        }
+
+        private static bool HasEnemyOnScreen(Component enemyParent)
+        {
+            Component enemy = ReadMember(enemyParent, "Enemy") as Component;
+            object hasOnScreen = ReadMember(enemy, "HasOnScreen");
+            if (hasOnScreen is bool value) return value;
+            return enemy != null && enemy.GetComponent("EnemyOnScreen") != null;
         }
 
         private static Component GetEnemyParentFromOnScreen(Component enemyOnScreen)
