@@ -19,7 +19,7 @@ using UnityEngine.SceneManagement;
 
 namespace OverlayHUD
 {
-    [BepInPlugin("local.overlay.overlay_hud", "OverlayHUD", "0.2.97")]
+    [BepInPlugin("local.overlay.overlay_hud", "OverlayHUD", "0.2.99")]
     public sealed class Plugin : BaseUnityPlugin
     {
         private static Plugin instance;
@@ -149,7 +149,6 @@ namespace OverlayHUD
         private readonly HashSet<int> pendingEncounterIds = new HashSet<int>();
         private float nextScanAt;
         private float nextStatusSyncAt;
-        private float nextTimerStatusSyncAt;
         private float nextUpgradeSyncAt;
         private float nextMapValueSyncAt;
         private float nextDebugSummaryAt;
@@ -161,7 +160,6 @@ namespace OverlayHUD
         private readonly HashSet<string> pendingUpgradeKeys = new HashSet<string>();
         private string lastRosterFingerprint = "";
         private string lastStatusFingerprint = "";
-        private string lastTimerStatusFingerprint = "";
         private string pendingRosterFingerprint = "";
         private int rosterStableScans;
         private int broadEnemyDiscoveryAttempts;
@@ -180,7 +178,6 @@ namespace OverlayHUD
         private ConfigEntry<string> levelEndpoint;
         private ConfigEntry<float> scanInterval;
         private ConfigEntry<float> statusInterval;
-        private ConfigEntry<float> timerStatusInterval;
         private ConfigEntry<bool> debugLogging;
         private ConfigEntry<bool> autoStartOverlayApp;
         private ConfigEntry<bool> autoCloseOverlayApp;
@@ -197,7 +194,6 @@ namespace OverlayHUD
             levelEndpoint = Config.Bind("Overlay", "LevelEndpoint", "http://127.0.0.1:8787/api/level", "Level sync endpoint on this PC.");
             scanInterval = Config.Bind("Detection", "ScanIntervalSeconds", 3f, "How often pending enemy roster sync is retried.");
             statusInterval = Config.Bind("Detection", "StatusIntervalSeconds", 2f, "How often monster health and respawn status are synced after the roster is known.");
-            timerStatusInterval = Config.Bind("Detection", "TimerStatusIntervalSeconds", 1f, "How often visible monster respawn timers are synced without a full status scan.");
             debugLogging = Config.Bind("Debug", "Logging", false, "Write periodic bridge debug logs.");
             autoStartOverlayApp = Config.Bind("OverlayApp", "AutoStart", true, "Start the bundled OverlayHUD desktop app when the game starts.");
             autoCloseOverlayApp = Config.Bind("OverlayApp", "AutoClose", true, "Close the bundled OverlayHUD desktop app when the game exits.");
@@ -381,6 +377,8 @@ namespace OverlayHUD
                 harmony = new Harmony("local.overlay.overlay_hud");
                 MethodInfo enemyParentSpawnRpc = AccessTools.Method("EnemyParent:SpawnRPC");
                 MethodInfo enemyParentDespawnRpc = AccessTools.Method("EnemyParent:DespawnRPC");
+                MethodInfo enemyParentDisableDecrease = AccessTools.Method("EnemyParent:DisableDecrease");
+                MethodInfo enemyParentDespawnedTimerSet = AccessTools.Method("EnemyParent:DespawnedTimerSet");
                 MethodInfo enemyParentPlayerCloseLogic = AccessTools.Method("EnemyParent:PlayerCloseLogic");
                 MethodInfo levelGeneratorGenerateDone = AccessTools.Method("LevelGenerator:GenerateDone");
                 MethodInfo levelGeneratorStartRoomGeneration = AccessTools.Method("LevelGenerator:StartRoomGeneration");
@@ -401,6 +399,7 @@ namespace OverlayHUD
                 HarmonyMethod levelGenerationStartingPrefix = new HarmonyMethod(typeof(Plugin).GetMethod(nameof(LevelGenerationStartingPrefix), BindingFlags.NonPublic | BindingFlags.Static));
                 HarmonyMethod enemySpawnedPostfix = new HarmonyMethod(typeof(Plugin).GetMethod(nameof(EnemyParentSpawnedPostfix), BindingFlags.NonPublic | BindingFlags.Static));
                 HarmonyMethod enemyDespawnedPostfix = new HarmonyMethod(typeof(Plugin).GetMethod(nameof(EnemyParentDespawnedPostfix), BindingFlags.NonPublic | BindingFlags.Static));
+                HarmonyMethod enemyTimerChangedPostfix = new HarmonyMethod(typeof(Plugin).GetMethod(nameof(EnemyParentTimerChangedPostfix), BindingFlags.NonPublic | BindingFlags.Static));
                 HarmonyMethod enemyPlayerCloseLogicPostfix = new HarmonyMethod(typeof(Plugin).GetMethod(nameof(EnemyParentPlayerCloseLogicPostfix), BindingFlags.NonPublic | BindingFlags.Static));
                 HarmonyMethod levelChangingPrefix = new HarmonyMethod(typeof(Plugin).GetMethod(nameof(LevelChangingPrefix), BindingFlags.NonPublic | BindingFlags.Static));
                 HarmonyMethod levelChangedPostfix = new HarmonyMethod(typeof(Plugin).GetMethod(nameof(LevelChangedPostfix), BindingFlags.NonPublic | BindingFlags.Static));
@@ -425,6 +424,18 @@ namespace OverlayHUD
                 {
                     harmony.Patch(enemyParentDespawnRpc, postfix: enemyDespawnedPostfix);
                     Logger.LogInfo("Patched EnemyParent.DespawnRPC for immediate status sync.");
+                }
+
+                if (enemyParentDisableDecrease != null)
+                {
+                    harmony.Patch(enemyParentDisableDecrease, postfix: enemyTimerChangedPostfix);
+                    Logger.LogInfo("Patched EnemyParent.DisableDecrease for event-driven respawn timer sync.");
+                }
+
+                if (enemyParentDespawnedTimerSet != null)
+                {
+                    harmony.Patch(enemyParentDespawnedTimerSet, postfix: enemyTimerChangedPostfix);
+                    Logger.LogInfo("Patched EnemyParent.DespawnedTimerSet for event-driven respawn timer sync.");
                 }
 
                 if (enemyParentPlayerCloseLogic != null)
@@ -613,6 +624,14 @@ namespace OverlayHUD
             }
         }
 
+        private static void EnemyParentTimerChangedPostfix(object __instance)
+        {
+            if (__instance is Component component)
+            {
+                instance?.SyncEnemyParentTimerChanged(component);
+            }
+        }
+
         private static void EnemyParentPlayerCloseLogicPostfix(object __instance, ref IEnumerator __result)
         {
             if (__result == null || !(__instance is Component enemyParent) || HasEnemyVision(enemyParent)) return;
@@ -691,12 +710,6 @@ namespace OverlayHUD
                 var keys = new HashSet<string>(pendingUpgradeKeys);
                 pendingUpgradeKeys.Clear();
                 SyncPlayerUpgradesIfChanged(keys);
-            }
-
-            if (rosterPublished && now >= nextTimerStatusSyncAt)
-            {
-                nextTimerStatusSyncAt = now + Math.Max(0.25f, timerStatusInterval.Value);
-                SyncVisibleMonsterTimers();
             }
 
             if (rosterPublished && now >= nextStatusSyncAt)
@@ -945,7 +958,6 @@ namespace OverlayHUD
             cachedLocalPlayerViewId = int.MinValue;
             lastRosterFingerprint = "";
             lastStatusFingerprint = "";
-            lastTimerStatusFingerprint = "";
             pendingRosterFingerprint = "";
             rosterStableScans = 0;
             broadEnemyDiscoveryAttempts = 0;
@@ -954,7 +966,6 @@ namespace OverlayHUD
             scanPausedUntil = Time.realtimeSinceStartup + 2f;
             nextScanAt = scanPausedUntil;
             nextStatusSyncAt = scanPausedUntil;
-            nextTimerStatusSyncAt = scanPausedUntil;
             nextUpgradeSyncAt = scanPausedUntil;
             nextDebugSummaryAt = 0f;
             nextBroadEnemyDiscoveryAt = scanPausedUntil;
@@ -1139,52 +1150,6 @@ namespace OverlayHUD
             StartCoroutine(PostMonsterStatuses(json.ToString()));
         }
 
-        private void SyncVisibleMonsterTimers()
-        {
-            var statusCandidates = new Dictionary<int, EnemyCandidate>();
-            foreach (Component enemyParent in GetKnownEnemyParentsSnapshot())
-            {
-                if (enemyParent == null) continue;
-                AddStatusCandidate(statusCandidates, enemyParent);
-            }
-
-            if (statusCandidates.Count == 0) return;
-
-            var sourceIds = new List<int>(statusCandidates.Keys);
-            sourceIds.Sort();
-
-            var json = new StringBuilder("{\"statuses\":[");
-            var fingerprint = new StringBuilder();
-            int statusCount = 0;
-
-            for (int index = 0; index < sourceIds.Count; index++)
-            {
-                int instanceId = sourceIds[index];
-                if (!IsEnemySent(instanceId)) continue;
-
-                EnemyCandidate candidate = statusCandidates[instanceId];
-                if (!TryGetEnemyRespawnStatus(candidate, out bool alive, out float remaining)) continue;
-
-                float roundedRemaining = alive ? 0f : (float)Math.Ceiling(Math.Max(0f, remaining) * 10f) / 10f;
-                string remainingText = roundedRemaining.ToString("0.0", CultureInfo.InvariantCulture);
-                fingerprint.Append(instanceId).Append(':').Append(alive ? '1' : '0').Append(':').Append(remainingText).Append(';');
-
-                if (statusCount++ > 0) json.Append(',');
-                json.Append("{\"id\":").Append(instanceId)
-                    .Append(",\"alive\":").Append(alive ? "true" : "false")
-                    .Append(",\"respawnRemaining\":").Append(remainingText)
-                    .Append('}');
-            }
-
-            if (statusCount == 0) return;
-            string nextFingerprint = fingerprint.ToString();
-            if (nextFingerprint == lastTimerStatusFingerprint) return;
-            lastTimerStatusFingerprint = nextFingerprint;
-
-            json.Append("]}");
-            StartCoroutine(PostMonsterStatuses(json.ToString()));
-        }
-
         private static bool TryGetEnemyRespawnStatus(EnemyCandidate candidate, out bool alive, out float remaining)
         {
             alive = true;
@@ -1230,6 +1195,34 @@ namespace OverlayHUD
             Component enemy = ReadMember(enemyHealthSource, "enemy") as Component;
             Component enemyParent = ReadMember(enemy, "EnemyParent") as Component;
             SyncEnemyParentStatusChanged(enemyParent);
+        }
+
+        private void SyncEnemyParentTimerChanged(Component enemyParent)
+        {
+            if (!gameplayActive || enemyParent == null) return;
+            GameObject root = GetEnemyRoot(enemyParent);
+            if (root == null) return;
+
+            int instanceId = root.GetInstanceID();
+            if (!IsEnemySent(instanceId)) return;
+
+            var candidate = new EnemyCandidate
+            {
+                Component = enemyParent,
+                Root = root,
+                Center = Vector3.zero
+            };
+
+            if (!TryGetEnemyRespawnStatus(candidate, out bool alive, out float remaining)) return;
+
+            float roundedRemaining = alive ? 0f : (float)Math.Ceiling(Math.Max(0f, remaining) * 10f) / 10f;
+            string remainingText = roundedRemaining.ToString("0.0", CultureInfo.InvariantCulture);
+            var json = new StringBuilder("{\"statuses\":[{\"id\":")
+                .Append(instanceId)
+                .Append(",\"alive\":").Append(alive ? "true" : "false")
+                .Append(",\"respawnRemaining\":").Append(remainingText)
+                .Append("}]}");
+            StartCoroutine(PostMonsterStatuses(json.ToString()));
         }
 
         private void SyncEnemyParentStatusChanged(Component enemyParent)
@@ -2169,6 +2162,7 @@ namespace OverlayHUD
                 Logger.LogInfo("Encountered nearby monster: " + monsterName + " from " + enemyParent.GetType().Name + " / " + root.name);
             }
             StartCoroutine(PostSeenMonster(monsterName, instanceId));
+            SyncEnemyParentStatusChanged(enemyParent);
             return true;
         }
 
