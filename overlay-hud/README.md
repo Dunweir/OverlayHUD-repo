@@ -23,7 +23,7 @@ BepInEx creates `local.overlay.overlay_hud.cfg` after first launch. Current sett
 
 - `Overlay.Endpoint` and `Overlay.LevelEndpoint` for the local HUD server.
 - `Detection.ScanIntervalSeconds` for pending roster retries.
-- `Detection.StatusIntervalSeconds` for periodic status sync; values below 5 seconds are raised to 5.
+- `Detection.StatusIntervalSeconds` for periodic safety sync; event-driven health and respawn changes remain immediate, and values below 10 seconds are raised to 10.
 - `Detection.PreferPlayerVisionDetection` for player-visible encounter detection, with legacy fallback for enemies that need it.
 - `Debug.Logging` for extra diagnostic logs.
 - `OverlayApp.AutoStart`, `OverlayApp.AutoClose`, `OverlayApp.ExecutableRelativePath`, and `OverlayApp.ArchiveName` for the bundled `OverlayHUD_app`.

@@ -1300,8 +1300,12 @@
             }
         }, 1000);
         setInterval(() => {
-            for (const square of monstersSquares.children) renderMonsterCooldown(square);
-        }, 50);
+            if (!latestState?.gameplayVisible
+                || (!latestState.respawnTimerVisible && !latestState.respawnIndicatorVisible)) return;
+            for (const square of monstersSquares.querySelectorAll('[data-cooldown-active="true"]')) {
+                renderMonsterCooldown(square);
+            }
+        }, 200);
     </script>
 </body>
 </html>

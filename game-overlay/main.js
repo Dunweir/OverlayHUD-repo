@@ -301,7 +301,7 @@ function startHoverTracking() {
     hoverTick = 0;
     refreshOverlayContentBounds();
     hoverTimer = setInterval(() => {
-        if (++hoverTick % 2 === 0) refreshOverlayContentBounds();
+        if (++hoverTick % 5 === 0) refreshOverlayContentBounds();
         const cursor = screen.getCursorScreenPoint();
         const isOverControls = overlayInteractiveBounds
             && cursor.x >= overlayInteractiveBounds.left

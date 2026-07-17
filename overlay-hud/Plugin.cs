@@ -19,7 +19,7 @@ using UnityEngine.SceneManagement;
 
 namespace OverlayHUD
 {
-    [BepInPlugin("local.overlay.overlay_hud", "OverlayHUD", "0.2.108")]
+    [BepInPlugin("local.overlay.overlay_hud", "OverlayHUD", "0.2.109")]
     public sealed class Plugin : BaseUnityPlugin
     {
         private static Plugin instance;
@@ -36,6 +36,8 @@ namespace OverlayHUD
         private static readonly Dictionary<string, MethodInfo> noArgMethodCache = new Dictionary<string, MethodInfo>();
         private static readonly HashSet<string> missingNoArgMethodCache = new HashSet<string>();
         private static Task networkQueueTail = Task.CompletedTask;
+        private static int latestMonsterStatusRequestVersion;
+        private static int latestMapValueRequestVersion;
         private static float mapValue;
         private static float mapValueInitial;
         private static float lostValue;
@@ -165,6 +167,7 @@ namespace OverlayHUD
         private float nextMapValueSyncAt;
         private float nextDebugSummaryAt;
         private float nextBroadEnemyDiscoveryAt;
+        private float nextStatusDirectorRecoveryAt;
         private float scanPausedUntil;
         private int fallbackLevel = 1;
         private int lastSyncedLevel;
@@ -206,7 +209,7 @@ namespace OverlayHUD
             endpoint = Config.Bind("Overlay", "Endpoint", "http://127.0.0.1:8787/api/monster-seen", "Monster endpoint on this PC.");
             levelEndpoint = Config.Bind("Overlay", "LevelEndpoint", "http://127.0.0.1:8787/api/level", "Level sync endpoint on this PC.");
             scanInterval = Config.Bind("Detection", "ScanIntervalSeconds", 3f, "How often pending enemy roster sync is retried.");
-            statusInterval = Config.Bind("Detection", "StatusIntervalSeconds", 5f, "How often monster health and respawn status are synced after the roster is known. Values below 5 are raised to 5.");
+            statusInterval = Config.Bind("Detection", "StatusIntervalSeconds", 10f, "How often monster health and respawn status are synced after the roster is known. Event-driven changes remain immediate; values below 10 are raised to 10.");
             preferPlayerVisionDetection = Config.Bind("Detection", "PreferPlayerVisionDetection", true, "When enabled, show monsters when the player sees them. When disabled, use the older enemy-vision plus player-very-close detection.");
             debugLogging = Config.Bind("Debug", "Logging", false, "Write periodic bridge debug logs.");
             autoStartOverlayApp = Config.Bind("OverlayApp", "AutoStart", true, "Start the bundled OverlayHUD desktop app when the game starts.");
@@ -224,9 +227,9 @@ namespace OverlayHUD
                 levelEndpoint.Value = "http://127.0.0.1:8787/api/level";
                 configChanged = true;
             }
-            if (statusInterval.Value < 5f)
+            if (statusInterval.Value < 10f)
             {
-                statusInterval.Value = 5f;
+                statusInterval.Value = 10f;
                 configChanged = true;
             }
             if (overlayAppRelativePath.Value == "OverlayHUD.exe"
@@ -747,7 +750,7 @@ namespace OverlayHUD
 
             if (rosterPublished && now >= nextStatusSyncAt)
             {
-                nextStatusSyncAt = now + Math.Max(5f, statusInterval.Value);
+                nextStatusSyncAt = now + Math.Max(10f, statusInterval.Value);
                 SyncMonsterStatuses(new List<ResolvedEnemyCandidate>());
             }
 
@@ -1006,6 +1009,7 @@ namespace OverlayHUD
             nextUpgradeSyncAt = scanPausedUntil;
             nextDebugSummaryAt = 0f;
             nextBroadEnemyDiscoveryAt = scanPausedUntil;
+            nextStatusDirectorRecoveryAt = scanPausedUntil;
             Logger.LogInfo("Cleared seen monsters: " + reason + ".");
         }
 
@@ -1123,11 +1127,16 @@ namespace OverlayHUD
                 AddStatusCandidate(statusCandidates, enemyParent);
             }
 
-            foreach (Component enemyParent in FindSpawnedEnemiesFromDirector())
+            float now = Time.realtimeSinceStartup;
+            if (statusCandidates.Count == 0 || now >= nextStatusDirectorRecoveryAt)
             {
-                if (enemyParent == null) continue;
-                RegisterEnemyParent(enemyParent);
-                AddStatusCandidate(statusCandidates, enemyParent);
+                nextStatusDirectorRecoveryAt = now + 30f;
+                foreach (Component enemyParent in FindSpawnedEnemiesFromDirector())
+                {
+                    if (enemyParent == null) continue;
+                    RegisterEnemyParent(enemyParent);
+                    AddStatusCandidate(statusCandidates, enemyParent);
+                }
             }
 
             var sourceIds = new List<int>(statusCandidates.Keys);
@@ -1184,7 +1193,7 @@ namespace OverlayHUD
             if (nextFingerprint == lastStatusFingerprint) return;
             lastStatusFingerprint = nextFingerprint;
             json.Append("]}");
-            StartCoroutine(PostMonsterStatuses(json.ToString()));
+            StartCoroutine(PostMonsterStatuses(json.ToString(), true));
         }
 
         private static bool TryGetEnemyRespawnStatus(EnemyCandidate candidate, out bool alive, out float remaining)
@@ -2628,12 +2637,16 @@ namespace OverlayHUD
             yield break;
         }
 
-        private IEnumerator PostMonsterStatuses(string json)
+        private IEnumerator PostMonsterStatuses(string json, bool coalesce = false)
         {
             string statusEndpoint = BuildSiblingEndpoint(levelEndpoint.Value, "/api/monster-status");
-            Task<string> request = QueueNetworkRequest(() => SendHttpPost(statusEndpoint, json));
+            int requestVersion = coalesce ? Interlocked.Increment(ref latestMonsterStatusRequestVersion) : 0;
+            Task<string> request = QueueNetworkRequest(() => !coalesce || requestVersion == Volatile.Read(ref latestMonsterStatusRequestVersion)
+                ? SendHttpPost(statusEndpoint, json)
+                : "SKIPPED:Superseded monster status snapshot.");
             while (!request.IsCompleted) yield return null;
             string result = request.IsFaulted ? "ERROR:" + request.Exception.GetBaseException().Message : request.Result;
+            if (result.StartsWith("SKIPPED:", StringComparison.Ordinal)) yield break;
             if (!IsHttpSuccess(result))
             {
                 Logger.LogWarning("Failed to sync monster respawn status: " + TrimHttpResult(result));
@@ -2736,9 +2749,13 @@ namespace OverlayHUD
             if (goal.HasValue) json += ",\"goal\":" + goal.Value.ToString(CultureInfo.InvariantCulture);
             json += "}";
 
-            Task<string> request = QueueNetworkRequest(() => SendHttpPost(mapValueEndpoint, json));
+            int requestVersion = Interlocked.Increment(ref latestMapValueRequestVersion);
+            Task<string> request = QueueNetworkRequest(() => requestVersion == Volatile.Read(ref latestMapValueRequestVersion)
+                ? SendHttpPost(mapValueEndpoint, json)
+                : "SKIPPED:Superseded map value snapshot.");
             while (!request.IsCompleted) yield return null;
             string result = request.IsFaulted ? "ERROR:" + request.Exception.GetBaseException().Message : request.Result;
+            if (result.StartsWith("SKIPPED:", StringComparison.Ordinal)) yield break;
             if (!IsHttpSuccess(result))
             {
                 Logger.LogWarning("Failed to sync map value: " + TrimHttpResult(result));
