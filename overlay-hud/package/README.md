@@ -1,15 +1,35 @@
 # OverlayHUD
 
-OverlayHUD connects R.E.P.O. to the desktop HUD app. It sends discovered monsters, level changes, player upgrades, and respawn cooldowns so the external HUD can stay in sync with the current run.
+**Author: EgorSalad**
 
-Holding Tab temporarily hides the in-game HUD until the key is released. PlayerVision detection is used when available, with legacy close/vision fallback for enemies that need it.
+OverlayHUD adds a bundled desktop HUD to R.E.P.O. The app starts with the game, closes automatically, and stays synchronized with the current run.
 
-The game needs BepInEx installed in the active Gale profile.
+The HUD displays:
+
+- encountered monsters and their strength;
+- monster health and respawn cooldowns;
+- level number and timer;
+- player upgrades;
+- current map value and lost value.
+
+Monsters appear only after an encounter instead of revealing the entire level roster. Holding Tab temporarily hides the HUD. The overlay includes controls for layout, scale, columns, visibility, language, and other display options.
+
+BepInEx must be installed in the active Gale profile.
 
 ## Russian
 
-OverlayHUD связывает R.E.P.O. с внешним HUD-приложением. Мод отправляет найденных монстров, смену уровня, улучшения игроков и таймеры респавна, чтобы внешний HUD оставался синхронизированным с текущим забегом.
+**Автор: EgorSalad**
 
-Удержание Tab временно скрывает HUD внутри игры до отпускания клавиши. Для Peeper используется отдельная дистанция обнаружения вблизи, когда игра помечает его как очень близкого к игроку.
+OverlayHUD добавляет в R.E.P.O. комплектный настольный HUD. Приложение запускается вместе с игрой, автоматически закрывается и остаётся синхронизированным с текущим забегом.
+
+HUD отображает:
+
+- встреченных монстров и их силу;
+- здоровье монстров и таймеры респавна;
+- номер уровня и таймер;
+- улучшения игрока;
+- текущую стоимость ценностей на карте и сумму потерь.
+
+Монстры появляются только после встречи и не раскрывают весь состав уровня заранее. Удержание Tab временно скрывает HUD. В оверлее доступны настройки расположения, масштаба, количества колонок, видимости элементов, языка и другие параметры отображения.
 
 Для работы игре нужен BepInEx в активном профиле Gale.

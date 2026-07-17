@@ -1,8 +1,8 @@
 {
   "name": "OverlayHUD",
-  "version_number": "0.2.109",
+  "version_number": "26.7.0",
   "website_url": "",
-  "description": "Syncs R.E.P.O. monsters, levels, upgrades, and respawn cooldowns with OverlayHUD. Синхронизирует монстров, уровни, улучшения и таймеры респавна с OverlayHUD.",
+  "description": "OverlayHUD by EgorSalad: monsters, health, respawns, timer, upgrades and valuables. OverlayHUD от EgorSalad: монстры, здоровье, респавны, таймер, улучшения и ценности.",
   "dependencies": [
     "BepInEx-BepInExPack-5.4.2305"
   ]

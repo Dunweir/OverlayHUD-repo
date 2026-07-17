@@ -1,5 +1,7 @@
 # OverlayHUD
 
+**Author: EgorSalad**
+
 Small BepInEx plugin source for syncing R.E.P.O. runtime state with the bundled OverlayHUD desktop app.
 
 The plugin does not reveal the whole level roster to the HUD as seen. It builds the roster for status tracking, then sends a monster as encountered only after the game reports a player-visible or legacy close/vision encounter. Tick and Upscream use the legacy fallback while PlayerVision detection is enabled because their `EnemyOnScreen` path is not reliable in current testing.
