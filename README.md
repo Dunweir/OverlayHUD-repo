@@ -9,7 +9,13 @@
 
 ## Как выглядит OverlayHUD
 
+**HUD во время игры:**
+
 ![OverlayHUD во время игры](docs/images/overlayhud-example.png)
+
+**Панель настроек:**
+
+![Панель настроек OverlayHUD](docs/images/overlayhud-settings.png)
 
 ## Что делает мод
 
