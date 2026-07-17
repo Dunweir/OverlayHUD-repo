@@ -11,11 +11,11 @@
 
 **HUD во время игры:**
 
-![OverlayHUD во время игры](docs/images/overlayhud-example.png)
+![OverlayHUD во время игры](docs/images/overlayhud-example.jpg)
 
 **Панель настроек:**
 
-![Панель настроек OverlayHUD](docs/images/overlayhud-settings.png)
+![Панель настроек OverlayHUD](docs/images/overlayhud-settings.jpg)
 
 ## Что делает мод
 
