@@ -2,7 +2,9 @@
 
 **Автор: EgorSalad**
 
-OverlayHUD добавляет в R.E.P.O. комплектный настольный HUD. Приложение запускается вместе с игрой, автоматически закрывается и остаётся синхронизированным с текущим забегом.
+OverlayHUD добавляет в R.E.P.O. настольный HUD поверх окна игры. Мод состоит из BepInEx-плагина `OverlayHUD.dll` и комплектного приложения `OverlayHUD.exe`.
+
+При первом запуске плагин распаковывает `OverlayHUD.exe` из архива мода в папку `OverlayHUD_app` рядом с DLL, а затем автоматически запускает его вместе с игрой. Плагин получает игровые события и передаёт их EXE через локальный адрес `127.0.0.1`; данные не отправляются во внешний интернет. При выходе из игры приложение автоматически закрывается.
 
 HUD отображает:
 
@@ -14,13 +16,15 @@ HUD отображает:
 
 Монстры появляются только после встречи и не раскрывают весь состав уровня заранее. Удержание Tab временно скрывает HUD. В оверлее доступны настройки расположения, масштаба, количества колонок, видимости элементов, языка и другие параметры отображения.
 
-Для работы игре нужен BepInEx в активном профиле Gale.
+Для работы нужен BepInEx в активном профиле Gale. Electron, Node.js и сам EXE отдельно устанавливать или запускать не требуется. Чтобы прозрачный HUD отображался поверх игры, используйте оконный или borderless-режим вместо exclusive fullscreen.
 
 ## English
 
 **Author: EgorSalad**
 
-OverlayHUD adds a bundled desktop HUD to R.E.P.O. The app starts with the game, closes automatically, and stays synchronized with the current run.
+OverlayHUD adds a desktop HUD over the R.E.P.O. game window. The mod consists of the `OverlayHUD.dll` BepInEx plugin and the bundled `OverlayHUD.exe` application.
+
+On first launch, the plugin extracts `OverlayHUD.exe` from the mod archive into an `OverlayHUD_app` folder next to the DLL, then starts it automatically with the game. The plugin receives game events and sends them to the EXE through the local `127.0.0.1` address; no data is sent to the external internet. The app closes automatically when the game exits.
 
 The HUD displays:
 
@@ -32,7 +36,7 @@ The HUD displays:
 
 Monsters appear only after an encounter instead of revealing the entire level roster. Holding Tab temporarily hides the HUD. The overlay includes controls for layout, scale, columns, visibility, language, and other display options.
 
-BepInEx must be installed in the active Gale profile.
+BepInEx must be installed in the active Gale profile. Electron, Node.js, and the EXE do not need to be installed or launched separately. Use windowed or borderless mode instead of exclusive fullscreen so the transparent HUD can appear over the game.
 
 ## License
 
