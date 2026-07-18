@@ -1,7 +1,7 @@
 {
   "name": "OverlayHUD",
   "version_number": "26.7.0",
-  "website_url": "",
+  "website_url": "https://github.com/Dunweir/overlay_repo",
   "description": "OverlayHUD от EgorSalad: монстры, здоровье, респавны, таймер, улучшения и ценности. OverlayHUD by EgorSalad: monsters, health, respawns, timer, upgrades and valuables.",
   "dependencies": [
     "BepInEx-BepInExPack-5.4.2305"

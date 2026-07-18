@@ -2,6 +2,7 @@
   "name": "overlay-hud",
   "version": "1.1.0",
   "private": true,
+  "license": "MPL-2.0",
   "description": "Transparent click-through desktop host for the REPO web overlay",
   "main": "main.js",
   "scripts": {

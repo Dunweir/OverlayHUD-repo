@@ -32,7 +32,6 @@ overlay-hud/package-flat/*.pak
 overlay-hud/package-flat/*.bin
 overlay-hud/package-flat/*.dat
 overlay-hud/package-flat/*.html
-overlay-hud/package-flat/LICENSE
 overlay-hud/package-flat/OverlayHUD.exe
 overlay-hud/package-flat/LICENSES.chromium.html
 overlay-hud/package-flat/locales/

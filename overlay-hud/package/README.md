@@ -33,3 +33,7 @@ The HUD displays:
 Monsters appear only after an encounter instead of revealing the entire level roster. Holding Tab temporarily hides the HUD. The overlay includes controls for layout, scale, columns, visibility, language, and other display options.
 
 BepInEx must be installed in the active Gale profile.
+
+## License
+
+OverlayHUD source code is licensed under the Mozilla Public License 2.0. See `LICENSE` and `THIRD_PARTY_NOTICES.md` included with the package.
