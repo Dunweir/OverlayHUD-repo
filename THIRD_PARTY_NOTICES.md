@@ -1,6 +1,6 @@
 # Third-party notices
 
-OverlayHUD includes or interoperates with third-party components and materials. The MPL-2.0 license for OverlayHUD does not replace their respective licenses or ownership terms.
+OverlayHUD includes or interoperates with third-party components and materials. The MIT License for OverlayHUD does not replace their respective licenses or ownership terms.
 
 ## Fonts distributed with OverlayHUD
 
@@ -19,8 +19,4 @@ OverlayHUD includes or interoperates with third-party components and materials. 
 
 OverlayHUD is an unofficial fan project and is not affiliated with semiwork or the publisher of R.E.P.O.
 
-Game names, trademarks, APIs, types, icons, character or monster images, upgrade images, screenshots, and other game-derived visual materials remain the property of their respective owners. Unless explicitly stated otherwise, those materials are not offered under the Mozilla Public License 2.0.
-
-## Referenced projects
-
-TimerMod, Imperium Repo, ChaosTricks and MenuLib are acknowledged in the main README as research or testing references. They are not included as OverlayHUD runtime dependencies, and their own licenses continue to apply to their respective projects.
+Game names, trademarks, APIs, types, icons, character or monster images, upgrade images, screenshots, and other game-derived visual materials remain the property of their respective owners. Unless explicitly stated otherwise, those materials are not offered under the MIT License.

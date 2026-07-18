@@ -36,4 +36,4 @@ BepInEx must be installed in the active Gale profile.
 
 ## License
 
-OverlayHUD source code is licensed under the Mozilla Public License 2.0. See `LICENSE` and `THIRD_PARTY_NOTICES.md` included with the package.
+OverlayHUD source code is licensed under the MIT License. See `LICENSE` and `THIRD_PARTY_NOTICES.md` included with the package.
