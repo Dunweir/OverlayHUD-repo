@@ -4,6 +4,8 @@
 
 **OverlayHUD целиком создан с использованием Codex AI.**
 
+**Релиз протестирован в R.E.P.O. перед публикацией.**
+
 OverlayHUD добавляет в R.E.P.O. настольный HUD поверх окна игры. Мод состоит из BepInEx-плагина `OverlayHUD.dll` и комплектного приложения `OverlayHUD.exe`.
 
 При первом запуске плагин распаковывает `OverlayHUD.exe` из архива мода в папку `OverlayHUD_app` рядом с DLL, а затем автоматически запускает его вместе с игрой. Плагин получает игровые события и передаёт их EXE через локальный адрес `127.0.0.1`; данные не отправляются во внешний интернет. При выходе из игры приложение автоматически закрывается.
@@ -25,6 +27,8 @@ HUD отображает:
 **Author: EgorSalad**
 
 **OverlayHUD was created entirely using Codex AI.**
+
+**This release was tested in R.E.P.O. before publication.**
 
 OverlayHUD adds a desktop HUD over the R.E.P.O. game window. The mod consists of the `OverlayHUD.dll` BepInEx plugin and the bundled `OverlayHUD.exe` application.
 
