@@ -246,6 +246,8 @@ body {
 }
 
 .overlay-topbar {
+    position: relative;
+    z-index: 2;
     display: block;
     max-width: 100%;
     column-gap: 10px;
@@ -658,6 +660,9 @@ body {
 }
 
 .monsters-squares {
+    position: relative;
+    z-index: 1;
+    isolation: isolate;
     display: flex;
     flex-wrap: wrap;
     justify-content: flex-start;
@@ -723,10 +728,6 @@ body {
     animation: monster-damage-flash 1s ease-out both;
 }
 
-.monster-square:hover {
-    z-index: 6;
-}
-
 .monster-square img {
     position: absolute;
     inset: 0;
@@ -741,7 +742,7 @@ body {
 .monster-proximity-wave {
     position: absolute;
     inset: -3px;
-    z-index: 0;
+    z-index: -1;
     border: 3px solid var(--glow-color);
     border-radius: inherit;
     opacity: 0;
@@ -776,7 +777,7 @@ body {
     }
     100% {
         opacity: 0;
-        transform: scale(1.55);
+        transform: scale(1.4125);
     }
 }
 

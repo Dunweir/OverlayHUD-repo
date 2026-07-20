@@ -1048,6 +1048,7 @@
 
                 monstersSquares.appendChild(square);
                 renderedSquareCount++;
+                setTimeout(() => square.classList.remove("is-slot-entering"), 400);
             }
 
             while (renderedSquareCount > totalCount) {

@@ -193,6 +193,7 @@ namespace OverlayHUD
         private ConfigEntry<string> levelEndpoint;
         private ConfigEntry<float> scanInterval;
         private ConfigEntry<float> statusInterval;
+        private ConfigEntry<bool> requireLineOfSight;
         private ConfigEntry<bool> preferPlayerVisionDetection;
         private ConfigEntry<bool> debugLogging;
         private ConfigEntry<bool> autoStartOverlayApp;
@@ -210,6 +211,7 @@ namespace OverlayHUD
             levelEndpoint = Config.Bind("Overlay", "LevelEndpoint", "http://127.0.0.1:8787/api/level", "Level sync endpoint on this PC.");
             scanInterval = Config.Bind("Detection", "ScanIntervalSeconds", 3f, "How often pending enemy roster sync is retried.");
             statusInterval = Config.Bind("Detection", "StatusIntervalSeconds", 10f, "How often monster health and respawn status are synced after the roster is known. Event-driven changes remain immediate; values below 10 are raised to 10.");
+            requireLineOfSight = Config.Bind("Detection", "RequireLineOfSight", true, "Reveal monsters only after an encounter. Disable to reveal the complete level roster as soon as it is known.");
             preferPlayerVisionDetection = Config.Bind("Detection", "PreferPlayerVisionDetection", true, "When enabled, show monsters when the player sees them. When disabled, use the older enemy-vision plus player-very-close detection.");
             debugLogging = Config.Bind("Debug", "Logging", false, "Write periodic bridge debug logs.");
             autoStartOverlayApp = Config.Bind("OverlayApp", "AutoStart", true, "Start the bundled OverlayHUD desktop app when the game starts.");
@@ -1053,6 +1055,7 @@ namespace OverlayHUD
                 }
                 return;
             }
+            if (!requireLineOfSight.Value) RevealAllKnownEnemies(resolvedEnemies);
             SyncMonsterStatuses(resolvedEnemies);
             TryPublishPendingVisionEncounters(resolvedEnemies);
             enemyRosterDirty = false;
@@ -1061,6 +1064,25 @@ namespace OverlayHUD
             {
                 nextDebugSummaryAt = Time.realtimeSinceStartup + 30f;
                 Logger.LogInfo("Enemy sync summary: candidates=" + candidates + ", resolved=" + resolvedEnemies.Count + ".");
+            }
+        }
+
+        private void RevealAllKnownEnemies(List<ResolvedEnemyCandidate> enemies)
+        {
+            for (int index = 0; index < enemies.Count; index++)
+            {
+                ResolvedEnemyCandidate resolvedEnemy = enemies[index];
+                EnemyCandidate candidate = resolvedEnemy.Candidate;
+                int instanceId = candidate.Root.GetInstanceID();
+                if (!TryMarkEnemySent(instanceId)) continue;
+
+                pendingEncounterIds.Remove(instanceId);
+                MarkMonsterSeen(resolvedEnemy.MonsterName, candidate);
+                if (debugLogging.Value)
+                {
+                    Logger.LogInfo("Revealed level monster: " + resolvedEnemy.MonsterName + " from " + candidate.Component.GetType().Name + " / " + candidate.Root.name);
+                }
+                StartCoroutine(PostSeenMonster(resolvedEnemy.MonsterName, instanceId));
             }
         }
 
