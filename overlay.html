@@ -126,6 +126,13 @@
                             </span>
                         </label>
                         <label class="overlay-toggle-row">
+                            <span data-i18n="proximityWaves">Волны приближения</span>
+                            <span class="overlay-toggle-switch">
+                                <input type="checkbox" id="overlayMonsterProximityWavesToggle">
+                                <span></span>
+                            </span>
+                        </label>
+                        <label class="overlay-toggle-row">
                             <span data-i18n="strength">Сила</span>
                             <span class="overlay-toggle-switch">
                                 <input type="checkbox" id="overlayMonsterStrengthToggle">
@@ -225,6 +232,7 @@
         const overlayLevelBadgeToggle = document.getElementById("overlayLevelBadgeToggle");
         const overlayUpgradeTooltipsToggle = document.getElementById("overlayUpgradeTooltipsToggle");
         const overlayMonsterHealthBarsToggle = document.getElementById("overlayMonsterHealthBarsToggle");
+        const overlayMonsterProximityWavesToggle = document.getElementById("overlayMonsterProximityWavesToggle");
         const overlayMonsterStrengthToggle = document.getElementById("overlayMonsterStrengthToggle");
         const overlayRespawnTimerToggle = document.getElementById("overlayRespawnTimerToggle");
         const overlayRespawnIndicatorToggle = document.getElementById("overlayRespawnIndicatorToggle");
@@ -266,6 +274,7 @@
         ];
         const interfaceText = {
             ru: {
+                proximityWaves: "Волны приближения",
                 languageLabel: "Язык",
                 groupGlobal: "Глобальные",
                 overlayOpacity: "Прозрачность ПУ",
@@ -320,6 +329,7 @@
                 }
             },
             en: {
+                proximityWaves: "Proximity waves",
                 languageLabel: "Language",
                 groupGlobal: "Global",
                 overlayOpacity: "Panel opacity",
@@ -922,6 +932,8 @@
         function updateMonsterSquare(square, level, monster, currentStrength, status = null) {
             square.classList.remove("level-1", "level-2", "level-3");
             square.classList.add(`level-${level}`);
+            square.classList.toggle("is-player-close", status?.playerClose === true || status?.playerVeryClose === true);
+            square.classList.toggle("is-player-very-close", status?.playerVeryClose === true);
 
             if (!monster) {
                 clearSquare(square);
@@ -1019,6 +1031,13 @@
                 img.src = "assets/monsters/unknown.webp";
                 img.alt = "Unknown Monster";
                 square.appendChild(img);
+
+                for (let waveIndex = 0; waveIndex < 2; waveIndex++) {
+                    const wave = document.createElement("span");
+                    wave.className = "monster-proximity-wave";
+                    wave.setAttribute("aria-hidden", "true");
+                    square.appendChild(wave);
+                }
 
                 const cooldown = document.createElement("div");
                 cooldown.className = "monster-cooldown";
@@ -1148,6 +1167,7 @@
             overlayLevelBadgeToggle.checked = state.levelBadgeVisible;
             overlayUpgradeTooltipsToggle.checked = state.upgradeTooltipsVisible;
             overlayMonsterHealthBarsToggle.checked = state.monsterHealthBarsVisible;
+            overlayMonsterProximityWavesToggle.checked = state.monsterProximityWavesVisible;
             overlayMonsterStrengthToggle.checked = state.monsterStrengthVisible;
             overlayRespawnTimerToggle.checked = state.respawnTimerVisible;
             overlayRespawnIndicatorToggle.checked = state.respawnIndicatorVisible;
@@ -1176,6 +1196,7 @@
             if (!state.upgradeTooltipsVisible) overlayContainer.classList.add("hide-upgrade-tooltips");
             if (!state.upgradeTooltipsVisible) overlayContainer.classList.add("hide-tooltips");
             if (!state.monsterHealthBarsVisible) overlayContainer.classList.add("hide-monster-health-bars");
+            if (!state.monsterProximityWavesVisible) overlayContainer.classList.add("hide-monster-proximity-waves");
             if (!state.monsterStrengthVisible) overlayContainer.classList.add("hide-monster-strength");
             if (!state.respawnTimerVisible) overlayContainer.classList.add("hide-respawn-timer");
             if (!state.respawnIndicatorVisible) overlayContainer.classList.add("hide-respawn-indicator");
@@ -1284,6 +1305,7 @@
         overlayLevelBadgeToggle.addEventListener("change", () => OverlayApp.setLevelBadgeVisible(overlayLevelBadgeToggle.checked));
         overlayUpgradeTooltipsToggle.addEventListener("change", () => OverlayApp.setUpgradeTooltipsVisible(overlayUpgradeTooltipsToggle.checked));
         overlayMonsterHealthBarsToggle.addEventListener("change", () => OverlayApp.setMonsterHealthBarsVisible(overlayMonsterHealthBarsToggle.checked));
+        overlayMonsterProximityWavesToggle.addEventListener("change", () => OverlayApp.setMonsterProximityWavesVisible(overlayMonsterProximityWavesToggle.checked));
         overlayMonsterStrengthToggle.addEventListener("change", () => OverlayApp.setMonsterStrengthVisible(overlayMonsterStrengthToggle.checked));
         overlayRespawnTimerToggle.addEventListener("change", () => OverlayApp.setRespawnTimerVisible(overlayRespawnTimerToggle.checked));
         overlayRespawnIndicatorToggle.addEventListener("change", () => OverlayApp.setRespawnIndicatorVisible(overlayRespawnIndicatorToggle.checked));

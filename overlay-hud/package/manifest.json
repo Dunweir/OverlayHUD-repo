@@ -1,6 +1,6 @@
 {
   "name": "OverlayHUD",
-  "version_number": "26.7.1",
+  "version_number": "26.7.2",
   "website_url": "https://github.com/Dunweir/overlay_repo",
   "description": "Desktop HUD for R.E.P.O. with a bundled EXE. Shows encountered monsters, health, respawn timers, player upgrades, level time, map value, and losses.",
   "dependencies": [

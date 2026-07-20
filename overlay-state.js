@@ -85,6 +85,7 @@ const OverlayApp = (() => {
         levelBadgeVisible: true,
         upgradeTooltipsVisible: false,
         monsterHealthBarsVisible: true,
+        monsterProximityWavesVisible: true,
         monsterStrengthVisible: true,
         respawnTimerVisible: true,
         respawnIndicatorVisible: true,
@@ -560,6 +561,10 @@ const OverlayApp = (() => {
         updateState((currentState) => ({ ...currentState, monsterHealthBarsVisible }));
     }
 
+    function setMonsterProximityWavesVisible(monsterProximityWavesVisible) {
+        updateState((currentState) => ({ ...currentState, monsterProximityWavesVisible }));
+    }
+
     function setMonsterStrengthVisible(monsterStrengthVisible) {
         updateState((currentState) => ({ ...currentState, monsterStrengthVisible }));
     }
@@ -626,6 +631,7 @@ const OverlayApp = (() => {
         setMapValueVisible,
         setMonsterIconsVisible,
         setMonsterHealthBarsVisible,
+        setMonsterProximityWavesVisible,
         setMonsterStrengthVisible,
         setOverlayAlignment,
         setOverlayPosition,

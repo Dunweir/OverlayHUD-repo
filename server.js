@@ -9,6 +9,7 @@ const clients = new Set();
 
 let overlayState = null;
 let timestampSession = null;
+const proximityBySourceId = new Map();
 
 const monsterConfig = {
     levels: {
@@ -131,6 +132,7 @@ const defaultOverlayState = {
     levelBadgeVisible: true,
     upgradeTooltipsVisible: false,
     monsterHealthBarsVisible: true,
+    monsterProximityWavesVisible: true,
     monsterStrengthVisible: true,
     respawnTimerVisible: true,
     respawnIndicatorVisible: true,
@@ -495,6 +497,10 @@ function updateMonsterRoster(rawMonsters) {
     }
 
     roster.sort((left, right) => left.level - right.level || left.id.localeCompare(right.id));
+    const rosterSourceIds = new Set(roster.flatMap((slot) => slot.sourceIds || []).map(String));
+    for (const sourceId of proximityBySourceId.keys()) {
+        if (!rosterSourceIds.has(sourceId)) proximityBySourceId.delete(sourceId);
+    }
     overlayState = { ...state, roster, rosterPending: false };
     return { ok: true, statusCode: 200, payload: { ok: true, slots: roster.length } };
 }
@@ -624,11 +630,19 @@ function updateMonsterStatuses(rawStatuses) {
         const maxHealth = Number(rawStatus.maxHealth);
         const hasHealth = rawStatus.health != null && Number.isFinite(health);
         const hasMaxHealth = rawStatus.maxHealth != null && Number.isFinite(maxHealth);
-        statuses.set(String(rawStatus.id), {
+        const sourceId = String(rawStatus.id);
+        const previousProximity = proximityBySourceId.get(sourceId) || { playerClose: false, playerVeryClose: false };
+        const proximity = {
+            playerClose: typeof rawStatus.playerClose === "boolean" ? rawStatus.playerClose : previousProximity.playerClose,
+            playerVeryClose: typeof rawStatus.playerVeryClose === "boolean" ? rawStatus.playerVeryClose : previousProximity.playerVeryClose
+        };
+        proximityBySourceId.set(sourceId, proximity);
+        statuses.set(sourceId, {
             alive: rawStatus.alive,
             respawnRemaining: Number.isFinite(remaining) ? Math.max(0, remaining) : 0,
             health: hasHealth ? Math.max(0, health) : null,
-            maxHealth: hasMaxHealth ? Math.max(0, maxHealth) : null
+            maxHealth: hasMaxHealth ? Math.max(0, maxHealth) : null,
+            ...proximity
         });
     }
 
@@ -637,7 +651,18 @@ function updateMonsterStatuses(rawStatuses) {
     const roster = state.roster.map((slot) => {
         const sourceIds = Array.isArray(slot.sourceIds) ? slot.sourceIds.map(String) : [];
         const sourceStatuses = sourceIds.map((id) => statuses.get(id)).filter(Boolean);
-        if (sourceStatuses.length === 0 || sourceStatuses.length !== sourceIds.length) return slot;
+        const proximityStatuses = sourceIds.map((id) => proximityBySourceId.get(id)).filter(Boolean);
+        const proximityPatch = {
+            playerClose: proximityStatuses.some((status) => status.playerClose),
+            playerVeryClose: proximityStatuses.some((status) => status.playerVeryClose)
+        };
+        if (sourceStatuses.length === 0 || sourceStatuses.length !== sourceIds.length) {
+            if (sourceStatuses.length > 0) {
+                updatedSlots++;
+                return { ...slot, ...proximityPatch };
+            }
+            return slot;
+        }
 
         updatedSlots++;
         const healthStatuses = sourceStatuses.filter((status) => status.health != null);
@@ -651,14 +676,14 @@ function updateMonsterStatuses(rawStatuses) {
             : {};
         const clearFlashPatch = { respawnFlashAt: null, respawnFlashUntil: null, respawnFlashAmount: null };
         if (sourceStatuses.some((status) => status.alive)) {
-            return { ...slot, ...healthPatch, ...clearFlashPatch, alive: true, respawnEndsAt: null, respawnDuration: null };
+            return { ...slot, ...healthPatch, ...proximityPatch, ...clearFlashPatch, alive: true, respawnEndsAt: null, respawnDuration: null };
         }
 
         const remainingValues = sourceStatuses
             .map((status) => status.respawnRemaining)
             .filter((remaining) => remaining > 0);
         if (remainingValues.length === 0) {
-            return { ...slot, ...healthPatch, ...clearFlashPatch, alive: false, respawnEndsAt: null, respawnDuration: null };
+            return { ...slot, ...healthPatch, ...proximityPatch, ...clearFlashPatch, alive: false, respawnEndsAt: null, respawnDuration: null };
         }
 
         const remaining = Math.min(...remainingValues);
@@ -690,7 +715,7 @@ function updateMonsterStatuses(rawStatuses) {
                 }
                 : { respawnFlashAt: null, respawnFlashUntil: null, respawnFlashAmount: null };
 
-        return { ...slot, ...healthPatch, ...flashPatch, alive: false, respawnEndsAt, respawnDuration };
+        return { ...slot, ...healthPatch, ...proximityPatch, ...flashPatch, alive: false, respawnEndsAt, respawnDuration };
     });
 
     overlayState = { ...state, roster };
@@ -704,6 +729,7 @@ function setGameLevel(rawLevel, rawLevelName) {
     }
 
     startTimestampLine(level, rawLevelName);
+    proximityBySourceId.clear();
 
     overlayState = {
         ...defaultOverlayState,

@@ -664,7 +664,7 @@ namespace OverlayHUD
 
         private static void EnemyParentPlayerCloseLogicPostfix(object __instance, ref IEnumerator __result)
         {
-            if (__result == null || !(__instance is Component enemyParent) || HasEnemyVision(enemyParent)) return;
+            if (__result == null || !(__instance is Component enemyParent)) return;
             __result = WatchBlindEnemyPlayerClose(__result, enemyParent);
         }
 
@@ -1149,6 +1149,9 @@ namespace OverlayHUD
                 float health = 0f;
                 float maxHealth = 0f;
                 bool hasHealth = IsEnemySent(instanceId) && TryGetEnemyHealth(candidate, out health, out maxHealth);
+                Component statusEnemyParent = GetEnemyParent(candidate);
+                bool playerClose = IsEnemyParentPlayerClose(statusEnemyParent);
+                bool playerVeryClose = IsEnemyParentPlayerVeryClose(statusEnemyParent);
 
                 if (!lastAliveBySourceId.TryGetValue(instanceId, out bool previousAlive) || previousAlive != alive)
                 {
@@ -1174,12 +1177,15 @@ namespace OverlayHUD
                     }
                 }
                 fingerprint.Append(instanceId).Append(':').Append(alive ? '1' : '0').Append(':').Append(remainingText)
-                    .Append(':').Append(healthText).Append('/').Append(maxHealthText).Append(';');
+                    .Append(':').Append(healthText).Append('/').Append(maxHealthText)
+                    .Append(':').Append(playerClose ? '1' : '0').Append(':').Append(playerVeryClose ? '1' : '0').Append(';');
 
                 if (statusCount++ > 0) json.Append(',');
                 json.Append("{\"id\":").Append(instanceId)
                     .Append(",\"alive\":").Append(alive ? "true" : "false")
-                    .Append(",\"respawnRemaining\":").Append(remainingText);
+                    .Append(",\"respawnRemaining\":").Append(remainingText)
+                    .Append(",\"playerClose\":").Append(playerClose ? "true" : "false")
+                    .Append(",\"playerVeryClose\":").Append(playerVeryClose ? "true" : "false");
                 if (hasHealth)
                 {
                     json.Append(",\"health\":").Append(healthText.Length > 0 ? healthText : "0");
@@ -1324,12 +1330,15 @@ namespace OverlayHUD
             float health = 0f;
             float maxHealth = 0f;
             bool hasHealth = shouldIncludeHealth && TryGetEnemyHealth(candidate, out health, out maxHealth);
+            bool playerClose = IsEnemyParentPlayerClose(enemyParent);
+            bool playerVeryClose = IsEnemyParentPlayerVeryClose(enemyParent);
 
             float roundedRemaining = alive ? 0f : (float)Math.Ceiling(Math.Max(0f, remaining) * 10f) / 10f;
             string remainingText = roundedRemaining.ToString("0.0", CultureInfo.InvariantCulture);
             string healthText = hasHealth ? Math.Max(0f, health).ToString("0.#", CultureInfo.InvariantCulture) : "";
             string maxHealthText = hasHealth && maxHealth > 0f ? maxHealth.ToString("0.#", CultureInfo.InvariantCulture) : "";
-            string fingerprint = instanceId + ":" + (alive ? "1" : "0") + ":" + remainingText + ":" + healthText + "/" + maxHealthText;
+            string fingerprint = instanceId + ":" + (alive ? "1" : "0") + ":" + remainingText + ":" + healthText + "/" + maxHealthText
+                + ":" + (playerClose ? "1" : "0") + ":" + (playerVeryClose ? "1" : "0");
             if (lastImmediateStatusBySourceId.TryGetValue(instanceId, out string previousFingerprint)
                 && previousFingerprint == fingerprint)
             {
@@ -1340,7 +1349,9 @@ namespace OverlayHUD
             var json = new StringBuilder("{\"statuses\":[{\"id\":")
                 .Append(instanceId)
                 .Append(",\"alive\":").Append(alive ? "true" : "false")
-                .Append(",\"respawnRemaining\":").Append(remainingText);
+                .Append(",\"respawnRemaining\":").Append(remainingText)
+                .Append(",\"playerClose\":").Append(playerClose ? "true" : "false")
+                .Append(",\"playerVeryClose\":").Append(playerVeryClose ? "true" : "false");
             if (hasHealth)
             {
                 json.Append(",\"health\":").Append(healthText.Length > 0 ? healthText : "0");
@@ -2195,7 +2206,13 @@ namespace OverlayHUD
             return monsterName != null && PlayerVisionLegacyFallbackMonsters.Contains(monsterName);
         }
 
-        private bool IsEnemyParentPlayerVeryClose(Component enemyParent)
+        private static bool IsEnemyParentPlayerClose(Component enemyParent)
+        {
+            object playerClose = ReadMember(enemyParent, "playerClose");
+            return playerClose is bool isPlayerClose && isPlayerClose;
+        }
+
+        private static bool IsEnemyParentPlayerVeryClose(Component enemyParent)
         {
             object playerVeryClose = ReadMember(enemyParent, "playerVeryClose");
             return playerVeryClose is bool isPlayerVeryClose && isPlayerVeryClose;
@@ -2211,22 +2228,29 @@ namespace OverlayHUD
 
         private static IEnumerator WatchBlindEnemyPlayerClose(IEnumerator inner, Component enemyParent)
         {
-            bool wasPlayerVeryClose = instance != null && instance.IsEnemyParentPlayerVeryClose(enemyParent);
+            bool wasPlayerClose = IsEnemyParentPlayerClose(enemyParent);
+            bool wasPlayerVeryClose = instance != null && IsEnemyParentPlayerVeryClose(enemyParent);
             while (inner.MoveNext())
             {
                 yield return inner.Current;
 
                 Plugin plugin = instance;
                 if (plugin == null || !plugin.gameplayActive || enemyParent == null) continue;
-                if (plugin.preferPlayerVisionDetection.Value
-                    && HasEnemyOnScreen(enemyParent)
-                    && !ShouldUseLegacyVisionFallback(enemyParent)) continue;
 
-                bool isPlayerVeryClose = plugin.IsEnemyParentPlayerVeryClose(enemyParent);
-                if (isPlayerVeryClose && !wasPlayerVeryClose)
+                bool isPlayerClose = IsEnemyParentPlayerClose(enemyParent);
+                bool isPlayerVeryClose = IsEnemyParentPlayerVeryClose(enemyParent);
+                if (isPlayerClose != wasPlayerClose || isPlayerVeryClose != wasPlayerVeryClose)
+                {
+                    plugin.SyncEnemyParentStatusChanged(enemyParent);
+                }
+                if (isPlayerVeryClose && !wasPlayerVeryClose
+                    && (!plugin.preferPlayerVisionDetection.Value
+                        || !HasEnemyOnScreen(enemyParent)
+                        || ShouldUseLegacyVisionFallback(enemyParent)))
                 {
                     plugin.HandleBlindEnemyPlayerVeryClose(enemyParent);
                 }
+                wasPlayerClose = isPlayerClose;
                 wasPlayerVeryClose = isPlayerVeryClose;
             }
         }

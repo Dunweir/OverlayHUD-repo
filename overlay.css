@@ -735,6 +735,49 @@ body {
     border-radius: inherit;
     object-fit: cover;
     filter: drop-shadow(0 0 4px var(--glow-color));
+    z-index: 1;
+}
+
+.monster-proximity-wave {
+    position: absolute;
+    inset: -3px;
+    z-index: 0;
+    border: 3px solid var(--glow-color);
+    border-radius: inherit;
+    opacity: 0;
+    pointer-events: none;
+}
+
+.monster-square.is-player-close .monster-proximity-wave {
+    animation: monster-proximity-wave 2.4s cubic-bezier(0.18, 0.62, 0.32, 1) infinite;
+}
+
+.monster-square.is-player-close .monster-proximity-wave:nth-of-type(2) {
+    animation-delay: -1.2s;
+}
+
+.monster-square.is-player-very-close .monster-proximity-wave {
+    animation-duration: 1.15s;
+}
+
+.monster-square.is-player-very-close .monster-proximity-wave:nth-of-type(2) {
+    animation-delay: -0.575s;
+}
+
+.overlay-container.hide-monster-proximity-waves .monster-proximity-wave {
+    animation: none !important;
+    opacity: 0 !important;
+}
+
+@keyframes monster-proximity-wave {
+    0% {
+        opacity: 0.8;
+        transform: scale(1);
+    }
+    100% {
+        opacity: 0;
+        transform: scale(1.55);
+    }
 }
 
 .monster-square.is-slot-entering {
@@ -1132,6 +1175,11 @@ body {
     .monster-square.is-cooldown-reduced .monster-cooldown-time,
     .monster-damage-pop {
         animation: none;
+    }
+
+    .monster-proximity-wave {
+        animation: none !important;
+        opacity: 0 !important;
     }
 
     .monster-square .monster-reveal-image {
