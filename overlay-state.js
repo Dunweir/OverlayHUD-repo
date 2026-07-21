@@ -14,7 +14,6 @@ const OverlayApp = (() => {
             Banger: 0,
             Gnome: 0,
             Gnomes: 0,
-            Tick: 0,
             Animal: 4,
             "Birthday Boy": 4,
             Headgrab: 4,
@@ -40,7 +39,8 @@ const OverlayApp = (() => {
             Trudge: 13,
             "Apex Predator": "impossible",
             Elsa: "impossible",
-            Peeper: "impossible"
+            Peeper: "impossible",
+            Tick: "impossible"
         },
         replacements: [
             "Animals", "Upscreams", "Bowties", "Rugrat", "Mentalists", "Peepers",

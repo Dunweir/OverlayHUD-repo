@@ -29,6 +29,8 @@
 
 :root {
     --square-size: 64px;
+    --monster-outline-width: max(3px, calc(var(--square-size) * 0.046875));
+    --monster-glow-radius: calc(var(--square-size) * 0.0625);
     --upgrade-size: 32px;
     --columns-count: 4;
     --viewport-scale: 1;
@@ -735,26 +737,26 @@ body {
     height: 100%;
     border-radius: inherit;
     object-fit: cover;
-    filter: drop-shadow(0 0 4px var(--glow-color));
+    filter: drop-shadow(0 0 var(--monster-glow-radius) var(--glow-color));
     z-index: 1;
 }
 
 .monster-proximity-wave {
     position: absolute;
-    inset: -3px;
+    inset: calc(-1 * var(--monster-outline-width));
     z-index: -1;
-    border: 3px solid var(--glow-color);
+    border: var(--monster-outline-width) solid var(--glow-color);
     border-radius: inherit;
     opacity: 0;
     pointer-events: none;
 }
 
 .monster-square.is-player-close .monster-proximity-wave {
-    animation: monster-proximity-wave 2.4s cubic-bezier(0.18, 0.62, 0.32, 1) infinite;
+    animation: monster-proximity-wave 4.8s cubic-bezier(0.18, 0.62, 0.32, 1) infinite;
 }
 
 .monster-square.is-player-close .monster-proximity-wave:nth-of-type(2) {
-    animation-delay: -1.2s;
+    animation-delay: -2.4s;
 }
 
 .monster-square.is-player-very-close .monster-proximity-wave {
@@ -1195,17 +1197,17 @@ body {
 }
 
 .monster-square.level-1 {
-    border: 3px solid #4caf50;
+    border: var(--monster-outline-width) solid #4caf50;
     --glow-color: #4caf50;
 }
 
 .monster-square.level-2 {
-    border: 3px solid #2196f3;
+    border: var(--monster-outline-width) solid #2196f3;
     --glow-color: #2196f3;
 }
 
 .monster-square.level-3 {
-    border: 3px solid #f44336;
+    border: var(--monster-outline-width) solid #f44336;
     --glow-color: #f44336;
 }
 
