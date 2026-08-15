@@ -59,6 +59,17 @@ const OverlayApp = (() => {
         "20+": { level1: 3, level2: 4, level3: 4 }
     };
 
+    const upgradeKeys = [
+        "strength", "tumbleLaunch", "range", "sprintSpeed", "tumbleWings",
+        "crouchRest", "extraJump", "tumbleClimb", "health", "stamina",
+        "mapPlayerCount", "deathHeadBattery"
+    ];
+
+    const defaultUpgradeVisibility = upgradeKeys.reduce((accumulator, key) => {
+        accumulator[key] = true;
+        return accumulator;
+    }, {});
+
     const defaultState = {
         level: 1,
         gameplayVisible: false,
@@ -71,6 +82,11 @@ const OverlayApp = (() => {
         crouchRest: 0,
         extraJump: 0,
         tumbleClimb: 0,
+        health: 0,
+        stamina: 0,
+        mapPlayerCount: 0,
+        deathHeadBattery: 0,
+        upgradeVisibility: { ...defaultUpgradeVisibility },
         style: 1,
         interfaceLanguage: "ru",
         bgEnabled: false,
@@ -181,6 +197,7 @@ const OverlayApp = (() => {
         const mapValueInitial = normalizeCurrencyValue(source.mapValueInitial, defaultState.mapValueInitial);
         const mapValueGoal = normalizeCurrencyValue(source.mapValueGoal, defaultState.mapValueGoal);
         const lostValue = normalizeCurrencyValue(source.lostValue, defaultState.lostValue);
+        const upgradeVisibility = normalizeUpgradeVisibility(source.upgradeVisibility);
         return {
             ...defaultState,
             ...source,
@@ -201,6 +218,7 @@ const OverlayApp = (() => {
             controlsPosition,
             timerVisible,
             upgradeTooltipsVisible,
+            upgradeVisibility,
             monsters: Array.isArray(source.monsters) ? source.monsters : [],
             roster: Array.isArray(source.roster) ? source.roster : [],
             mapValue,
@@ -208,6 +226,14 @@ const OverlayApp = (() => {
             mapValueGoal,
             lostValue
         };
+    }
+
+    function normalizeUpgradeVisibility(rawVisibility) {
+        const source = rawVisibility && typeof rawVisibility === "object" ? rawVisibility : {};
+        return upgradeKeys.reduce((accumulator, key) => {
+            accumulator[key] = Object.prototype.hasOwnProperty.call(source, key) ? Boolean(source[key]) : true;
+            return accumulator;
+        }, {});
     }
 
     function normalizeCurrencyValue(value, fallback) {
@@ -447,6 +473,16 @@ const OverlayApp = (() => {
         updateState((currentState) => ({ ...currentState, strength }));
     }
 
+    function setUpgradeVisibility(upgradeKey, isVisible) {
+        updateState((currentState) => ({
+            ...currentState,
+            upgradeVisibility: {
+                ...currentState.upgradeVisibility,
+                [upgradeKey]: Boolean(isVisible)
+            }
+        }));
+    }
+
     function setTumbleLaunch(tumbleLaunch) {
         updateState((currentState) => ({ ...currentState, tumbleLaunch }));
     }
@@ -610,6 +646,7 @@ const OverlayApp = (() => {
 
     return {
         monsterConfig,
+        upgradeKeys,
         addMonster,
         formatTime,
         getCountsForLevel,
@@ -645,6 +682,7 @@ const OverlayApp = (() => {
         setUpgradeTooltipsVisible,
         setUpgradeSize,
         setUpgradesVisible,
+        setUpgradeVisibility,
         setRespawnTimerVisible,
         setRespawnIndicatorVisible,
         startTimer,

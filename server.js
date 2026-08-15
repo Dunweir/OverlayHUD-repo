@@ -110,14 +110,26 @@ const defaultPlayerUpgrades = {
     tumbleWings: 0,
     crouchRest: 0,
     extraJump: 0,
-    tumbleClimb: 0
+    tumbleClimb: 0,
+    health: 0,
+    stamina: 0,
+    mapPlayerCount: 0,
+    deathHeadBattery: 0
 };
+
+const allUpgradeKeys = Object.keys(defaultPlayerUpgrades);
+
+const defaultUpgradeVisibility = allUpgradeKeys.reduce((accumulator, key) => {
+    accumulator[key] = true;
+    return accumulator;
+}, {});
 
 const defaultOverlayState = {
     level: 1,
     gameplayVisible: false,
     tabHidden: false,
     ...defaultPlayerUpgrades,
+    upgradeVisibility: { ...defaultUpgradeVisibility },
     style: 1,
     interfaceLanguage: "ru",
     bgEnabled: false,
@@ -230,6 +242,7 @@ function normalizeOverlayState(rawState) {
     const mapValueInitial = normalizeCurrencyValue(source.mapValueInitial, defaultOverlayState.mapValueInitial);
     const mapValueGoal = normalizeCurrencyValue(source.mapValueGoal, defaultOverlayState.mapValueGoal);
     const lostValue = normalizeCurrencyValue(source.lostValue, defaultOverlayState.lostValue);
+    const upgradeVisibility = normalizeUpgradeVisibility(source.upgradeVisibility);
 
     return {
         ...source,
@@ -250,6 +263,7 @@ function normalizeOverlayState(rawState) {
         controlsPosition,
         timerVisible,
         upgradeTooltipsVisible,
+        upgradeVisibility,
         monsters: Array.isArray(source.monsters) ? source.monsters : [],
         roster: Array.isArray(source.roster) ? source.roster : [],
         mapValue,
@@ -264,6 +278,14 @@ function normalizeCurrencyValue(value, fallback) {
     const parsed = Number(value);
     if (!Number.isFinite(parsed)) return fallback;
     return Math.max(0, Math.round(parsed));
+}
+
+function normalizeUpgradeVisibility(rawVisibility) {
+    const source = rawVisibility && typeof rawVisibility === "object" ? rawVisibility : {};
+    return allUpgradeKeys.reduce((accumulator, key) => {
+        accumulator[key] = Object.prototype.hasOwnProperty.call(source, key) ? Boolean(source[key]) : true;
+        return accumulator;
+    }, {});
 }
 
 function normalizePosition(position) {

@@ -102,7 +102,11 @@ namespace OverlayHUD
             new KeyValuePair<string, string>("tumbleWings", "playerUpgradeTumbleWings"),
             new KeyValuePair<string, string>("crouchRest", "playerUpgradeCrouchRest"),
             new KeyValuePair<string, string>("extraJump", "playerUpgradeExtraJump"),
-            new KeyValuePair<string, string>("tumbleClimb", "playerUpgradeTumbleClimb")
+            new KeyValuePair<string, string>("tumbleClimb", "playerUpgradeTumbleClimb"),
+            new KeyValuePair<string, string>("health", "playerUpgradeHealth"),
+            new KeyValuePair<string, string>("stamina", "playerUpgradeStamina"),
+            new KeyValuePair<string, string>("mapPlayerCount", "playerUpgradeMapPlayerCount"),
+            new KeyValuePair<string, string>("deathHeadBattery", "playerUpgradeDeathHeadBattery")
         };
 
         private static readonly Dictionary<string, string> UpgradeStateKeyByPunMethod = new Dictionary<string, string>
@@ -114,7 +118,11 @@ namespace OverlayHUD
             { "UpgradePlayerTumbleWings", "tumbleWings" },
             { "UpgradePlayerCrouchRest", "crouchRest" },
             { "UpgradePlayerExtraJump", "extraJump" },
-            { "UpgradePlayerTumbleClimb", "tumbleClimb" }
+            { "UpgradePlayerTumbleClimb", "tumbleClimb" },
+            { "UpgradePlayerHealth", "health" },
+            { "UpgradePlayerEnergy", "stamina" },
+            { "UpgradeMapPlayerCount", "mapPlayerCount" },
+            { "UpgradeDeathHeadBattery", "deathHeadBattery" }
         };
 
         private static readonly HashSet<string> PlayerVisionLegacyFallbackMonsters = new HashSet<string>(StringComparer.Ordinal)
