@@ -97,6 +97,7 @@ const OverlayApp = (() => {
         upgradeRows: "double",
         mapValueVisible: true,
         lostValueVisible: true,
+        valueWrapEnabled: false,
         monsterIconsVisible: true,
         levelBadgeVisible: true,
         upgradeTooltipsVisible: false,
@@ -105,6 +106,8 @@ const OverlayApp = (() => {
         monsterStrengthVisible: true,
         respawnTimerVisible: true,
         respawnIndicatorVisible: true,
+        onlyAliveMonstersVisible: false,
+        onlyAliveIncludeUndetected: false,
         squareSize: 70,
         upgradeSize: 38,
         overlayScaleVersion: 3,
@@ -581,6 +584,10 @@ const OverlayApp = (() => {
         updateState((currentState) => ({ ...currentState, lostValueVisible }));
     }
 
+    function setValueWrapEnabled(valueWrapEnabled) {
+        updateState((currentState) => ({ ...currentState, valueWrapEnabled: Boolean(valueWrapEnabled) }));
+    }
+
     function setMonsterIconsVisible(monsterIconsVisible) {
         updateState((currentState) => ({ ...currentState, monsterIconsVisible }));
     }
@@ -611,6 +618,14 @@ const OverlayApp = (() => {
 
     function setRespawnIndicatorVisible(respawnIndicatorVisible) {
         updateState((currentState) => ({ ...currentState, respawnIndicatorVisible }));
+    }
+
+    function setOnlyAliveMonstersVisible(onlyAliveMonstersVisible) {
+        updateState((currentState) => ({ ...currentState, onlyAliveMonstersVisible: Boolean(onlyAliveMonstersVisible) }));
+    }
+
+    function setOnlyAliveIncludeUndetected(onlyAliveIncludeUndetected) {
+        updateState((currentState) => ({ ...currentState, onlyAliveIncludeUndetected: Boolean(onlyAliveIncludeUndetected) }));
     }
 
     function setSquareSize(squareSize) {
@@ -665,6 +680,7 @@ const OverlayApp = (() => {
         setLevel,
         setLevelBadgeVisible,
         setLostValueVisible,
+        setValueWrapEnabled,
         setMapValueVisible,
         setMonsterIconsVisible,
         setMonsterHealthBarsVisible,
@@ -685,6 +701,8 @@ const OverlayApp = (() => {
         setUpgradeVisibility,
         setRespawnTimerVisible,
         setRespawnIndicatorVisible,
+        setOnlyAliveMonstersVisible,
+        setOnlyAliveIncludeUndetected,
         startTimer,
         stopTimer,
         subscribe

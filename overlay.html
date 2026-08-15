@@ -89,6 +89,13 @@
                             </span>
                         </label>
                         <label class="overlay-toggle-row">
+                            <span data-i18n="valueWrap">Перенос цены (2 строки)</span>
+                            <span class="overlay-toggle-switch">
+                                <input type="checkbox" id="overlayValueWrapToggle">
+                                <span></span>
+                            </span>
+                        </label>
+                        <label class="overlay-toggle-row">
                             <span data-i18n="levelBadge">Уровень</span>
                             <span class="overlay-toggle-switch">
                                 <input type="checkbox" id="overlayLevelBadgeToggle">
@@ -139,20 +146,36 @@
                                 <span></span>
                             </span>
                         </label>
-                        <label class="overlay-toggle-row">
+                        <label class="overlay-toggle-row" id="overlayRespawnTimerRow">
                             <span data-i18n="respawnTime">Время респавна</span>
                             <span class="overlay-toggle-switch">
                                 <input type="checkbox" id="overlayRespawnTimerToggle">
                                 <span></span>
                             </span>
                         </label>
-                        <label class="overlay-toggle-row">
+                        <label class="overlay-toggle-row" id="overlayRespawnIndicatorRow">
                             <span data-i18n="cooldownIndicator">Индикатор КД</span>
                             <span class="overlay-toggle-switch">
                                 <input type="checkbox" id="overlayRespawnIndicatorToggle">
                                 <span></span>
                             </span>
                         </label>
+                        <div class="overlay-toggle-subgroup">
+                            <label class="overlay-toggle-row">
+                                <span data-i18n="onlyAliveMonsters">Только живые монстры</span>
+                                <span class="overlay-toggle-switch">
+                                    <input type="checkbox" id="overlayOnlyAliveMonstersToggle">
+                                    <span></span>
+                                </span>
+                            </label>
+                            <label class="overlay-toggle-row overlay-toggle-row-sub" id="overlayOnlyAliveIncludeUndetectedRow">
+                                <span data-i18n="onlyAliveIncludeUndetected">и необнаруженных</span>
+                                <span class="overlay-toggle-switch">
+                                    <input type="checkbox" id="overlayOnlyAliveIncludeUndetectedToggle">
+                                    <span></span>
+                                </span>
+                            </label>
+                        </div>
                     </div>
                 </section>
 
@@ -230,13 +253,19 @@
         const overlayMonsterIconsToggle = document.getElementById("overlayMonsterIconsToggle");
         const overlayMapValueToggle = document.getElementById("overlayMapValueToggle");
         const overlayLostValueToggle = document.getElementById("overlayLostValueToggle");
+        const overlayValueWrapToggle = document.getElementById("overlayValueWrapToggle");
         const overlayLevelBadgeToggle = document.getElementById("overlayLevelBadgeToggle");
         const overlayUpgradeTooltipsToggle = document.getElementById("overlayUpgradeTooltipsToggle");
         const overlayMonsterHealthBarsToggle = document.getElementById("overlayMonsterHealthBarsToggle");
         const overlayMonsterProximityWavesToggle = document.getElementById("overlayMonsterProximityWavesToggle");
         const overlayMonsterStrengthToggle = document.getElementById("overlayMonsterStrengthToggle");
         const overlayRespawnTimerToggle = document.getElementById("overlayRespawnTimerToggle");
+        const overlayRespawnTimerRow = document.getElementById("overlayRespawnTimerRow");
         const overlayRespawnIndicatorToggle = document.getElementById("overlayRespawnIndicatorToggle");
+        const overlayRespawnIndicatorRow = document.getElementById("overlayRespawnIndicatorRow");
+        const overlayOnlyAliveMonstersToggle = document.getElementById("overlayOnlyAliveMonstersToggle");
+        const overlayOnlyAliveIncludeUndetectedToggle = document.getElementById("overlayOnlyAliveIncludeUndetectedToggle");
+        const overlayOnlyAliveIncludeUndetectedRow = document.getElementById("overlayOnlyAliveIncludeUndetectedRow");
         const overlayUpgradeVisibilityList = document.getElementById("overlayUpgradeVisibilityList");
         const overlayUpgradeVisibilityToggles = new Map();
         const overlayLanguageRuBtn = document.getElementById("overlayLanguageRuBtn");
@@ -309,6 +338,7 @@
                 mapValueShort: "КАРТА",
                 lostValue: "Потеряно",
                 lostValueShort: "ПОТЕРЯ",
+                valueWrap: "Перенос цены (2 строки)",
                 levelBadge: "Уровень",
                 tooltips: "Подсказки",
                 upgradeIconSize: "Размер иконок",
@@ -316,6 +346,8 @@
                 strength: "Сила",
                 respawnTime: "Время респавна",
                 cooldownIndicator: "Индикатор КД",
+                onlyAliveMonsters: "Только живые монстры",
+                onlyAliveIncludeUndetected: "и необнаруженных",
                 level: "УРОВЕНЬ",
                 healthUnknown: "ХП: ?",
                 healthValueUnknown: (health) => `ХП: ${health} / ?`,
@@ -323,7 +355,7 @@
                 strengthUnknown: "Сила: ?",
                 strengthImpossible: "Сила: нельзя поднять",
                 strengthValue: (strength) => `Сила: ${strength}`,
-                cooldownShort: "КД",
+                cooldownShort: "💀",
                 upgradesNames: {
                     strength: "Сила",
                     tumbleLaunch: "Кувырок: запуск",
@@ -368,6 +400,7 @@
                 mapValueShort: "MAP",
                 lostValue: "Lost value",
                 lostValueShort: "LOSS",
+                valueWrap: "Wrap value (2 lines)",
                 levelBadge: "Level",
                 tooltips: "Tooltips",
                 upgradeIconSize: "Icon size",
@@ -375,6 +408,8 @@
                 strength: "Strength",
                 respawnTime: "Respawn time",
                 cooldownIndicator: "CD indicator",
+                onlyAliveMonsters: "Only alive monsters",
+                onlyAliveIncludeUndetected: "and undetected",
                 level: "LEVEL",
                 healthUnknown: "HP: ?",
                 healthValueUnknown: (health) => `HP: ${health} / ?`,
@@ -382,7 +417,7 @@
                 strengthUnknown: "Strength: ?",
                 strengthImpossible: "Strength: cannot be lifted",
                 strengthValue: (strength) => `Strength: ${strength}`,
-                cooldownShort: "CD",
+                cooldownShort: "💀",
                 upgradesNames: {
                     strength: "Strength",
                     tumbleLaunch: "Tumble Launch",
@@ -607,6 +642,10 @@
                 mapValue: state.mapValue,
                 lostValueVisible: state.lostValueVisible,
                 lostValue: state.lostValue,
+                valueWrapEnabled: state.valueWrapEnabled,
+                onlyAliveMonstersVisible: state.onlyAliveMonstersVisible,
+                onlyAliveIncludeUndetected: state.onlyAliveIncludeUndetected,
+                monsterRosterAliveFingerprint: (Array.isArray(state.roster) ? state.roster : []).map((slot) => `${slot.id}:${slot.alive}`).join("|"),
                 levelBadgeVisible: state.levelBadgeVisible,
                 overlayAlignment: state.overlayAlignment,
                 compactModeEnabled: state.compactModeEnabled,
@@ -1272,6 +1311,7 @@
             overlayMonsterIconsToggle.checked = state.monsterIconsVisible;
             overlayMapValueToggle.checked = state.mapValueVisible;
             overlayLostValueToggle.checked = state.lostValueVisible;
+            overlayValueWrapToggle.checked = state.valueWrapEnabled;
             overlayLevelBadgeToggle.checked = state.levelBadgeVisible;
             overlayUpgradeTooltipsToggle.checked = state.upgradeTooltipsVisible;
             overlayMonsterHealthBarsToggle.checked = state.monsterHealthBarsVisible;
@@ -1279,6 +1319,14 @@
             overlayMonsterStrengthToggle.checked = state.monsterStrengthVisible;
             overlayRespawnTimerToggle.checked = state.respawnTimerVisible;
             overlayRespawnIndicatorToggle.checked = state.respawnIndicatorVisible;
+            overlayRespawnTimerToggle.disabled = state.onlyAliveMonstersVisible;
+            overlayRespawnTimerRow.classList.toggle("is-disabled", state.onlyAliveMonstersVisible);
+            overlayRespawnIndicatorToggle.disabled = state.onlyAliveMonstersVisible;
+            overlayRespawnIndicatorRow.classList.toggle("is-disabled", state.onlyAliveMonstersVisible);
+            overlayOnlyAliveMonstersToggle.checked = state.onlyAliveMonstersVisible;
+            overlayOnlyAliveIncludeUndetectedToggle.checked = state.onlyAliveIncludeUndetected;
+            overlayOnlyAliveIncludeUndetectedToggle.disabled = !state.onlyAliveMonstersVisible;
+            overlayOnlyAliveIncludeUndetectedRow.classList.toggle("is-disabled", !state.onlyAliveMonstersVisible);
             const upgradeVisibilityForToggles = state.upgradeVisibility || {};
             overlayUpgradeVisibilityToggles.forEach((toggle, key) => {
                 toggle.input.checked = upgradeVisibilityForToggles[key] !== false;
@@ -1304,6 +1352,7 @@
             if (!state.monsterIconsVisible) overlayContainer.classList.add("hide-monster-icons");
             if (!state.mapValueVisible || Number(state.mapValue) <= 0) overlayContainer.classList.add("hide-map-value");
             if (!state.lostValueVisible || Number(state.lostValue) <= 0) overlayContainer.classList.add("hide-lost-value");
+            overlayContainer.classList.toggle("is-value-wrap", Boolean(state.valueWrapEnabled));
             if (!state.levelBadgeVisible) overlayContainer.classList.add("hide-level-badge");
             if (!state.upgradeTooltipsVisible) overlayContainer.classList.add("hide-upgrade-tooltips");
             if (!state.upgradeTooltipsVisible) overlayContainer.classList.add("hide-tooltips");
@@ -1346,8 +1395,14 @@
                         .filter((monster) => monster.sourceId != null)
                         .map((monster) => [String(monster.sourceId), monster])
                 );
-                ensureMonsterSquares(roster.length);
-                roster.forEach((slot, index) => {
+                const visibleRoster = roster.filter((slot) => {
+                    if (!state.onlyAliveMonstersVisible || slot?.alive !== false) return true;
+                    const isDetected = revealedBySource.has(String(slot.id));
+                    if (isDetected) return false;
+                    return !state.onlyAliveIncludeUndetected;
+                });
+                ensureMonsterSquares(visibleRoster.length);
+                visibleRoster.forEach((slot, index) => {
                     updateMonsterSquare(monstersSquares.children[index], slot.level, revealedBySource.get(String(slot.id)), state.strength, slot);
                 });
             } else {
@@ -1417,6 +1472,7 @@
         overlayMonsterIconsToggle.addEventListener("change", () => OverlayApp.setMonsterIconsVisible(overlayMonsterIconsToggle.checked));
         overlayMapValueToggle.addEventListener("change", () => OverlayApp.setMapValueVisible(overlayMapValueToggle.checked));
         overlayLostValueToggle.addEventListener("change", () => OverlayApp.setLostValueVisible(overlayLostValueToggle.checked));
+        overlayValueWrapToggle.addEventListener("change", () => OverlayApp.setValueWrapEnabled(overlayValueWrapToggle.checked));
         overlayLevelBadgeToggle.addEventListener("change", () => OverlayApp.setLevelBadgeVisible(overlayLevelBadgeToggle.checked));
         overlayUpgradeTooltipsToggle.addEventListener("change", () => OverlayApp.setUpgradeTooltipsVisible(overlayUpgradeTooltipsToggle.checked));
         overlayMonsterHealthBarsToggle.addEventListener("change", () => OverlayApp.setMonsterHealthBarsVisible(overlayMonsterHealthBarsToggle.checked));
@@ -1424,6 +1480,8 @@
         overlayMonsterStrengthToggle.addEventListener("change", () => OverlayApp.setMonsterStrengthVisible(overlayMonsterStrengthToggle.checked));
         overlayRespawnTimerToggle.addEventListener("change", () => OverlayApp.setRespawnTimerVisible(overlayRespawnTimerToggle.checked));
         overlayRespawnIndicatorToggle.addEventListener("change", () => OverlayApp.setRespawnIndicatorVisible(overlayRespawnIndicatorToggle.checked));
+        overlayOnlyAliveMonstersToggle.addEventListener("change", () => OverlayApp.setOnlyAliveMonstersVisible(overlayOnlyAliveMonstersToggle.checked));
+        overlayOnlyAliveIncludeUndetectedToggle.addEventListener("change", () => OverlayApp.setOnlyAliveIncludeUndetected(overlayOnlyAliveIncludeUndetectedToggle.checked));
         overlayLanguageRuBtn.addEventListener("click", () => OverlayApp.setInterfaceLanguage("ru"));
         overlayLanguageEnBtn.addEventListener("click", () => OverlayApp.setInterfaceLanguage("en"));
         [overlaySizeSlider, overlayUpgradeSizeSlider, overlayColumnsSlider, overlayHoverOpacitySlider].forEach((slider) => {

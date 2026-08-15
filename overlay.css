@@ -247,6 +247,48 @@ body {
     transition-delay: 0.08s, 0.08s, 0.08s, 0.08s, 0.08s, 0s, 0s, var(--overlay-reveal-duration);
 }
 
+.overlay-container.is-value-wrap .map-value-pill,
+.overlay-container.is-value-wrap .lost-value-pill {
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: center;
+    gap: 0;
+    min-height: 46px;
+    text-align: left;
+}
+
+.overlay-container.is-value-wrap .map-value-number,
+.overlay-container.is-value-wrap .lost-value-number {
+    width: auto;
+    justify-content: flex-start;
+}
+
+.overlay-container.is-value-wrap.align-center .map-value-pill,
+.overlay-container.is-value-wrap.align-center .lost-value-pill {
+    align-items: center;
+    text-align: center;
+}
+
+.overlay-container.is-value-wrap.align-center .map-value-number,
+.overlay-container.is-value-wrap.align-center .lost-value-number {
+    justify-content: center;
+}
+
+.overlay-container.is-value-wrap.align-right .map-value-pill,
+.overlay-container.is-value-wrap.align-right .lost-value-pill {
+    align-items: flex-end;
+    text-align: right;
+}
+
+.overlay-container.is-value-wrap.align-right .map-value-number,
+.overlay-container.is-value-wrap.align-right .lost-value-number {
+    justify-content: flex-end;
+}
+
+.overlay-container.is-value-wrap .overlay-header {
+    max-height: 70px;
+}
+
 .overlay-topbar {
     position: relative;
     z-index: 2;
@@ -1602,6 +1644,42 @@ body {
 .overlay-toggle-row > span:first-child {
     min-width: 0;
     line-height: 1.08;
+}
+
+.overlay-toggle-row.is-disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+
+.overlay-toggle-row.is-disabled .overlay-toggle-switch {
+    cursor: not-allowed;
+}
+
+.overlay-toggle-subgroup {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.overlay-toggle-row-sub {
+    position: relative;
+    padding-left: 14px;
+    min-height: 26px;
+    font-size: 12px;
+    font-weight: 600;
+    color: rgba(238, 244, 248, 0.78);
+}
+
+.overlay-toggle-row-sub::before {
+    position: absolute;
+    top: 0;
+    left: 4px;
+    width: 8px;
+    height: 13px;
+    border-bottom: 1px solid rgba(238, 244, 248, 0.35);
+    border-left: 1px solid rgba(238, 244, 248, 0.35);
+    border-radius: 0 0 0 4px;
+    content: "";
 }
 
 .overlay-toggle-switch {
