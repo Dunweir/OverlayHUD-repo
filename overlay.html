@@ -10,7 +10,13 @@
     <div class="overlay">
         <div class="overlay-hover-controls" id="overlayHoverControls">
             <div class="overlay-control-panel">
-                <section class="overlay-control-section overlay-control-section-global" aria-labelledby="overlayGlobalGroupTitle">
+                <div class="overlay-control-tabs" id="overlayControlTabs" role="tablist" aria-label="Settings sections">
+                    <button type="button" class="overlay-control-tab" data-tab="global" role="tab" aria-selected="true" data-i18n="tabGlobal">Общие</button>
+                    <button type="button" class="overlay-control-tab" data-tab="display" role="tab" aria-selected="false" data-i18n="tabDisplay">Элементы</button>
+                    <button type="button" class="overlay-control-tab" data-tab="monsters" role="tab" aria-selected="false" data-i18n="tabMonsters">Монстры</button>
+                    <button type="button" class="overlay-control-tab" data-tab="upgrades" role="tab" aria-selected="false" data-i18n="tabUpgrades">Апгрейды</button>
+                </div>
+                <section class="overlay-control-section overlay-control-section-global" data-tab-panel="global" role="tabpanel" aria-labelledby="overlayGlobalGroupTitle">
                     <div class="overlay-toggle-group-title" id="overlayGlobalGroupTitle" data-i18n="groupGlobal">Глобальные</div>
                     <div class="overlay-language-row" aria-label="Interface language">
                         <span data-i18n="languageLabel">Язык</span>
@@ -57,7 +63,7 @@
                     </div>
                 </section>
 
-                <section class="overlay-control-section" aria-labelledby="overlayVisibilityGroupTitle">
+                <section class="overlay-control-section" data-tab-panel="display" role="tabpanel" aria-labelledby="overlayVisibilityGroupTitle">
                     <div class="overlay-toggle-group-title" id="overlayVisibilityGroupTitle" data-i18n="groupElements">Отображение</div>
                     <div class="overlay-toggle-group-items">
                         <label class="overlay-toggle-row">
@@ -112,7 +118,7 @@
                     </div>
                 </section>
 
-                <section class="overlay-control-section" aria-labelledby="overlayMonsterGroupTitle">
+                <section class="overlay-control-section" data-tab-panel="monsters" role="tabpanel" aria-labelledby="overlayMonsterGroupTitle">
                     <div class="overlay-toggle-group-title" id="overlayMonsterGroupTitle" data-i18n="groupMonsters">Монстры</div>
                     <div class="overlay-slider-row">
                         <label for="overlaySizeSlider" data-i18n="monsterIconSize">Размер иконок</label>
@@ -179,7 +185,7 @@
                     </div>
                 </section>
 
-                <section class="overlay-control-section" aria-labelledby="overlayUpgradesGroupTitle">
+                <section class="overlay-control-section" data-tab-panel="upgrades" role="tabpanel" aria-labelledby="overlayUpgradesGroupTitle">
                     <div class="overlay-toggle-group-title" id="overlayUpgradesGroupTitle" data-i18n="groupUpgrades">Апгрейды</div>
                     <div class="overlay-slider-row">
                         <label for="overlayUpgradeSizeSlider" data-i18n="upgradeIconSize">Размер иконок</label>
@@ -195,6 +201,10 @@
                     </div>
                     <div class="overlay-toggle-group-items overlay-toggle-group-items-upgrades" id="overlayUpgradeVisibilityList"></div>
                 </section>
+
+                <div class="overlay-control-footer">
+                    <a class="overlay-version-link" id="overlayVersionLink" href="https://github.com/Dunweir/OverlayHUD-repo" target="_blank" rel="noopener noreferrer">OverlayHUD v26.8.0</a>
+                </div>
             </div>
             <div class="overlay-control-hotspot" id="overlayControlHotspot" aria-hidden="true"></div>
             <div class="overlay-drag-corner overlay-drag-corner-controls" data-drag-target="controls" aria-hidden="true"></div>
@@ -270,6 +280,9 @@
         const overlayUpgradeVisibilityToggles = new Map();
         const overlayLanguageRuBtn = document.getElementById("overlayLanguageRuBtn");
         const overlayLanguageEnBtn = document.getElementById("overlayLanguageEnBtn");
+        const overlayControlTabButtons = [...document.querySelectorAll(".overlay-control-tab")];
+        const overlayControlTabPanels = [...document.querySelectorAll("[data-tab-panel]")];
+        const controlTabStorageKey = "overlay-control-active-tab";
         const mapValuePill = document.getElementById("mapValuePill");
         const mapValueNumber = document.getElementById("mapValueNumber");
         const lostValuePill = document.getElementById("lostValuePill");
@@ -310,6 +323,10 @@
         ];
         const interfaceText = {
             ru: {
+                tabGlobal: "Общие",
+                tabDisplay: "Элементы",
+                tabMonsters: "Монстры",
+                tabUpgrades: "Апгрейды",
                 proximityWaves: "Волны приближения",
                 languageLabel: "Язык",
                 groupGlobal: "Глобальные",
@@ -372,6 +389,10 @@
                 }
             },
             en: {
+                tabGlobal: "General",
+                tabDisplay: "Elements",
+                tabMonsters: "Monsters",
+                tabUpgrades: "Upgrades",
                 proximityWaves: "Proximity waves",
                 languageLabel: "Language",
                 groupGlobal: "Global",
@@ -1452,6 +1473,38 @@
         overlayDragCorners.forEach((corner) => {
             corner.addEventListener("pointerdown", startOverlayDrag);
         });
+
+        function activateControlTab(tabName) {
+            const availableTabs = overlayControlTabButtons.map((button) => button.dataset.tab);
+            const targetTab = availableTabs.includes(tabName) ? tabName : availableTabs[0];
+            overlayControlTabButtons.forEach((button) => {
+                const isActive = button.dataset.tab === targetTab;
+                button.classList.toggle("is-active", isActive);
+                button.setAttribute("aria-selected", String(isActive));
+            });
+            overlayControlTabPanels.forEach((panel) => {
+                panel.classList.toggle("is-active-tab", panel.dataset.tabPanel === targetTab);
+            });
+            try {
+                localStorage.setItem(controlTabStorageKey, targetTab);
+            } catch {
+                /* ignore storage errors */
+            }
+            applySavedPositions();
+            reclampPositionedElement(overlayHoverControls);
+        }
+
+        overlayControlTabButtons.forEach((button) => {
+            button.addEventListener("click", () => activateControlTab(button.dataset.tab));
+        });
+
+        let savedControlTab = "global";
+        try {
+            savedControlTab = localStorage.getItem(controlTabStorageKey) || "global";
+        } catch {
+            savedControlTab = "global";
+        }
+        activateControlTab(savedControlTab);
 
         buildUpgradeRow();
         buildUpgradeVisibilityList();

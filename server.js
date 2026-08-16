@@ -140,7 +140,7 @@ const defaultOverlayState = {
     upgradeRows: "double",
     mapValueVisible: true,
     lostValueVisible: true,
-    valueWrapEnabled: false,
+    valueWrapEnabled: true,
     monsterIconsVisible: true,
     levelBadgeVisible: true,
     upgradeTooltipsVisible: false,
@@ -156,7 +156,7 @@ const defaultOverlayState = {
     overlayScaleVersion: 3,
     columnsCount: 11,
     columnsLayoutVersion: 2,
-    overlayDefaultsVersion: 3,
+    overlayDefaultsVersion: 4,
     overlayAlignment: "center",
     overlayPosition: { left: 0, top: 0, anchorX: "center", anchorY: "top" },
     controlsPosition: null,
@@ -197,6 +197,7 @@ function normalizeOverlayState(rawState) {
     const sourceOverlayDefaultsVersion = Number(rawState.overlayDefaultsVersion || 0);
     const shouldMigrateOverlayDefaults = sourceOverlayDefaultsVersion < 2;
     const shouldMigrateTooltipDefault = sourceOverlayDefaultsVersion < 3;
+    const shouldMigrateValueWrapDefault = sourceOverlayDefaultsVersion < 4;
     const squareSize = Number.isFinite(sourceSquareSize)
         ? (shouldMigrateDefaultSizes && (sourceSquareSize === 50 || sourceSquareSize === 64) ? defaultOverlayState.squareSize : sourceSquareSize)
         : defaultOverlayState.squareSize;
@@ -241,6 +242,9 @@ function normalizeOverlayState(rawState) {
     const upgradeTooltipsVisible = shouldMigrateTooltipDefault && source.upgradeTooltipsVisible === true
         ? defaultOverlayState.upgradeTooltipsVisible
         : Boolean(source.upgradeTooltipsVisible);
+    const valueWrapEnabled = shouldMigrateValueWrapDefault && source.valueWrapEnabled === false
+        ? defaultOverlayState.valueWrapEnabled
+        : Boolean(source.valueWrapEnabled);
     const mapValue = normalizeCurrencyValue(source.mapValue, defaultOverlayState.mapValue);
     const mapValueInitial = normalizeCurrencyValue(source.mapValueInitial, defaultOverlayState.mapValueInitial);
     const mapValueGoal = normalizeCurrencyValue(source.mapValueGoal, defaultOverlayState.mapValueGoal);
@@ -266,6 +270,7 @@ function normalizeOverlayState(rawState) {
         controlsPosition,
         timerVisible,
         upgradeTooltipsVisible,
+        valueWrapEnabled,
         upgradeVisibility,
         monsters: Array.isArray(source.monsters) ? source.monsters : [],
         roster: Array.isArray(source.roster) ? source.roster : [],

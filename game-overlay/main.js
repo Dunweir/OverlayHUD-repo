@@ -1,4 +1,4 @@
-const { app, BrowserWindow, Menu, Tray, dialog, globalShortcut, nativeImage, screen } = require("electron");
+const { app, BrowserWindow, Menu, Tray, dialog, globalShortcut, nativeImage, screen, shell } = require("electron");
 const fs = require("fs");
 const path = require("path");
 
@@ -397,6 +397,11 @@ function createOverlayWindow() {
     overlayWindow.setIgnoreMouseEvents(true, { forward: true });
     mousePassthrough = true;
     overlayWindow.webContents.setZoomFactor(Math.max(0.25, Number(config.zoomFactor) || 1));
+
+    overlayWindow.webContents.setWindowOpenHandler(({ url }) => {
+        if (url.startsWith("http://") || url.startsWith("https://")) shell.openExternal(url);
+        return { action: "deny" };
+    });
 
     overlayWindow.webContents.on("did-finish-load", () => {
         clearTimeout(retryTimer);
