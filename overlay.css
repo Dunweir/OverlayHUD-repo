@@ -1464,6 +1464,55 @@ body {
     pointer-events: auto;
 }
 
+.overlay-safe-zone {
+    position: fixed;
+    top: var(--overlay-edge-offset);
+    right: var(--overlay-edge-offset);
+    bottom: var(--overlay-edge-offset);
+    left: var(--overlay-edge-offset);
+    z-index: 30;
+    border: 1.5px dashed rgba(255, 207, 98, 0);
+    border-radius: 10px;
+    background: rgba(255, 207, 98, 0);
+    opacity: 0;
+    transition: opacity 0.18s ease, background 0.18s ease, border-color 0.18s ease;
+    pointer-events: none;
+}
+
+.overlay-safe-zone.is-visible {
+    border-color: rgba(255, 207, 98, 0.55);
+    background: rgba(255, 207, 98, 0.03);
+    opacity: 1;
+}
+
+.overlay-safe-zone-guide {
+    position: absolute;
+    opacity: 0;
+    background: rgba(255, 207, 98, 0.75);
+    box-shadow: 0 0 6px rgba(255, 207, 98, 0.55);
+    transition: opacity 0.12s ease;
+}
+
+.overlay-safe-zone-guide-x {
+    top: 0;
+    bottom: 0;
+    left: 50%;
+    width: 1.5px;
+    transform: translateX(-50%);
+}
+
+.overlay-safe-zone-guide-y {
+    top: 50%;
+    right: 0;
+    left: 0;
+    height: 1.5px;
+    transform: translateY(-50%);
+}
+
+.overlay-safe-zone-guide.is-visible {
+    opacity: 1;
+}
+
 .overlay-drag-corner {
     position: absolute;
     top: 0;

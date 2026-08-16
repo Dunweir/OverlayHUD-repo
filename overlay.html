@@ -8,6 +8,10 @@
 </head>
 <body class="overlay-page">
     <div class="overlay">
+        <div class="overlay-safe-zone" id="overlaySafeZone" aria-hidden="true">
+            <div class="overlay-safe-zone-guide overlay-safe-zone-guide-x" id="overlaySafeZoneGuideX"></div>
+            <div class="overlay-safe-zone-guide overlay-safe-zone-guide-y" id="overlaySafeZoneGuideY"></div>
+        </div>
         <div class="overlay-hover-controls" id="overlayHoverControls">
             <div class="overlay-control-panel">
                 <div class="overlay-control-tabs" id="overlayControlTabs" role="tablist" aria-label="Settings sections">
@@ -253,6 +257,9 @@
         const overlayColumnsValue = document.getElementById("overlayColumnsValue");
         const overlayHoverOpacitySlider = document.getElementById("overlayHoverOpacitySlider");
         const overlayHoverOpacityValue = document.getElementById("overlayHoverOpacityValue");
+        const overlaySafeZone = document.getElementById("overlaySafeZone");
+        const overlaySafeZoneGuideX = document.getElementById("overlaySafeZoneGuideX");
+        const overlaySafeZoneGuideY = document.getElementById("overlaySafeZoneGuideY");
         const overlayAlignmentButtons = [...document.querySelectorAll("[data-alignment]")];
         const overlayCompactModeToggle = document.getElementById("overlayCompactModeToggle");
         const overlayUpgradeRowsButtons = [...document.querySelectorAll("[data-upgrade-rows]")];
@@ -606,6 +613,11 @@
             return { ...clampPosition(element, snappedLeft, snappedTop), anchorX, anchorY };
         }
 
+        function updateSafeZoneGuides(anchorX, anchorY) {
+            overlaySafeZoneGuideX.classList.toggle("is-visible", Boolean(anchorX === "center"));
+            overlaySafeZoneGuideY.classList.toggle("is-visible", Boolean(anchorY === "center"));
+        }
+
         function positionElement(element, targetName, position) {
             if (element.classList.contains("is-dragging")) return;
             element.classList.toggle("is-positioned", Boolean(position));
@@ -710,6 +722,8 @@
             document.documentElement.dataset.overlayDragging = targetName;
             element.style.setProperty("--overlay-left", `${Math.round(startPosition.left)}px`);
             element.style.setProperty("--overlay-top", `${Math.round(startPosition.top)}px`);
+            overlaySafeZone.classList.add("is-visible");
+            updateSafeZoneGuides(null, null);
             event.currentTarget.setPointerCapture(event.pointerId);
             window.addEventListener("pointermove", moveOverlayDrag, true);
             window.addEventListener("pointerup", stopOverlayDrag, true);
@@ -726,6 +740,7 @@
             );
             activeDrag.element.style.setProperty("--overlay-left", `${Math.round(nextPosition.left)}px`);
             activeDrag.element.style.setProperty("--overlay-top", `${Math.round(nextPosition.top)}px`);
+            updateSafeZoneGuides(nextPosition.anchorX, nextPosition.anchorY);
             event.preventDefault();
         }
 
@@ -749,6 +764,8 @@
             requestAnimationFrame(() => {
                 draggedElement.style.transition = "";
             });
+            overlaySafeZone.classList.remove("is-visible");
+            updateSafeZoneGuides(null, null);
             lastPositionLayoutKey = "";
             activeDrag = null;
             delete document.documentElement.dataset.overlayDragging;
