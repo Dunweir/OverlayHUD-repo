@@ -4,6 +4,8 @@
 
 **OverlayHUD целиком создан с использованием Codex AI.**
 
+**Ныне поддерживается с помощью Claude Sonnet 5.**
+
 **Релиз протестирован в R.E.P.O. перед публикацией.**
 
 OverlayHUD добавляет в R.E.P.O. настольный HUD поверх окна игры. Мод состоит из BepInEx-плагина `OverlayHUD.dll` и комплектного приложения `OverlayHUD.exe`.
@@ -27,6 +29,8 @@ HUD отображает:
 **Author: EgorSalad**
 
 **OverlayHUD was created entirely using Codex AI.**
+
+**Now maintained with the help of Claude Sonnet 5.**
 
 **This release was tested in R.E.P.O. before publication.**
 
