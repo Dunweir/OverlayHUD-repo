@@ -402,6 +402,11 @@ function createOverlayWindow() {
         if (url.startsWith("http://") || url.startsWith("https://")) shell.openExternal(url);
         return { action: "deny" };
     });
+    overlayWindow.webContents.on("will-navigate", (event, url) => {
+        if (url === overlayWindow.webContents.getURL()) return;
+        event.preventDefault();
+        if (url.startsWith("http://") || url.startsWith("https://")) shell.openExternal(url);
+    });
 
     overlayWindow.webContents.on("did-finish-load", () => {
         clearTimeout(retryTimer);
