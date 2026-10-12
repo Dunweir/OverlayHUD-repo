@@ -151,6 +151,7 @@ const defaultOverlayState = {
     respawnIndicatorVisible: true,
     onlyAliveMonstersVisible: false,
     onlyAliveIncludeUndetected: false,
+    itemDestroyedAlertsVisible: true,
     squareSize: 70,
     upgradeSize: 38,
     overlayScaleVersion: 3,
@@ -170,7 +171,8 @@ const defaultOverlayState = {
     mapValue: 0,
     mapValueInitial: 0,
     mapValueGoal: null,
-    lostValue: 0
+    lostValue: 0,
+    lastDestroyedItem: null
 };
 
 const levelNameAliases = {
@@ -250,6 +252,8 @@ function normalizeOverlayState(rawState) {
     const mapValueGoal = normalizeCurrencyValue(source.mapValueGoal, defaultOverlayState.mapValueGoal);
     const lostValue = normalizeCurrencyValue(source.lostValue, defaultOverlayState.lostValue);
     const upgradeVisibility = normalizeUpgradeVisibility(source.upgradeVisibility);
+    const itemDestroyedAlertsVisible = Boolean(source.itemDestroyedAlertsVisible);
+    const lastDestroyedItem = normalizeDestroyedItem(source.lastDestroyedItem);
 
     return {
         ...source,
@@ -272,12 +276,14 @@ function normalizeOverlayState(rawState) {
         upgradeTooltipsVisible,
         valueWrapEnabled,
         upgradeVisibility,
+        itemDestroyedAlertsVisible,
         monsters: Array.isArray(source.monsters) ? source.monsters : [],
         roster: Array.isArray(source.roster) ? source.roster : [],
         mapValue,
         mapValueInitial,
         mapValueGoal,
-        lostValue
+        lostValue,
+        lastDestroyedItem
     };
 }
 
@@ -307,6 +313,15 @@ function normalizePosition(position) {
         anchorX: ["left", "center", "right"].includes(position.anchorX) ? position.anchorX : null,
         anchorY: ["top", "center", "bottom"].includes(position.anchorY) ? position.anchorY : null
     };
+}
+
+function normalizeDestroyedItem(rawEntry) {
+    if (!rawEntry || typeof rawEntry !== "object") return null;
+    const player = typeof rawEntry.player === "string" ? rawEntry.player.slice(0, 60).trim() : "";
+    const item = typeof rawEntry.item === "string" ? rawEntry.item.slice(0, 80).trim() : "";
+    const at = Number(rawEntry.at);
+    if (!player || !item || !Number.isFinite(at)) return null;
+    return { player, item, at };
 }
 
 const mimeTypes = {
@@ -896,6 +911,23 @@ function setMapValue(rawPayload) {
     return { ok: true, statusCode: 200, payload: { ok: true, mapValue: overlayState.mapValue, mapValueInitial: overlayState.mapValueInitial, mapValueGoal: overlayState.mapValueGoal, lostValue: overlayState.lostValue } };
 }
 
+function setItemDestroyed(rawPlayer, rawItem) {
+    const player = typeof rawPlayer === "string" ? rawPlayer.slice(0, 60).trim() : "";
+    const item = typeof rawItem === "string" ? rawItem.slice(0, 80).trim() : "";
+    if (!player || !item) {
+        return { ok: false, statusCode: 422, payload: { error: "Invalid item-destroyed payload", received: { player: rawPlayer, item: rawItem } } };
+    }
+
+    const lastDestroyedItem = { player, item, at: Date.now() };
+    overlayState = {
+        ...defaultOverlayState,
+        ...(normalizeOverlayState(overlayState) || {}),
+        lastDestroyedItem
+    };
+
+    return { ok: true, statusCode: 200, payload: { ok: true, lastDestroyedItem } };
+}
+
 function serveFile(request, response) {
     const requestUrl = new URL(request.url, `http://${request.headers.host}`);
     const pathname = decodeURIComponent(requestUrl.pathname === "/" ? "/overlay.html" : requestUrl.pathname);
@@ -1038,6 +1070,17 @@ const server = http.createServer(async (request, response) => {
             const body = await readBody(request);
             const payload = JSON.parse(body || "{}");
             const result = setMapValue(payload);
+            sendJson(response, result.statusCode, result.payload);
+            if (result.ok) {
+                broadcastState();
+            }
+            return;
+        }
+
+        if (request.method === "POST" && request.url === "/api/item-destroyed") {
+            const body = await readBody(request);
+            const payload = JSON.parse(body || "{}");
+            const result = setItemDestroyed(payload.player, payload.item);
             sendJson(response, result.statusCode, result.payload);
             if (result.ok) {
                 broadcastState();

@@ -119,6 +119,13 @@
                                 <span></span>
                             </span>
                         </label>
+                        <label class="overlay-toggle-row">
+                            <span data-i18n="itemDestroyedAlerts">Кто разрушил предмет</span>
+                            <span class="overlay-toggle-switch">
+                                <input type="checkbox" id="overlayItemDestroyedAlertsToggle">
+                                <span></span>
+                            </span>
+                        </label>
                     </div>
                 </section>
 
@@ -207,7 +214,7 @@
                 </section>
 
                 <div class="overlay-control-footer">
-                    <a class="overlay-version-link" id="overlayVersionLink" href="https://github.com/Dunweir/OverlayHUD-repo" target="_blank" rel="noopener noreferrer">OverlayHUD v26.8.0</a>
+                    <a class="overlay-version-link" id="overlayVersionLink" href="https://github.com/Dunweir/OverlayHUD-repo" target="_blank" rel="noopener noreferrer">OverlayHUD v26.8.10</a>
                 </div>
             </div>
             <div class="overlay-control-hotspot" id="overlayControlHotspot" aria-hidden="true"></div>
@@ -236,6 +243,7 @@
                 <div class="upgrade-row" id="upgradeRow" aria-label="Player upgrades"></div>
             </div>
             <div class="monsters-squares" id="monstersSquares"></div>
+            <div class="item-destroyed-alert" id="itemDestroyedAlert" aria-live="polite"></div>
         </div>
     </div>
 
@@ -294,6 +302,10 @@
         const mapValueNumber = document.getElementById("mapValueNumber");
         const lostValuePill = document.getElementById("lostValuePill");
         const lostValueNumber = document.getElementById("lostValueNumber");
+        const overlayItemDestroyedAlertsToggle = document.getElementById("overlayItemDestroyedAlertsToggle");
+        const itemDestroyedAlert = document.getElementById("itemDestroyedAlert");
+        let lastShownDestroyedItemAt = 0;
+        let itemDestroyedAlertHideTimer = 0;
         let latestState = null;
         let renderedSquareCount = 0;
         let lastTimerText = "";
@@ -372,6 +384,8 @@
                 cooldownIndicator: "Индикатор КД",
                 onlyAliveMonsters: "Только живые монстры",
                 onlyAliveIncludeUndetected: "и необнаруженных",
+                itemDestroyedAlerts: "Кто разрушил предмет",
+                itemDestroyedMessage: (player, item) => ({ prefix: `💥 ${player} `, action: "разрушил", suffix: ` ${item}` }),
                 level: "УРОВЕНЬ",
                 healthUnknown: "ХП: ?",
                 healthValueUnknown: (health) => `ХП: ${health} / ?`,
@@ -438,6 +452,8 @@
                 cooldownIndicator: "CD indicator",
                 onlyAliveMonsters: "Only alive monsters",
                 onlyAliveIncludeUndetected: "and undetected",
+                itemDestroyedAlerts: "Who destroyed the item",
+                itemDestroyedMessage: (player, item) => ({ prefix: `💥 ${player} `, action: "destroyed", suffix: ` ${item}` }),
                 level: "LEVEL",
                 healthUnknown: "HP: ?",
                 healthValueUnknown: (health) => `HP: ${health} / ?`,
@@ -1293,6 +1309,45 @@
             overlayContainer.classList.toggle("is-topbar-inline", latestState.compactModeEnabled && hasHeader && hasUpgrades);
         }
 
+        function positionItemDestroyedAlert() {
+            const containerRect = overlayContainer.getBoundingClientRect();
+            const alertHeight = itemDestroyedAlert.offsetHeight || 40;
+            const margin = 14;
+            const spaceAbove = containerRect.top;
+            const spaceBelow = window.innerHeight - containerRect.bottom;
+            const fitsAbove = spaceAbove >= alertHeight + margin;
+            const fitsBelow = spaceBelow >= alertHeight + margin;
+            const shouldPlaceBelow = !fitsAbove && (fitsBelow || spaceBelow > spaceAbove);
+            itemDestroyedAlert.classList.toggle("is-below", shouldPlaceBelow);
+        }
+
+        function updateItemDestroyedAlert(state) {
+            const entry = state.lastDestroyedItem;
+            const at = Number(entry?.at);
+            if (!state.itemDestroyedAlertsVisible || !entry || !Number.isFinite(at) || at <= lastShownDestroyedItemAt) return;
+            if (Date.now() - at > 15000) {
+                lastShownDestroyedItemAt = at;
+                return;
+            }
+
+            lastShownDestroyedItemAt = at;
+            const message = getText("itemDestroyedMessage")(entry.player, entry.item);
+            itemDestroyedAlert.textContent = "";
+            itemDestroyedAlert.append(
+                document.createTextNode(message.prefix),
+                Object.assign(document.createElement("span"), { className: "item-destroyed-action", textContent: message.action }),
+                document.createTextNode(message.suffix)
+            );
+            itemDestroyedAlert.classList.remove("is-visible");
+            positionItemDestroyedAlert();
+            void itemDestroyedAlert.offsetWidth;
+            itemDestroyedAlert.classList.add("is-visible");
+            window.clearTimeout(itemDestroyedAlertHideTimer);
+            itemDestroyedAlertHideTimer = window.setTimeout(() => {
+                itemDestroyedAlert.classList.remove("is-visible");
+            }, 6000);
+        }
+
         function render(state) {
             const previousState = latestState;
             const keepInlineUntilUpgradesHidden = overlayContainer.classList.contains("is-topbar-inline") && !state.upgradesVisible;
@@ -1365,6 +1420,7 @@
             overlayOnlyAliveIncludeUndetectedToggle.checked = state.onlyAliveIncludeUndetected;
             overlayOnlyAliveIncludeUndetectedToggle.disabled = !state.onlyAliveMonstersVisible;
             overlayOnlyAliveIncludeUndetectedRow.classList.toggle("is-disabled", !state.onlyAliveMonstersVisible);
+            overlayItemDestroyedAlertsToggle.checked = state.itemDestroyedAlertsVisible;
             const upgradeVisibilityForToggles = state.upgradeVisibility || {};
             overlayUpgradeVisibilityToggles.forEach((toggle, key) => {
                 toggle.input.checked = upgradeVisibilityForToggles[key] !== false;
@@ -1470,6 +1526,7 @@
             }
             applySavedPositionsWhenLayoutChanges(state);
             if (majorVisibilityChanged) scheduleLayoutReclamp();
+            updateItemDestroyedAlert(state);
         }
 
         applyViewportScale();
@@ -1552,6 +1609,7 @@
         overlayRespawnIndicatorToggle.addEventListener("change", () => OverlayApp.setRespawnIndicatorVisible(overlayRespawnIndicatorToggle.checked));
         overlayOnlyAliveMonstersToggle.addEventListener("change", () => OverlayApp.setOnlyAliveMonstersVisible(overlayOnlyAliveMonstersToggle.checked));
         overlayOnlyAliveIncludeUndetectedToggle.addEventListener("change", () => OverlayApp.setOnlyAliveIncludeUndetected(overlayOnlyAliveIncludeUndetectedToggle.checked));
+        overlayItemDestroyedAlertsToggle.addEventListener("change", () => OverlayApp.setItemDestroyedAlertsVisible(overlayItemDestroyedAlertsToggle.checked));
         overlayLanguageRuBtn.addEventListener("click", () => OverlayApp.setInterfaceLanguage("ru"));
         overlayLanguageEnBtn.addEventListener("click", () => OverlayApp.setInterfaceLanguage("en"));
         [overlaySizeSlider, overlayUpgradeSizeSlider, overlayColumnsSlider, overlayHoverOpacitySlider].forEach((slider) => {

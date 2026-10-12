@@ -10,6 +10,7 @@ using System.IO;
 using System.IO.Compression;
 using System.Net.Sockets;
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading;
@@ -19,7 +20,7 @@ using UnityEngine.SceneManagement;
 
 namespace OverlayHUD
 {
-    [BepInPlugin("local.overlay.overlay_hud", "OverlayHUD", "26.8.0")]
+    [BepInPlugin("local.overlay.overlay_hud", "OverlayHUD", "26.8.10")]
     public sealed class Plugin : BaseUnityPlugin
     {
         private static Plugin instance;
@@ -41,6 +42,7 @@ namespace OverlayHUD
         private static float mapValue;
         private static float mapValueInitial;
         private static float lostValue;
+        private static readonly ConditionalWeakTable<object, string> lastGrabberNameByPhysGrabObject = new ConditionalWeakTable<object, string>();
 
         private static readonly Dictionary<string, string> KnownMonsters = new Dictionary<string, string>
         {
@@ -425,6 +427,8 @@ namespace OverlayHUD
                 MethodInfo valuableDollarHaulRemoveRpc = AccessTools.Method("ValuableObject:RemoveFromDollarHaulListRPC");
                 MethodInfo physGrabObjectBreakRpc = AccessTools.Method("PhysGrabObjectImpactDetector:BreakRPC");
                 MethodInfo physGrabObjectDestroyRpc = AccessTools.Method("PhysGrabObject:DestroyPhysGrabObjectRPC");
+                MethodInfo physGrabObjectGrabStarted = AccessTools.Method("PhysGrabObject:GrabStarted");
+                MethodInfo physGrabObjectGrabPlayerAddRpc = AccessTools.Method("PhysGrabObject:GrabPlayerAddRPC");
                 MethodInfo enemyVisionTrigger = AccessTools.Method("EnemyVision:VisionTrigger");
                 MethodInfo enemyHealthHurt = AccessTools.Method("EnemyHealth:Hurt");
                 MethodInfo enemyHealthHurtRpc = AccessTools.Method("EnemyHealth:HurtRPC");
@@ -445,6 +449,8 @@ namespace OverlayHUD
                 HarmonyMethod valuableDollarHaulRemovePostfix = new HarmonyMethod(typeof(Plugin).GetMethod(nameof(ValuableDollarHaulRemovePostfix), BindingFlags.NonPublic | BindingFlags.Static));
                 HarmonyMethod physGrabObjectBreakPostfix = new HarmonyMethod(typeof(Plugin).GetMethod(nameof(PhysGrabObjectBreakPostfix), BindingFlags.NonPublic | BindingFlags.Static));
                 HarmonyMethod physGrabObjectDestroyedPostfix = new HarmonyMethod(typeof(Plugin).GetMethod(nameof(PhysGrabObjectDestroyedPostfix), BindingFlags.NonPublic | BindingFlags.Static));
+                HarmonyMethod physGrabObjectGrabStartedPostfix = new HarmonyMethod(typeof(Plugin).GetMethod(nameof(PhysGrabObjectGrabStartedPostfix), BindingFlags.NonPublic | BindingFlags.Static));
+                HarmonyMethod physGrabObjectGrabPlayerAddRpcPostfix = new HarmonyMethod(typeof(Plugin).GetMethod(nameof(PhysGrabObjectGrabPlayerAddRpcPostfix), BindingFlags.NonPublic | BindingFlags.Static));
                 HarmonyMethod enemyVisionTriggerPostfix = new HarmonyMethod(typeof(Plugin).GetMethod(nameof(EnemyVisionTriggerPostfix), BindingFlags.NonPublic | BindingFlags.Static));
                 HarmonyMethod enemyHealthChangedPostfix = new HarmonyMethod(typeof(Plugin).GetMethod(nameof(EnemyHealthChangedPostfix), BindingFlags.NonPublic | BindingFlags.Static));
 
@@ -554,6 +560,18 @@ namespace OverlayHUD
                 {
                     harmony.Patch(physGrabObjectDestroyRpc, postfix: physGrabObjectDestroyedPostfix);
                     Logger.LogInfo("Patched PhysGrabObject.DestroyPhysGrabObjectRPC for map value removal.");
+                }
+
+                if (physGrabObjectGrabStarted != null)
+                {
+                    harmony.Patch(physGrabObjectGrabStarted, postfix: physGrabObjectGrabStartedPostfix);
+                    Logger.LogInfo("Patched PhysGrabObject.GrabStarted for last-grabber tracking.");
+                }
+
+                if (physGrabObjectGrabPlayerAddRpc != null)
+                {
+                    harmony.Patch(physGrabObjectGrabPlayerAddRpc, postfix: physGrabObjectGrabPlayerAddRpcPostfix);
+                    Logger.LogInfo("Patched PhysGrabObject.GrabPlayerAddRPC for last-grabber tracking.");
                 }
 
                 if (enemyVisionTrigger != null)
@@ -720,15 +738,49 @@ namespace OverlayHUD
         private static void PhysGrabObjectDestroyedPostfix(object __instance)
         {
             if (!IsRunLevel()) return;
-            Component valuable = GetValuableComponent(__instance);
-            if (valuable == null) return;
 
-            float currentValue = ReadValuableCurrentValue(valuable);
-            float originalValue = ReadValuableOriginalValue(valuable);
-            if (originalValue > 0f && currentValue < originalValue * 0.15f) return;
-            instance?.AddMapValue(-currentValue, "valuable destroyed");
-            if (IsValuableInDollarHaul(valuable)) return;
-            instance?.AddLostValue(currentValue, "valuable destroyed");
+            Component valuable = GetValuableComponent(__instance);
+            bool wasSubmittedForExtraction = false;
+            if (valuable != null)
+            {
+                float currentValue = ReadValuableCurrentValue(valuable);
+                float originalValue = ReadValuableOriginalValue(valuable);
+                bool alreadyAccountedFor = originalValue > 0f && currentValue < originalValue * 0.15f;
+                wasSubmittedForExtraction = IsValuableInDollarHaul(valuable);
+                if (!alreadyAccountedFor)
+                {
+                    instance?.AddMapValue(-currentValue, "valuable destroyed");
+                    if (!wasSubmittedForExtraction)
+                    {
+                        instance?.AddLostValue(currentValue, "valuable destroyed");
+                    }
+                }
+            }
+
+            if (valuable != null && !wasSubmittedForExtraction)
+            {
+                instance?.ReportDestroyedItem(__instance);
+            }
+        }
+
+        private static void PhysGrabObjectGrabStartedPostfix(object __instance, object player)
+        {
+            RecordLastGrabber(__instance, ReadMember(player, "playerAvatar"));
+        }
+
+        private static void PhysGrabObjectGrabPlayerAddRpcPostfix(object __instance, int photonViewID)
+        {
+            RecordLastGrabber(__instance, InvokePlayerAvatarGetFromPhotonID(photonViewID));
+        }
+
+        private static void RecordLastGrabber(object physGrabObjectInstance, object playerAvatar)
+        {
+            if (physGrabObjectInstance == null || playerAvatar == null) return;
+            string playerName = ReadMember(playerAvatar, "playerName") as string;
+            if (string.IsNullOrWhiteSpace(playerName)) return;
+
+            lastGrabberNameByPhysGrabObject.Remove(physGrabObjectInstance);
+            lastGrabberNameByPhysGrabObject.Add(physGrabObjectInstance, playerName);
         }
 
         private static void EnemyVisionTriggerPostfix(object __instance, int playerID, object player, bool culled, bool playerNear)
@@ -950,6 +1002,51 @@ namespace OverlayHUD
         {
             mapValueDirty = true;
             nextMapValueSyncAt = Time.realtimeSinceStartup + 0.2f;
+        }
+
+        private void ReportDestroyedItem(object physGrabObjectInstance)
+        {
+            if (!(physGrabObjectInstance is Component physGrabObjectComponent))
+            {
+                if (debugLogging.Value) Logger.LogInfo("Destroyed-item report skipped: destroyed instance is not a Component.");
+                return;
+            }
+
+            string playerName = ResolveLastGrabberName(physGrabObjectInstance);
+            if (string.IsNullOrWhiteSpace(playerName))
+            {
+                if (debugLogging.Value) Logger.LogInfo("Destroyed-item report skipped: no known last grabber for the destroyed object.");
+                return;
+            }
+
+            string itemName = ResolveDestroyedItemName(physGrabObjectComponent);
+            if (debugLogging.Value) Logger.LogInfo("Destroyed-item report: " + playerName + " destroyed " + itemName + ".");
+            StartCoroutine(PostItemDestroyed(playerName, itemName));
+        }
+
+        private static string ResolveLastGrabberName(object physGrabObjectInstance)
+        {
+            if (lastGrabberNameByPhysGrabObject.TryGetValue(physGrabObjectInstance, out string trackedName)
+                && !string.IsNullOrWhiteSpace(trackedName))
+            {
+                return trackedName;
+            }
+
+            object lastPlayerGrabbing = ReadMember(physGrabObjectInstance, "lastPlayerGrabbing");
+            if (lastPlayerGrabbing == null) return null;
+            return ReadMember(lastPlayerGrabbing, "playerName") as string;
+        }
+
+        private static string ResolveDestroyedItemName(Component physGrabObjectComponent)
+        {
+            Component itemAttributes = physGrabObjectComponent.GetComponent("ItemAttributes");
+            string itemName = ReadMember(itemAttributes, "itemName") as string;
+            if (!string.IsNullOrWhiteSpace(itemName)) return itemName;
+
+            Component valuable = physGrabObjectComponent.GetComponent("ValuableObject");
+            string fallbackName = valuable != null ? valuable.gameObject.name : physGrabObjectComponent.gameObject.name;
+            if (string.IsNullOrWhiteSpace(fallbackName)) return "Item";
+            return fallbackName.Replace("(Clone)", "").Trim();
         }
 
         private void SyncMapValueIfChanged()
@@ -2640,6 +2737,21 @@ namespace OverlayHUD
             }
         }
 
+        private static object InvokePlayerAvatarGetFromPhotonID(int photonViewId)
+        {
+            MethodInfo method = AccessTools.Method("SemiFunc:PlayerAvatarGetFromPhotonID");
+            if (method == null) return null;
+
+            try
+            {
+                return method.Invoke(null, new object[] { photonViewId });
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
         private static Task<string> QueueNetworkRequest(Func<string> request)
         {
             lock (networkQueueLock)
@@ -2817,6 +2929,25 @@ namespace OverlayHUD
             else if (debugLogging.Value)
             {
                 Logger.LogInfo("Synced map value " + value + ": " + result);
+            }
+
+            yield break;
+        }
+
+        private IEnumerator PostItemDestroyed(string playerName, string itemName)
+        {
+            string itemDestroyedEndpoint = BuildSiblingEndpoint(levelEndpoint.Value, "/api/item-destroyed");
+            string json = "{\"player\":\"" + EscapeJson(playerName) + "\",\"item\":\"" + EscapeJson(itemName) + "\"}";
+            Task<string> request = QueueNetworkRequest(() => SendHttpPost(itemDestroyedEndpoint, json));
+            while (!request.IsCompleted) yield return null;
+            string result = request.IsFaulted ? "ERROR:" + request.Exception.GetBaseException().Message : request.Result;
+            if (!IsHttpSuccess(result))
+            {
+                Logger.LogWarning("Failed to sync item destroyed by " + playerName + ": " + TrimHttpResult(result));
+            }
+            else if (debugLogging.Value)
+            {
+                Logger.LogInfo(playerName + " destroyed " + itemName + ": " + result);
             }
 
             yield break;

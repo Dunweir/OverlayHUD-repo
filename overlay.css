@@ -1190,6 +1190,49 @@ body {
     }
 }
 
+.item-destroyed-alert {
+    position: absolute;
+    bottom: calc(100% + 14px);
+    left: 0;
+    right: 0;
+    z-index: 8;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    width: max-content;
+    max-width: none;
+    margin: 0 auto;
+    padding: 6px 18px 5px;
+    border-radius: 7px;
+    background: rgba(225, 70, 70, 0.17);
+    color: #ff9a9a;
+    font-size: 26px;
+    line-height: 1;
+    opacity: 0;
+    pointer-events: none;
+    text-align: center;
+    text-transform: uppercase;
+    transform: translateY(6px);
+    transition: opacity 0.25s ease, transform 0.25s ease;
+    white-space: nowrap;
+}
+
+.item-destroyed-alert.is-below {
+    top: calc(100% + 14px);
+    bottom: auto;
+    transform: translateY(-6px);
+}
+
+.item-destroyed-alert.is-visible {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.item-destroyed-action {
+    color: rgba(247, 251, 255, 0.72);
+}
+
 @media (prefers-reduced-motion: reduce) {
     .overlay-container {
         transition: none;
@@ -1207,7 +1250,8 @@ body {
     .monster-health-fill,
     .strength-required,
     .monster-cooldown::before,
-    .monster-cooldown-time {
+    .monster-cooldown-time,
+    .item-destroyed-alert {
         transition: none;
     }
 

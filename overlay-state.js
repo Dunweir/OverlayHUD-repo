@@ -108,6 +108,7 @@ const OverlayApp = (() => {
         respawnIndicatorVisible: true,
         onlyAliveMonstersVisible: false,
         onlyAliveIncludeUndetected: false,
+        itemDestroyedAlertsVisible: true,
         squareSize: 70,
         upgradeSize: 38,
         overlayScaleVersion: 3,
@@ -127,7 +128,8 @@ const OverlayApp = (() => {
         mapValue: 0,
         mapValueInitial: 0,
         mapValueGoal: null,
-        lostValue: 0
+        lostValue: 0,
+        lastDestroyedItem: null
     };
 
     let state = defaultState;
@@ -205,6 +207,8 @@ const OverlayApp = (() => {
         const mapValueGoal = normalizeCurrencyValue(source.mapValueGoal, defaultState.mapValueGoal);
         const lostValue = normalizeCurrencyValue(source.lostValue, defaultState.lostValue);
         const upgradeVisibility = normalizeUpgradeVisibility(source.upgradeVisibility);
+        const itemDestroyedAlertsVisible = Boolean(source.itemDestroyedAlertsVisible);
+        const lastDestroyedItem = normalizeDestroyedItem(source.lastDestroyedItem);
         return {
             ...defaultState,
             ...source,
@@ -227,12 +231,14 @@ const OverlayApp = (() => {
             upgradeTooltipsVisible,
             valueWrapEnabled,
             upgradeVisibility,
+            itemDestroyedAlertsVisible,
             monsters: Array.isArray(source.monsters) ? source.monsters : [],
             roster: Array.isArray(source.roster) ? source.roster : [],
             mapValue,
             mapValueInitial,
             mapValueGoal,
-            lostValue
+            lostValue,
+            lastDestroyedItem
         };
     }
 
@@ -249,6 +255,15 @@ const OverlayApp = (() => {
         const parsed = Number(value);
         if (!Number.isFinite(parsed)) return fallback;
         return Math.max(0, Math.round(parsed));
+    }
+
+    function normalizeDestroyedItem(rawEntry) {
+        if (!rawEntry || typeof rawEntry !== "object") return null;
+        const player = typeof rawEntry.player === "string" ? rawEntry.player.slice(0, 60).trim() : "";
+        const item = typeof rawEntry.item === "string" ? rawEntry.item.slice(0, 80).trim() : "";
+        const at = Number(rawEntry.at);
+        if (!player || !item || !Number.isFinite(at)) return null;
+        return { player, item, at };
     }
 
     function normalizePosition(position) {
@@ -629,6 +644,10 @@ const OverlayApp = (() => {
         updateState((currentState) => ({ ...currentState, onlyAliveMonstersVisible: Boolean(onlyAliveMonstersVisible) }));
     }
 
+    function setItemDestroyedAlertsVisible(itemDestroyedAlertsVisible) {
+        updateState((currentState) => ({ ...currentState, itemDestroyedAlertsVisible: Boolean(itemDestroyedAlertsVisible) }));
+    }
+
     function setOnlyAliveIncludeUndetected(onlyAliveIncludeUndetected) {
         updateState((currentState) => ({ ...currentState, onlyAliveIncludeUndetected: Boolean(onlyAliveIncludeUndetected) }));
     }
@@ -708,6 +727,7 @@ const OverlayApp = (() => {
         setRespawnIndicatorVisible,
         setOnlyAliveMonstersVisible,
         setOnlyAliveIncludeUndetected,
+        setItemDestroyedAlertsVisible,
         startTimer,
         stopTimer,
         subscribe
