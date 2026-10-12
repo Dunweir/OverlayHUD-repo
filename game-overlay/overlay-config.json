@@ -1,5 +1,7 @@
 {
   "overlayUrl": "http://127.0.0.1:8787/overlay.html",
   "displayIndex": 0,
+  "displayId": null,
+  "hardwareAcceleration": true,
   "zoomFactor": 1
 }

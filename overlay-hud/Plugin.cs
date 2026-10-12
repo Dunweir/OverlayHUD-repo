@@ -289,6 +289,9 @@ namespace OverlayHUD
                 launchedOverlayProcess = Process.Start(new ProcessStartInfo
                 {
                     FileName = exePath,
+                    Arguments = autoCloseOverlayApp.Value
+                        ? "--overlay-game-pid=" + Process.GetCurrentProcess().Id.ToString(System.Globalization.CultureInfo.InvariantCulture)
+                        : string.Empty,
                     WorkingDirectory = Path.GetDirectoryName(exePath),
                     UseShellExecute = true
                 });
@@ -746,7 +749,10 @@ namespace OverlayHUD
                 float currentValue = ReadValuableCurrentValue(valuable);
                 float originalValue = ReadValuableOriginalValue(valuable);
                 bool alreadyAccountedFor = originalValue > 0f && currentValue < originalValue * 0.15f;
-                wasSubmittedForExtraction = IsValuableInDollarHaul(valuable);
+                // Haul membership only means the object is in the extraction room.
+                // Damage destruction sets dead; normal extraction destroys it without doing so.
+                wasSubmittedForExtraction = IsValuableInDollarHaul(valuable)
+                    && !(ReadMember(__instance, "dead") is bool dead && dead);
                 if (!alreadyAccountedFor)
                 {
                     instance?.AddMapValue(-currentValue, "valuable destroyed");
@@ -1145,9 +1151,9 @@ namespace OverlayHUD
                 resolvedEnemies.Add(new ResolvedEnemyCandidate { Candidate = candidate, MonsterName = monsterName });
             }
 
-            if (resolvedEnemies.Count == 0)
+            // Finish the bounded discovery retries before publishing an empty level.
+            if (resolvedEnemies.Count == 0 && !rosterPublished && broadEnemyDiscoveryAttempts < 3)
             {
-                enemyRosterDirty = false;
                 return;
             }
 
@@ -1203,9 +1209,9 @@ namespace OverlayHUD
             }
 
             string nextFingerprint = fingerprint.ToString();
+            bool firstPublication = !rosterPublished;
             if (!rosterPublished)
             {
-                if (enemies.Count == 0) return false;
                 if (nextFingerprint != pendingRosterFingerprint)
                 {
                     pendingRosterFingerprint = nextFingerprint;
@@ -1218,7 +1224,8 @@ namespace OverlayHUD
                 rosterPublished = true;
             }
 
-            if (nextFingerprint == lastRosterFingerprint) return true;
+            // The first empty roster has the same fingerprint as the reset state.
+            if (!firstPublication && nextFingerprint == lastRosterFingerprint) return true;
             lastRosterFingerprint = nextFingerprint;
             var json = new StringBuilder("{\"monsters\":[");
             for (int index = 0; index < enemies.Count; index++)

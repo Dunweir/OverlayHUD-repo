@@ -1427,9 +1427,7 @@
             });
 
             const roster = Array.isArray(state.roster) ? [...state.roster] : [];
-            const hasMonsterIconSlots = !state.rosterPending
-                && (roster.length > 0 || (Array.isArray(state.monsters) && state.monsters.length > 0));
-            const overlayShouldBeVisible = Boolean(state.gameplayVisible && hasMonsterIconSlots);
+            const overlayShouldBeVisible = Boolean(state.gameplayVisible);
 
             const keepOverlayPositioned = overlayContainer.classList.contains("is-positioned");
             const keepOverlayDragging = overlayContainer.classList.contains("is-dragging");

@@ -1,12 +1,15 @@
 const { app, BrowserWindow, Menu, Tray, dialog, globalShortcut, nativeImage, screen, shell } = require("electron");
 const fs = require("fs");
 const path = require("path");
+const { startGameLifetimeWatcher } = require("./game-lifetime");
 
 const portableRoot = app.isPackaged ? path.dirname(process.execPath) : __dirname;
 const configPath = path.join(portableRoot, "overlay-config.json");
 const defaultConfig = {
     overlayUrl: "http://127.0.0.1:8787/overlay.html",
     displayIndex: 0,
+    displayId: null,
+    hardwareAcceleration: true,
     zoomFactor: 1
 };
 
@@ -31,6 +34,17 @@ let opacityTimer = null;
 let hoverTick = 0;
 let quitting = false;
 let localServerModule = null;
+let hoverBoundsGeneration = 0;
+let screenshotInProgress = false;
+let stopGameLifetimeWatcher = () => {};
+let displaySettleTimer = null;
+let displayTransitionGeneration = 0;
+let displayTransitionActive = false;
+const startupConfig = readConfig();
+let displayConfig = startupConfig;
+
+// Transparent windows can render black with GPU compositing on some Windows drivers.
+if (startupConfig.hardwareAcceleration === false) app.disableHardwareAcceleration();
 
 function readConfig() {
     try {
@@ -65,14 +79,186 @@ async function startLocalServer() {
     }
 }
 
-function getTargetDisplay(displayIndex) {
+function getOrderedDisplays() {
     const primary = screen.getPrimaryDisplay();
     const otherDisplays = screen.getAllDisplays().filter((display) => display.id !== primary.id).sort((left, right) => {
         return left.bounds.x - right.bounds.x || left.bounds.y - right.bounds.y;
     });
-    const displays = [primary, ...otherDisplays];
-    const index = Math.min(Math.max(Number(displayIndex) || 0, 0), displays.length - 1);
-    return displays[index] || screen.getPrimaryDisplay();
+    return [primary, ...otherDisplays];
+}
+
+function getTargetDisplay(config = displayConfig) {
+    const displays = getOrderedDisplays();
+    const matched = config.displayId != null
+        ? displays.find((display) => String(display.id) === String(config.displayId))
+        : null;
+    const index = Math.min(Math.max(Number(config.displayIndex) || 0, 0), displays.length - 1);
+    return matched || displays[index] || screen.getPrimaryDisplay();
+}
+
+function invalidateHoverBounds() {
+    ++hoverBoundsGeneration;
+    overlayContentBounds = null;
+    overlayInteractiveBounds = null;
+    overlayHotspotBounds = null;
+    overlayDragBounds = [];
+    overlayDragging = false;
+    dragHoldUntil = 0;
+    overlayControlsEnabled = false;
+    applyMousePassthrough(clickThrough);
+    setHoverDimmed(false);
+}
+
+function cancelDisplayTransition() {
+    clearTimeout(displaySettleTimer);
+    displaySettleTimer = null;
+    displayTransitionActive = false;
+    ++displayTransitionGeneration;
+}
+
+function displayBoundsMatch(window, bounds) {
+    const actual = window.getBounds();
+    const content = window.getContentBounds();
+    return ["x", "y", "width", "height"].every((key) => Math.abs(actual[key] - bounds[key]) <= 1)
+        && Math.abs(content.width - bounds.width) <= 1
+        && Math.abs(content.height - bounds.height) <= 1;
+}
+
+function repositionOverlay() {
+    cancelDisplayTransition();
+    const window = overlayWindow;
+    if (window && !window.isDestroyed() && !quitting) {
+        const generation = displayTransitionGeneration;
+        displayTransitionActive = true;
+        invalidateHoverBounds();
+        // Fixed-size constraints can retain the old monitor's DPI during WM_DPICHANGED.
+        // Keep bounds in DIP; Electron performs the physical-pixel conversion.
+        window.setResizable(true);
+        window.setBounds(getTargetDisplay().bounds, false);
+        invalidateHoverBounds();
+        refreshOverlayContentBounds();
+        const delays = [50, 100, 200, 400];
+        function settle(attempt) {
+            if (generation !== displayTransitionGeneration || window !== overlayWindow || window.isDestroyed() || quitting) return;
+            const bounds = getTargetDisplay().bounds;
+            if (!displayBoundsMatch(window, bounds)) {
+                window.setBounds(bounds, false);
+                invalidateHoverBounds();
+            }
+            if (attempt < delays.length - 1) {
+                displaySettleTimer = setTimeout(() => settle(attempt + 1), delays[attempt + 1]);
+                return;
+            }
+            window.setResizable(false);
+            // Verify once more after restoring fixed-size constraints, without a resize loop.
+            displaySettleTimer = setTimeout(() => {
+                if (generation !== displayTransitionGeneration || window !== overlayWindow || window.isDestroyed() || quitting) return;
+                const finalBounds = getTargetDisplay().bounds;
+                if (!displayBoundsMatch(window, finalBounds)) window.setBounds(finalBounds, false);
+                if (!displayBoundsMatch(window, finalBounds)) {
+                    console.warn("Overlay bounds did not settle after DPI change", { expected: finalBounds, actual: window.getBounds() });
+                }
+                displaySettleTimer = null;
+                displayTransitionActive = false;
+                invalidateHoverBounds();
+                refreshOverlayContentBounds();
+            }, 100);
+        }
+        displaySettleTimer = setTimeout(() => settle(0), delays[0]);
+    }
+    rebuildTrayMenu();
+}
+
+function selectDisplay(displayId) {
+    try {
+        const displays = getOrderedDisplays();
+        const displayIndex = displays.findIndex((display) => display.id === displayId);
+        if (displayIndex < 0) return repositionOverlay();
+        displayConfig = saveConfig({ displayId, displayIndex });
+        repositionOverlay();
+    } catch (error) {
+        dialog.showErrorBox("OverlayHUD", `Не удалось сохранить монитор:\n${error.message}`);
+        rebuildTrayMenu();
+    }
+}
+
+function saveConfig(changes) {
+    // Never overwrite an unreadable config or discard unrelated settings.
+    let existing = {};
+    try {
+        existing = JSON.parse(fs.readFileSync(configPath, "utf8"));
+    } catch (error) {
+        if (error.code !== "ENOENT") throw error;
+    }
+    if (!existing || typeof existing !== "object" || Array.isArray(existing)) {
+        throw new Error("Invalid overlay config object");
+    }
+    const config = { ...defaultConfig, ...existing, ...changes };
+    fs.writeFileSync(configPath, `${JSON.stringify(config, null, 2)}\n`, "utf8");
+    return config;
+}
+
+function setHardwareAcceleration(enabled) {
+    try {
+        const choice = dialog.showMessageBoxSync({
+            type: "question",
+            title: "OverlayHUD",
+            message: `${enabled ? "Включить" : "Отключить"} аппаратное ускорение?`,
+            detail: "Для применения настройки приложение оверлея будет перезапущено. Игра продолжит работать.",
+            buttons: ["Перезапустить оверлей", "Отмена"],
+            defaultId: 0,
+            cancelId: 1
+        });
+        if (choice !== 0) return;
+        saveConfig({ hardwareAcceleration: enabled });
+        // An explicit disable-gpu argument would otherwise survive re-enabling via the tray.
+        const args = process.argv.slice(1).filter((arg) => !enabled || !/^--disable-gpu(?:=.*)?$/.test(arg));
+        app.relaunch({ args });
+        app.quit();
+    } catch (error) {
+        dialog.showErrorBox("OverlayHUD", `Не удалось изменить аппаратное ускорение:\n${error.message}`);
+    } finally {
+        rebuildTrayMenu();
+    }
+}
+
+function screenshotFileName(now = new Date()) {
+    const pad = (value, length = 2) => String(value).padStart(length, "0");
+    return `OverlayHUD_${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}_${pad(now.getHours())}-${pad(now.getMinutes())}-${pad(now.getSeconds())}-${pad(now.getMilliseconds(), 3)}.png`;
+}
+
+async function saveOverlayScreenshot() {
+    if (screenshotInProgress) return;
+    screenshotInProgress = true;
+    rebuildTrayMenu();
+    try {
+        const window = overlayWindow;
+        if (!window || window.isDestroyed() || !window.isVisible() || window.webContents.isLoading()) {
+            throw new Error("Покажите оверлей и дождитесь загрузки страницы.");
+        }
+        // Capture only this renderer surface, never the desktop or the game beneath it.
+        const fileName = screenshotFileName();
+        const image = await window.webContents.capturePage();
+        if (window.isDestroyed() || quitting) throw new Error("Окно оверлея закрыто.");
+        if (image.isEmpty()) throw new Error("Electron вернул пустой снимок.");
+        const png = image.toPNG();
+        if (!png.length) throw new Error("Не удалось сформировать PNG.");
+        const result = await dialog.showSaveDialog({
+            title: "Сохранить PNG оверлея (без игры)",
+            defaultPath: fileName,
+            filters: [{ name: "PNG image", extensions: ["png"] }],
+            properties: ["showOverwriteConfirmation"]
+        });
+        if (result.canceled || !result.filePath || quitting) return;
+        const filePath = /\.png$/i.test(result.filePath) ? result.filePath : `${result.filePath}.png`;
+        await fs.promises.writeFile(filePath, png);
+    } catch (error) {
+        console.error(`Overlay screenshot failed: ${error.message}`);
+        if (!quitting) dialog.showErrorBox("OverlayHUD", `Не удалось сохранить снимок оверлея:\n${error.message}`);
+    } finally {
+        screenshotInProgress = false;
+        rebuildTrayMenu();
+    }
 }
 
 function applyClickThrough(enabled) {
@@ -186,6 +372,8 @@ async function setOverlayHoverState(isOpen, cursor) {
 
 async function refreshOverlayContentBounds() {
     if (!overlayWindow || overlayWindow.isDestroyed() || overlayWindow.webContents.isLoading()) return;
+    const window = overlayWindow;
+    const generation = hoverBoundsGeneration;
     try {
         const rects = await overlayWindow.webContents.executeJavaScript(`(() => {
             const toRect = (element) => {
@@ -232,6 +420,7 @@ async function refreshOverlayContentBounds() {
                 hoverOpacity
             };
         })()`);
+        if (window !== overlayWindow || window.isDestroyed() || generation !== hoverBoundsGeneration) return;
         if (!rects || !rects.overlay) {
             overlayContentBounds = null;
             setHoverDimmed(false);
@@ -286,6 +475,7 @@ async function refreshOverlayContentBounds() {
             overlayDragBounds = [];
         }
     } catch {
+        if (window !== overlayWindow || window.isDestroyed() || generation !== hoverBoundsGeneration) return;
         overlayContentBounds = null;
         overlayInteractiveBounds = null;
         overlayHotspotBounds = null;
@@ -341,14 +531,36 @@ function startHoverTracking() {
 function rebuildTrayMenu() {
     if (!tray) return;
     const visible = overlayWindow && !overlayWindow.isDestroyed() && overlayWindow.isVisible();
+    const displays = getOrderedDisplays();
+    const target = getTargetDisplay();
     tray.setContextMenu(Menu.buildFromTemplate([
         { label: visible ? "Скрыть оверлей" : "Показать оверлей", click: toggleOverlay },
         { label: "Обновить", click: reloadOverlay },
+        ...(displays.length > 1 ? [{
+            label: "Монитор",
+            submenu: displays.map((display, index) => ({
+                label: `${index + 1}: ${display.label || "Монитор"} (${display.bounds.width}×${display.bounds.height})${index === 0 ? " — основной" : ""}`,
+                type: "radio",
+                checked: display.id === target.id,
+                click: () => selectDisplay(display.id)
+            }))
+        }] : []),
+        {
+            label: "Сохранить PNG оверлея (без игры)…",
+            enabled: Boolean(visible) && !screenshotInProgress,
+            click: saveOverlayScreenshot
+        },
         {
             label: "Пропускать клики",
             type: "checkbox",
             checked: clickThrough,
             click: (item) => applyClickThrough(item.checked)
+        },
+        {
+            label: "Аппаратное ускорение (перезапуск)…",
+            type: "checkbox",
+            checked: startupConfig.hardwareAcceleration !== false && !app.commandLine.hasSwitch("disable-gpu"),
+            click: (item) => setHardwareAcceleration(item.checked)
         },
         { type: "separator" },
         { label: "Выход", click: () => app.quit() }
@@ -364,7 +576,8 @@ function scheduleRetry() {
 
 function createOverlayWindow() {
     const config = readConfig();
-    const display = getTargetDisplay(config.displayIndex);
+    displayConfig = config;
+    const display = getTargetDisplay();
     const { x, y, width, height } = display.bounds;
 
     overlayWindow = new BrowserWindow({
@@ -408,6 +621,17 @@ function createOverlayWindow() {
         if (url.startsWith("http://") || url.startsWith("https://")) shell.openExternal(url);
     });
 
+    if (process.platform === "win32") {
+        overlayWindow.hookWindowMessage(0x02E0, () => {
+            // Do not change bounds recursively inside the native DPI message handler.
+            if (displayTransitionActive || quitting) return;
+            clearTimeout(displaySettleTimer);
+            displaySettleTimer = setTimeout(repositionOverlay, 0);
+        });
+    }
+    overlayWindow.on("move", invalidateHoverBounds);
+    overlayWindow.on("resize", invalidateHoverBounds);
+    overlayWindow.webContents.on("did-start-loading", invalidateHoverBounds);
     overlayWindow.webContents.on("did-finish-load", () => {
         clearTimeout(retryTimer);
         overlayWindow.showInactive();
@@ -420,6 +644,7 @@ function createOverlayWindow() {
         scheduleRetry();
     });
     overlayWindow.on("closed", () => {
+        cancelDisplayTransition();
         clearInterval(hoverTimer);
         clearInterval(opacityTimer);
         hoverTimer = null;
@@ -477,11 +702,20 @@ if (!app.requestSingleInstanceLock()) {
         createOverlayWindow();
         createTray();
         registerShortcuts();
+        screen.on("display-added", repositionOverlay);
+        screen.on("display-removed", repositionOverlay);
+        screen.on("display-metrics-changed", repositionOverlay);
+        stopGameLifetimeWatcher = startGameLifetimeWatcher({ quit: () => app.quit() });
     });
 }
 
 app.on("before-quit", () => {
     quitting = true;
+    stopGameLifetimeWatcher();
+    cancelDisplayTransition();
+    screen.removeListener("display-added", repositionOverlay);
+    screen.removeListener("display-removed", repositionOverlay);
+    screen.removeListener("display-metrics-changed", repositionOverlay);
     clearTimeout(retryTimer);
     clearInterval(hoverTimer);
     if (localServerModule) localServerModule.stopOverlayServer();
