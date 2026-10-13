@@ -36,6 +36,7 @@ let quitting = false;
 let localServerModule = null;
 let hoverBoundsGeneration = 0;
 let screenshotInProgress = false;
+let overlayPreferences = { interfaceLanguage: "ru", saveTimestampsEnabled: true };
 let stopGameLifetimeWatcher = () => {};
 let displaySettleTimer = null;
 let displayTransitionGeneration = 0;
@@ -401,7 +402,9 @@ async function refreshOverlayContentBounds() {
             const hoverOpacity = Number.isFinite(Number(controls?.dataset.hoverOpacity)) ? Number(controls.dataset.hoverOpacity) / 100 : 0.5;
             const overlayVisible = overlay && overlay.classList.contains("is-visible") && !overlay.classList.contains("is-tab-hidden");
             const controlsEnabled = Boolean(controls && controls.classList.contains("is-enabled"));
+            const state = typeof OverlayApp !== "undefined" ? OverlayApp.getState() : null;
             return {
+                preferences: state ? { interfaceLanguage: state.interfaceLanguage, saveTimestampsEnabled: state.saveTimestampsEnabled } : null,
                 overlay: overlayVisible
                     ? toRect(overlay)
                     : null,
@@ -421,6 +424,7 @@ async function refreshOverlayContentBounds() {
             };
         })()`);
         if (window !== overlayWindow || window.isDestroyed() || generation !== hoverBoundsGeneration) return;
+        if (rects?.preferences) updateTrayPreferences(rects.preferences);
         if (!rects || !rects.overlay) {
             overlayContentBounds = null;
             setHoverDimmed(false);
@@ -528,6 +532,37 @@ function startHoverTracking() {
     }, 100);
 }
 
+function updateTrayPreferences(preferences) {
+    const next = {
+        interfaceLanguage: preferences.interfaceLanguage === "en" ? "en" : "ru",
+        saveTimestampsEnabled: preferences.saveTimestampsEnabled !== false
+    };
+    if (next.interfaceLanguage === overlayPreferences.interfaceLanguage
+        && next.saveTimestampsEnabled === overlayPreferences.saveTimestampsEnabled) return;
+    overlayPreferences = next;
+    rebuildTrayMenu();
+}
+
+async function setOverlayPreference(key, value) {
+    try {
+        const window = overlayWindow;
+        if (!window || window.isDestroyed() || window.webContents.isLoading()) {
+            throw new Error("Дождитесь загрузки оверлея.");
+        }
+        const setter = key === "interfaceLanguage" ? "setInterfaceLanguage" : "setSaveTimestampsEnabled";
+        const preferences = await window.webContents.executeJavaScript(`(() => {
+            OverlayApp.${setter}(${JSON.stringify(value)});
+            const state = OverlayApp.getState();
+            return { interfaceLanguage: state.interfaceLanguage, saveTimestampsEnabled: state.saveTimestampsEnabled };
+        })()`);
+        updateTrayPreferences(preferences);
+    } catch (error) {
+        dialog.showErrorBox("OverlayHUD", `Не удалось изменить настройку:\n${error.message}`);
+    } finally {
+        rebuildTrayMenu();
+    }
+}
+
 function rebuildTrayMenu() {
     if (!tray) return;
     const visible = overlayWindow && !overlayWindow.isDestroyed() && overlayWindow.isVisible();
@@ -536,6 +571,13 @@ function rebuildTrayMenu() {
     tray.setContextMenu(Menu.buildFromTemplate([
 
         { label: "Обновить", click: reloadOverlay },
+        {
+            label: "Язык / Language",
+            submenu: [
+                { label: "Русский", type: "radio", checked: overlayPreferences.interfaceLanguage === "ru", click: () => setOverlayPreference("interfaceLanguage", "ru") },
+                { label: "English", type: "radio", checked: overlayPreferences.interfaceLanguage === "en", click: () => setOverlayPreference("interfaceLanguage", "en") }
+            ]
+        },
         ...(displays.length > 1 ? [{
             label: "Монитор",
             submenu: displays.map((display, index) => ({
@@ -559,6 +601,12 @@ function rebuildTrayMenu() {
                     type: "checkbox",
                     checked: !clickThrough,
                     click: (item) => applyClickThrough(!item.checked)
+                },
+                {
+                    label: "Сохранять таймкоды",
+                    type: "checkbox",
+                    checked: overlayPreferences.saveTimestampsEnabled,
+                    click: (item) => setOverlayPreference("saveTimestampsEnabled", item.checked)
                 }
             ]
         },

@@ -20,6 +20,19 @@ function loadClient(initialState = null) {
     return context.api;
 }
 
+test('timestamp preference defaults on and persists with the interface language', () => {
+    const client = loadClient();
+    assert.equal(client.getState().saveTimestampsEnabled, true);
+    client.setSaveTimestampsEnabled(false);
+    client.setInterfaceLanguage('en');
+    const restored = loadClient(client.getState());
+    assert.equal(restored.getState().saveTimestampsEnabled, false);
+    assert.equal(restored.getState().interfaceLanguage, 'en');
+    restored.setSaveTimestampsEnabled(true);
+    assert.equal(restored.getState().saveTimestampsEnabled, true);
+    assert.equal(loadClient({ saveTimestampsEnabled: 'false' }).getState().saveTimestampsEnabled, true);
+});
+
 const plain = (value) => JSON.parse(JSON.stringify(value));
 const position = (anchorY, anchorX = 'left') => ({ left: 20, top: 20, anchorX, anchorY });
 

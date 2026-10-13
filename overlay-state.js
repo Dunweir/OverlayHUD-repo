@@ -91,6 +91,7 @@ const OverlayApp = (() => {
         upgradeVisibility: { ...defaultUpgradeVisibility },
         style: 1,
         interfaceLanguage: "ru",
+        saveTimestampsEnabled: true,
         bgEnabled: false,
         timerVisible: true,
         upgradesVisible: true,
@@ -227,6 +228,7 @@ const OverlayApp = (() => {
             overlayDefaultsVersion: defaultState.overlayDefaultsVersion,
             hoverOpacity,
             interfaceLanguage,
+            saveTimestampsEnabled: typeof source.saveTimestampsEnabled === "boolean" ? source.saveTimestampsEnabled : true,
             overlayAlignment,
             compactModeEnabled,
             upgradeLayout: compactModeEnabled ? "inline" : "stacked",
@@ -568,6 +570,10 @@ const OverlayApp = (() => {
         updateState((currentState) => ({ ...currentState, style: 1 }));
     }
 
+    function setSaveTimestampsEnabled(enabled) {
+        updateState((currentState) => ({ ...currentState, saveTimestampsEnabled: Boolean(enabled) }));
+    }
+
     function setInterfaceLanguage(interfaceLanguage) {
         updateState((currentState) => ({ ...currentState, interfaceLanguage: interfaceLanguage === "en" ? "en" : "ru" }));
     }
@@ -714,6 +720,7 @@ const OverlayApp = (() => {
         setHoverOpacity,
         setControlsPosition,
         setInterfaceLanguage,
+        setSaveTimestampsEnabled,
         setLevel,
         setLevelBadgeVisible,
         setLostValueVisible,

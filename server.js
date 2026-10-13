@@ -134,6 +134,7 @@ const defaultOverlayState = {
     upgradeVisibility: { ...defaultUpgradeVisibility },
     style: 1,
     interfaceLanguage: "ru",
+    saveTimestampsEnabled: true,
     bgEnabled: false,
     timerVisible: true,
     upgradesVisible: true,
@@ -272,6 +273,9 @@ function normalizeOverlayState(rawState) {
         overlayDefaultsVersion: defaultOverlayState.overlayDefaultsVersion,
         hoverOpacity,
         interfaceLanguage,
+        saveTimestampsEnabled: typeof source.saveTimestampsEnabled === "boolean"
+            ? source.saveTimestampsEnabled
+            : defaultOverlayState.saveTimestampsEnabled,
         overlayAlignment,
         compactModeEnabled,
         upgradeLayout: compactModeEnabled ? "inline" : "stacked",
@@ -612,7 +616,7 @@ function getTimestampSession() {
 }
 
 function writeTimestampSession() {
-    if (!timestampSession) return;
+    if (overlayState?.saveTimestampsEnabled === false || !timestampSession) return;
 
     try {
         fs.mkdirSync(path.dirname(timestampSession.filePath), { recursive: true });
@@ -622,14 +626,57 @@ function writeTimestampSession() {
     }
 }
 
-function formatMonsterTimestampList(monsters) {
-    return getMonsterTotals(monsters).map(({ name, count }) => count > 1 ? `${name} x${count}` : name);
+const timestampMonsterNamesRu = {
+    "Animal": "Зверь",
+    "Apex Predator": "Утка",
+    "Banger": "Черепа",
+    "Bella": "Белла",
+    "Birthday Boy": "Именинник",
+    "Bowtie": "Бабочка",
+    "Chef": "Повар",
+    "Cleanup Crew": "Уборщик",
+    "Clown": "Клоун",
+    "Elsa": "Эльза",
+    "Gambit": "Гамбит",
+    "Gnomes": "Гномы",
+    "Headgrab": "Хэдграб",
+    "Headman": "Хэдмен",
+    "Heart Hugger": "Сердцеед",
+    "Hidden": "Невидимка",
+    "Huntsman": "Охотник",
+    "Loom": "Лум",
+    "Mentalist": "Менталист",
+    "Oogly": "Угли",
+    "Peeper": "Глаз",
+    "Reaper": "Жнец",
+    "Robe": "Роба",
+    "Rugrat": "Карапуз",
+    "Shadow Child": "Теневой ребёнок",
+    "Spewer": "Плевун",
+    "Tick": "Клещ",
+    "Trudge": "Топтун",
+    "Upscream": "Крикун"
+};
+
+function normalizeTimestampMonsterName(name) {
+    const key = normalizeMonsterKey(name);
+    const canonical = monsterConfig.aliases[key];
+    if (Object.prototype.hasOwnProperty.call(timestampMonsterNamesRu, canonical)) return canonical;
+    if (key === "shadowchildren") return "Shadow Child";
+    return monsterConfig.aliases[key.replace(/s$/, "")] || canonical || name;
+}
+
+function formatMonsterTimestampList(monsters, language) {
+    return getMonsterTotals(monsters).map(({ name, count }) => {
+        const label = language === "ru" ? timestampMonsterNamesRu[name] || name : name;
+        return count > 1 ? `${label} x${count}` : label;
+    });
 }
 
 function getMonsterTotals(monsters) {
     const totals = new Map();
     for (const monster of Array.isArray(monsters) ? monsters : []) {
-        const name = String(monster?.name || "").trim();
+        const name = normalizeTimestampMonsterName(String(monster?.name || "").trim());
         if (!name) continue;
 
         const count = Number(monster.count);
@@ -641,9 +688,9 @@ function getMonsterTotals(monsters) {
 }
 
 function finalizeActiveTimestampLine() {
-    if (!timestampSession || timestampSession.activeLineIndex == null) return;
+    if (overlayState?.saveTimestampsEnabled === false || !timestampSession || timestampSession.activeLineIndex == null) return;
 
-    const monsters = formatMonsterTimestampList(overlayState?.monsters);
+    const monsters = formatMonsterTimestampList(overlayState?.monsters, timestampSession.activeLineLanguage);
     const line = timestampSession.lines[timestampSession.activeLineIndex] || "";
     timestampSession.lines[timestampSession.activeLineIndex] = monsters.length > 0
         ? `${line.replace(/\s+\[[^\]]*\]$/, "")} [${monsters.join(", ")}]`
@@ -653,10 +700,14 @@ function finalizeActiveTimestampLine() {
 }
 
 function startTimestampLine(level, rawLevelName) {
+    if (overlayState?.saveTimestampsEnabled === false) return;
     finalizeActiveTimestampLine();
 
     const session = getTimestampSession();
-    const line = `${formatLocalClockTime()} Level ${level} ${normalizeLevelName(rawLevelName)}`;
+    // Keep the heading and monster list in the same language even after a settings change.
+    session.activeLineLanguage = overlayState?.interfaceLanguage === "en" ? "en" : "ru";
+    const levelLabel = session.activeLineLanguage === "ru" ? "Уровень" : "Level";
+    const line = `${formatLocalClockTime()} ${levelLabel} ${level} ${normalizeLevelName(rawLevelName)}`;
     session.lines.push(line);
     session.activeLineIndex = session.lines.length - 1;
     writeTimestampSession();
@@ -977,7 +1028,13 @@ const server = http.createServer(async (request, response) => {
         if (request.method === "POST" && request.url === "/api/state") {
             const body = await readBody(request);
             const payload = JSON.parse(body || "{}");
-            overlayState = normalizeOverlayState(payload.state);
+            const nextState = normalizeOverlayState(payload.state);
+            if (nextState?.saveTimestampsEnabled === false) {
+                finalizeActiveTimestampLine();
+                // Do not resume a partially recorded level when saving is re-enabled.
+                if (timestampSession) timestampSession.activeLineIndex = null;
+            }
+            overlayState = nextState;
             sendJson(response, 200, { ok: true });
             broadcastState();
             return;

@@ -156,6 +156,45 @@ async function boot(config = {}, args = []) {
     return { state, api: context.api, screen, app, image, runTimers };
 }
 
+test("tray changes the shared overlay language and timestamp preference", async () => {
+    const { state } = await boot();
+    const language = () => state.menu.find((item) => item.label === "Язык / Language").submenu;
+    const timestamps = () => state.menu.find((item) => item.label === "Прочее").submenu.find((item) => item.label === "Сохранять таймкоды");
+    assert.equal(language()[0].checked, true);
+    assert.equal(timestamps().checked, true);
+    const preferences = { interfaceLanguage: "ru", saveTimestampsEnabled: true };
+    state.window.webContents.executeJavaScript = async (script) => {
+        return vm.runInNewContext(script, { OverlayApp: {
+            setInterfaceLanguage(value) { preferences.interfaceLanguage = value; },
+            setSaveTimestampsEnabled(value) { preferences.saveTimestampsEnabled = value; },
+            getState: () => preferences
+        } });
+    };
+    await language()[1].click();
+    assert.equal(preferences.interfaceLanguage, "en");
+    assert.equal(language()[1].checked, true);
+    await timestamps().click({ checked: false });
+    assert.equal(preferences.saveTimestampsEnabled, false);
+    assert.equal(timestamps().checked, false);
+    assert.deepEqual(state.errors, []);
+});
+
+test("tray follows preferences changed in the overlay panel", async () => {
+    const { state, api } = await boot();
+    state.rectPromise = Promise.resolve({ preferences: { interfaceLanguage: "en", saveTimestampsEnabled: false } });
+    await api.refreshOverlayContentBounds();
+    assert.equal(state.menu.find((item) => item.label === "Язык / Language").submenu[1].checked, true);
+    assert.equal(state.menu.find((item) => item.label === "Прочее").submenu.find((item) => item.label === "Сохранять таймкоды").checked, false);
+});
+
+test("tray preference changes fail safely while the overlay is loading", async () => {
+    const { state } = await boot();
+    state.loading = true;
+    await state.menu.find((item) => item.label === "Язык / Language").submenu[1].click();
+    assert.equal(state.errors.length, 1);
+    assert.equal(state.menu.find((item) => item.label === "Язык / Language").submenu[0].checked, true);
+});
+
 const monitorMenu = (state) => state.menu.find((item) => item.label === "Монитор");
 
 test("hardware acceleration is default and only boolean false disables it before ready", async () => {

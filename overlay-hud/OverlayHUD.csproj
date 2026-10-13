@@ -4,6 +4,7 @@
     <LangVersion>latest</LangVersion>
     <Nullable>disable</Nullable>
     <AssemblyName>OverlayHUD</AssemblyName>
+    <Version>26.10.0</Version>
     <RootNamespace>OverlayHUD</RootNamespace>
   </PropertyGroup>
 
