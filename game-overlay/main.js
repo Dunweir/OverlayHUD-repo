@@ -204,9 +204,9 @@ function setHardwareAcceleration(enabled) {
         const choice = dialog.showMessageBoxSync({
             type: "question",
             title: "OverlayHUD",
-            message: `${enabled ? "Включить" : "Отключить"} аппаратное ускорение?`,
-            detail: "Для применения настройки приложение оверлея будет перезапущено. Игра продолжит работать.",
-            buttons: ["Перезапустить оверлей", "Отмена"],
+            message: trayText(`${enabled ? "Включить" : "Отключить"} аппаратное ускорение?`, `${enabled ? "Enable" : "Disable"} hardware acceleration?`),
+            detail: trayText("Для применения настройки приложение оверлея будет перезапущено. Игра продолжит работать.", "The overlay will restart to apply this setting. The game will keep running."),
+            buttons: [trayText("Перезапустить оверлей", "Restart overlay"), trayText("Отмена", "Cancel")],
             defaultId: 0,
             cancelId: 1
         });
@@ -245,7 +245,7 @@ async function saveOverlayScreenshot() {
         const png = image.toPNG();
         if (!png.length) throw new Error("Не удалось сформировать PNG.");
         const result = await dialog.showSaveDialog({
-            title: "Сохранить PNG оверлея (без игры)",
+            title: trayText("Сохранить PNG оверлея (без игры)", "Save overlay PNG (without game)"),
             defaultPath: fileName,
             filters: [{ name: "PNG image", extensions: ["png"] }],
             properties: ["showOverwriteConfirmation"]
@@ -563,6 +563,10 @@ async function setOverlayPreference(key, value) {
     }
 }
 
+function trayText(ru, en) {
+    return overlayPreferences.interfaceLanguage === "en" ? en : ru;
+}
+
 function rebuildTrayMenu() {
     if (!tray) return;
     const visible = overlayWindow && !overlayWindow.isDestroyed() && overlayWindow.isVisible();
@@ -570,40 +574,40 @@ function rebuildTrayMenu() {
     const target = getTargetDisplay();
     tray.setContextMenu(Menu.buildFromTemplate([
 
-        { label: "Обновить", click: reloadOverlay },
+        { label: trayText("Обновить", "Reload"), click: reloadOverlay },
         {
-            label: "Язык / Language",
+            label: trayText("Язык / Language", "Language"),
             submenu: [
                 { label: "Русский", type: "radio", checked: overlayPreferences.interfaceLanguage === "ru", click: () => setOverlayPreference("interfaceLanguage", "ru") },
                 { label: "English", type: "radio", checked: overlayPreferences.interfaceLanguage === "en", click: () => setOverlayPreference("interfaceLanguage", "en") }
             ]
         },
         ...(displays.length > 1 ? [{
-            label: "Монитор",
+            label: trayText("Монитор", "Monitor"),
             submenu: displays.map((display, index) => ({
-                label: `${index + 1}: ${display.label || "Монитор"} (${display.bounds.width}×${display.bounds.height})${index === 0 ? " — основной" : ""}`,
+                label: `${index + 1}: ${display.label || trayText("Монитор", "Monitor")} (${display.bounds.width}×${display.bounds.height})${index === 0 ? trayText(" — основной", " — primary") : ""}`,
                 type: "radio",
                 checked: display.id === target.id,
                 click: () => selectDisplay(display.id)
             }))
         }] : []),
         {
-            label: "Сделать скриншот",
+            label: trayText("Сделать скриншот", "Take screenshot"),
             enabled: Boolean(visible) && !screenshotInProgress,
             click: saveOverlayScreenshot
         },
         {
-            label: "Прочее",
+            label: trayText("Прочее", "Other"),
             submenu: [
-                { label: visible ? "Скрыть оверлей" : "Показать оверлей", click: toggleOverlay },
+                { label: visible ? trayText("Скрыть оверлей", "Hide overlay") : trayText("Показать оверлей", "Show overlay"), click: toggleOverlay },
                 {
-                    label: "Взаимодействовать с оверлеем",
+                    label: trayText("Взаимодействовать с оверлеем", "Interact with overlay"),
                     type: "checkbox",
                     checked: !clickThrough,
                     click: (item) => applyClickThrough(!item.checked)
                 },
                 {
-                    label: "Сохранять таймкоды",
+                    label: trayText("Сохранять таймкоды", "Save timestamps"),
                     type: "checkbox",
                     checked: overlayPreferences.saveTimestampsEnabled,
                     click: (item) => setOverlayPreference("saveTimestampsEnabled", item.checked)
@@ -611,13 +615,13 @@ function rebuildTrayMenu() {
             ]
         },
         {
-            label: "Аппаратное ускорение (перезапуск)…",
+            label: trayText("Аппаратное ускорение (перезапуск)…", "Hardware acceleration (restart)…"),
             type: "checkbox",
             checked: startupConfig.hardwareAcceleration !== false && !app.commandLine.hasSwitch("disable-gpu"),
             click: (item) => setHardwareAcceleration(item.checked)
         },
         { type: "separator" },
-        { label: "Выход", click: () => app.quit() }
+        { label: trayText("Выход", "Quit"), click: () => app.quit() }
     ]));
 }
 

@@ -158,8 +158,8 @@ async function boot(config = {}, args = []) {
 
 test("tray changes the shared overlay language and timestamp preference", async () => {
     const { state } = await boot();
-    const language = () => state.menu.find((item) => item.label === "Язык / Language").submenu;
-    const timestamps = () => state.menu.find((item) => item.label === "Прочее").submenu.find((item) => item.label === "Сохранять таймкоды");
+    const language = () => state.menu.find((item) => ["Язык / Language", "Language"].includes(item.label)).submenu;
+    const timestamps = () => state.menu.find((item) => ["Прочее", "Other"].includes(item.label)).submenu.find((item) => ["Сохранять таймкоды", "Save timestamps"].includes(item.label));
     assert.equal(language()[0].checked, true);
     assert.equal(timestamps().checked, true);
     const preferences = { interfaceLanguage: "ru", saveTimestampsEnabled: true };
@@ -176,6 +176,18 @@ test("tray changes the shared overlay language and timestamp preference", async 
     await timestamps().click({ checked: false });
     assert.equal(preferences.saveTimestampsEnabled, false);
     assert.equal(timestamps().checked, false);
+    assert.deepEqual(Array.from(state.menu, (item) => item.label).filter(Boolean), [
+        "Reload", "Language", "Monitor", "Take screenshot", "Other", "Hardware acceleration (restart)…", "Quit"
+    ]);
+    assert.match(state.menu.find((item) => item.label === "Monitor").submenu[0].label, / — primary$/);
+    assert.deepEqual(Array.from(state.menu.find((item) => item.label === "Other").submenu, (item) => item.label), [
+        "Hide overlay", "Interact with overlay", "Save timestamps"
+    ]);
+    state.menu.find((item) => item.label.startsWith("Hardware acceleration")).click({ checked: false });
+    assert.equal(state.confirmOptions.message, "Disable hardware acceleration?");
+    await language()[0].click();
+    assert.equal(state.menu[0].label, "Обновить");
+    assert.equal(language()[0].checked, true);
     assert.deepEqual(state.errors, []);
 });
 
@@ -183,8 +195,8 @@ test("tray follows preferences changed in the overlay panel", async () => {
     const { state, api } = await boot();
     state.rectPromise = Promise.resolve({ preferences: { interfaceLanguage: "en", saveTimestampsEnabled: false } });
     await api.refreshOverlayContentBounds();
-    assert.equal(state.menu.find((item) => item.label === "Язык / Language").submenu[1].checked, true);
-    assert.equal(state.menu.find((item) => item.label === "Прочее").submenu.find((item) => item.label === "Сохранять таймкоды").checked, false);
+    assert.equal(state.menu.find((item) => item.label === "Language").submenu[1].checked, true);
+    assert.equal(state.menu.find((item) => item.label === "Other").submenu.find((item) => item.label === "Save timestamps").checked, false);
 });
 
 test("tray preference changes fail safely while the overlay is loading", async () => {

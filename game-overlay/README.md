@@ -33,6 +33,8 @@ Run `node --test game-overlay/main.test.js game-overlay/game-lifetime.test.js` f
 
 Run `build-portable.bat`. The ready-to-copy application will appear in `dist\OverlayHUD-win32-x64`. It does not require Node.js on the gaming PC.
 
+Keep `--no-asar` in the packaging command. The source is shipped in `resources/app/`, not `resources/app.asar`: Electron-based mod managers can treat ASAR files as virtual directories and fail to remove them with `EBUSY`. The plugin recognizes both layouts. When upgrading an old ASAR installation, close the game, overlay and mod manager, back up `timestamps` and `overlay-config.json`, and remove the old extracted `OverlayHUD_app` directory in Explorer before installing the new bundle.
+
 ## Hotkeys
 
 - `Ctrl+Alt+O`: show or hide the overlay.

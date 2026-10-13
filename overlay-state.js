@@ -140,12 +140,12 @@ const OverlayApp = (() => {
     const listeners = new Set();
     let serverSyncReady = false;
 
-    function loadState() {
+    function loadState(fallbackState = state || defaultState) {
         try {
             const raw = localStorage.getItem(storageKey);
             return raw ? JSON.parse(raw) : defaultState;
         } catch {
-            return state || defaultState;
+            return fallbackState;
         }
     }
 
@@ -315,13 +315,16 @@ const OverlayApp = (() => {
 
     async function postStateToServer(nextState) {
         try {
-            await fetch("/api/state", {
+            const response = await fetch("/api/state", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ state: nextState })
             });
+            if (!response.ok) throw new Error("State sync failed");
+            return true;
         } catch {
             serverSyncReady = false;
+            return false;
         }
     }
 
@@ -332,13 +335,25 @@ const OverlayApp = (() => {
             const response = await fetch("/api/state", { cache: "no-store" });
             if (!response.ok) return;
 
-            serverSyncReady = true;
             const payload = await response.json();
+            const localState = loadState(null);
+            const savedLanguage = localState !== defaultState
+                && ["ru", "en"].includes(localState?.interfaceLanguage)
+                ? localState.interfaceLanguage
+                : null;
             if (payload.state) {
-                saveState(payload.state, false);
+                const nextState = savedLanguage
+                    ? { ...payload.state, interfaceLanguage: savedLanguage }
+                    : payload.state;
+                saveState(nextState, false);
+                // Publish the saved preference before SSE delivers its initial server snapshot.
+                if (savedLanguage && savedLanguage !== payload.state.interfaceLanguage) {
+                    if (!await postStateToServer(state)) return;
+                }
             } else {
-                postStateToServer(getState());
+                if (!await postStateToServer(getState())) return;
             }
+            serverSyncReady = true;
         } catch {
             serverSyncReady = false;
             return;

@@ -358,7 +358,13 @@ namespace OverlayHUD
 
         private void EnsureOverlayAppExtracted(string exePath)
         {
-            if (File.Exists(exePath) && File.Exists(Path.Combine(Path.GetDirectoryName(exePath), "resources", "app.asar"))) return;
+            if (string.IsNullOrWhiteSpace(exePath)) return;
+            string resourcesDirectory = Path.Combine(Path.GetDirectoryName(exePath), "resources");
+            // New bundles use a regular app directory; retain support for existing ASAR installs.
+            bool hasApp = File.Exists(Path.Combine(resourcesDirectory, "app.asar"))
+                || (File.Exists(Path.Combine(resourcesDirectory, "app", "package.json"))
+                    && File.Exists(Path.Combine(resourcesDirectory, "app", "main.js")));
+            if (File.Exists(exePath) && hasApp) return;
 
             string pluginDirectory = GetPluginDirectory();
             string archivePath = Path.Combine(pluginDirectory, overlayAppArchiveName.Value);

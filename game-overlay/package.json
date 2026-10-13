@@ -8,7 +8,7 @@
   "scripts": {
     "start": "electron .",
     "check": "node --check main.js",
-    "package": "electron-packager . OverlayHUD --platform=win32 --arch=x64 --out=dist --overwrite --prune=true --icon=../assets/icons/icon.ico --ignore=^/dist --ignore=^/.electron-cache --electron-zip-dir=.electron-cache --extra-resource=../server.js --extra-resource=../overlay.html --extra-resource=../overlay-state.js --extra-resource=../overlay.css --extra-resource=../assets"
+    "package": "electron-packager . OverlayHUD --platform=win32 --arch=x64 --out=dist --overwrite --no-asar --prune=true --icon=../assets/icons/icon.ico --ignore=^/dist --ignore=^/.electron-cache --electron-zip-dir=.electron-cache --extra-resource=../server.js --extra-resource=../overlay.html --extra-resource=../overlay-state.js --extra-resource=../overlay.css --extra-resource=../assets"
   },
   "devDependencies": {
     "@electron/packager": "20.0.1",
