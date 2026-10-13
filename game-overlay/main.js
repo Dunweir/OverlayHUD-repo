@@ -534,7 +534,7 @@ function rebuildTrayMenu() {
     const displays = getOrderedDisplays();
     const target = getTargetDisplay();
     tray.setContextMenu(Menu.buildFromTemplate([
-        { label: visible ? "Скрыть оверлей" : "Показать оверлей", click: toggleOverlay },
+
         { label: "Обновить", click: reloadOverlay },
         ...(displays.length > 1 ? [{
             label: "Монитор",
@@ -546,15 +546,21 @@ function rebuildTrayMenu() {
             }))
         }] : []),
         {
-            label: "Сохранить PNG оверлея (без игры)…",
+            label: "Сделать скриншот",
             enabled: Boolean(visible) && !screenshotInProgress,
             click: saveOverlayScreenshot
         },
         {
-            label: "Пропускать клики",
-            type: "checkbox",
-            checked: clickThrough,
-            click: (item) => applyClickThrough(item.checked)
+            label: "Прочее",
+            submenu: [
+                { label: visible ? "Скрыть оверлей" : "Показать оверлей", click: toggleOverlay },
+                {
+                    label: "Взаимодействовать с оверлеем",
+                    type: "checkbox",
+                    checked: !clickThrough,
+                    click: (item) => applyClickThrough(!item.checked)
+                }
+            ]
         },
         {
             label: "Аппаратное ускорение (перезапуск)…",

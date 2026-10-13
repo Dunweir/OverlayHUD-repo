@@ -730,6 +730,16 @@ body {
     visibility: visible;
 }
 
+/* Raise the grid's stacking context above the topbar only for an active tooltip. */
+.overlay-container:not(.hide-tooltips) .monsters-squares:has(.monster-square:hover, .monster-square.is-tooltip-active) {
+    z-index: 3;
+}
+
+.monster-square:hover,
+.monster-square.is-tooltip-active {
+    z-index: 6;
+}
+
 .overlay-container.align-center .monsters-squares {
     margin-right: auto;
     margin-left: auto;

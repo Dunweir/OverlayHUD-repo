@@ -111,6 +111,12 @@ namespace OverlayHUD
             new KeyValuePair<string, string>("deathHeadBattery", "playerUpgradeDeathHeadBattery")
         };
 
+        private static class PlayerUpgradeTypes
+        {
+            internal static readonly Type StatsManager = AccessTools.TypeByName("StatsManager");
+            internal static readonly Type PlayerController = AccessTools.TypeByName("PlayerController");
+        }
+
         private static readonly Dictionary<string, string> UpgradeStateKeyByPunMethod = new Dictionary<string, string>
         {
             { "UpgradePlayerGrabStrength", "strength" },
@@ -2126,13 +2132,16 @@ namespace OverlayHUD
 
         private void SyncPlayerUpgradesIfChanged(HashSet<string> onlyKeys = null)
         {
+            // Resolve live instances once per snapshot, not once for every upgrade.
+            object statsManager = ReadMember(PlayerUpgradeTypes.StatsManager, "instance");
+            string steamId = ResolveLocalPlayerSteamId();
             var json = new StringBuilder("{\"upgrades\":{");
             int changedCount = 0;
             for (int index = 0; index < TrackedPlayerUpgrades.Length; index++)
             {
                 KeyValuePair<string, string> binding = TrackedPlayerUpgrades[index];
                 if (onlyKeys != null && !onlyKeys.Contains(binding.Key)) continue;
-                int? value = ResolveLocalPlayerUpgrade(binding.Value);
+                int? value = ResolveLocalPlayerUpgrade(statsManager, steamId, binding.Value);
                 if (!value.HasValue) continue;
                 if (lastSyncedUpgrades.TryGetValue(binding.Key, out int previousValue) && previousValue == value.Value) continue;
 
@@ -2146,14 +2155,10 @@ namespace OverlayHUD
             StartCoroutine(PostPlayerUpgrades(json.ToString(), changedCount));
         }
 
-        private static int? ResolveLocalPlayerUpgrade(string memberName)
+        private static int? ResolveLocalPlayerUpgrade(object statsManager, string steamId, string memberName)
         {
-            Type statsManagerType = AccessTools.TypeByName("StatsManager");
-            object statsManager = ReadMember(statsManagerType, "instance");
             object upgradesValue = ReadMember(statsManager, memberName);
             if (!(upgradesValue is IDictionary upgrades)) return null;
-
-            string steamId = ResolveLocalPlayerSteamId();
 
             object value = !string.IsNullOrEmpty(steamId) && upgrades.Contains(steamId) ? upgrades[steamId] : null;
             if (value == null && upgrades.Count == 1)
@@ -2178,8 +2183,7 @@ namespace OverlayHUD
 
         private static string ResolveLocalPlayerSteamId()
         {
-            Type playerControllerType = AccessTools.TypeByName("PlayerController");
-            object playerController = ReadMember(playerControllerType, "instance");
+            object playerController = ReadMember(PlayerUpgradeTypes.PlayerController, "instance");
             string steamId = ReadMember(playerController, "playerSteamID") as string;
             if (!string.IsNullOrEmpty(steamId)) return steamId;
 
