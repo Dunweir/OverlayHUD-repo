@@ -88,7 +88,7 @@ body {
     visibility: hidden;
     transform: translateX(-50%) translateY(var(--overlay-slide-y)) scale(calc(var(--viewport-scale) * 0.98));
     transform-origin: center top;
-    transition: opacity 0.28s ease, transform 0.28s ease, visibility 0s linear 0.28s,
+    transition: opacity var(--game-ui-opacity-duration, 0.28s) ease, transform 0.28s ease, visibility 0s linear 0.28s,
         background-color 0.24s ease, border-color 0.24s ease;
     will-change: opacity, transform;
 }
@@ -362,11 +362,16 @@ body {
     margin-left: 0;
 }
 
-.overlay-container.is-tab-hidden,
-.overlay-container.is-tab-hidden:hover {
-    opacity: 0;
-    visibility: hidden;
+/* Suppress game-UI conflicts immediately without changing the drag position. */
+.overlay-container[data-game-ui-hidden],
+.overlay-container[data-game-ui-hidden]:hover {
+    --game-ui-opacity-duration: 0s;
+    opacity: 0 !important;
     pointer-events: none;
+}
+
+.overlay-container[data-game-ui-hidden] * {
+    pointer-events: none !important;
 }
 
 .level-badge {

@@ -74,6 +74,8 @@ const OverlayApp = (() => {
         level: 1,
         gameplayVisible: false,
         tabHidden: false,
+        currencyVisible: false,
+
         strength: 0,
         tumbleLaunch: 0,
         range: 0,
@@ -147,7 +149,8 @@ const OverlayApp = (() => {
     }
 
     function normalizeState(nextState) {
-        const source = nextState || defaultState;
+        const source = { ...(nextState || defaultState) };
+        delete source.currencyRect;
         const sourceSquareSize = Number(source.squareSize);
         const sourceUpgradeSize = Number(source.upgradeSize);
         const shouldMigrateDefaultSizes = Number(source.overlayScaleVersion) < 3;
@@ -212,6 +215,9 @@ const OverlayApp = (() => {
         return {
             ...defaultState,
             ...source,
+            tabHidden: source.tabHidden === true,
+            currencyVisible: source.currencyVisible === true,
+
             overlayScaleVersion: defaultState.overlayScaleVersion,
             columnsLayoutVersion: defaultState.columnsLayoutVersion,
             style: 1,
@@ -248,6 +254,11 @@ const OverlayApp = (() => {
             accumulator[key] = Object.prototype.hasOwnProperty.call(source, key) ? Boolean(source[key]) : true;
             return accumulator;
         }, {});
+    }
+
+    function shouldHideForGameUI(state, position = state.overlayPosition) {
+        if (state.tabHidden) return true;
+        return Boolean(state.currencyVisible && (position == null || position.anchorY === "top"));
     }
 
     function normalizeCurrencyValue(value, fallback) {
@@ -684,6 +695,8 @@ const OverlayApp = (() => {
     }
 
     return {
+
+        shouldHideForGameUI,
         monsterConfig,
         upgradeKeys,
         addMonster,

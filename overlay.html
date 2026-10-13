@@ -731,7 +731,8 @@
                 startX: event.clientX,
                 startY: event.clientY,
                 startLeft: startPosition.left,
-                startTop: startPosition.top
+                startTop: startPosition.top,
+                position: getSavedPosition(targetName)
             };
             element.classList.add("is-dragging", "is-positioned");
             element.classList.remove("is-anchor-center-x", "is-anchor-center-y");
@@ -756,6 +757,8 @@
             );
             activeDrag.element.style.setProperty("--overlay-left", `${Math.round(nextPosition.left)}px`);
             activeDrag.element.style.setProperty("--overlay-top", `${Math.round(nextPosition.top)}px`);
+            activeDrag.position = nextPosition;
+            checkGameUIVisibility();
             updateSafeZoneGuides(nextPosition.anchorX, nextPosition.anchorY);
             event.preventDefault();
         }
@@ -763,6 +766,7 @@
         function stopOverlayDrag(event) {
             if (!activeDrag || event.pointerId !== activeDrag.pointerId) return;
             const finalPosition = snapPosition(activeDrag.element, activeDrag.element.getBoundingClientRect().left, activeDrag.element.getBoundingClientRect().top);
+            activeDrag.position = finalPosition;
             const draggedElement = activeDrag.element;
             try {
                 activeDrag.handle.releasePointerCapture(event.pointerId);
@@ -784,6 +788,7 @@
             updateSafeZoneGuides(null, null);
             lastPositionLayoutKey = "";
             activeDrag = null;
+            checkGameUIVisibility();
             delete document.documentElement.dataset.overlayDragging;
             window.removeEventListener("pointermove", moveOverlayDrag, true);
             window.removeEventListener("pointerup", stopOverlayDrag, true);
@@ -1348,8 +1353,29 @@
             }, 6000);
         }
 
+
+        function checkGameUIVisibility() {
+            if (!latestState) return;
+            const position = activeDrag?.targetName === "overlay"
+                ? activeDrag.position : latestState.overlayPosition;
+            const hidden = OverlayApp.shouldHideForGameUI(latestState, position);
+            if (overlayContainer.hasAttribute("data-game-ui-hidden") !== hidden) {
+                overlayContainer.toggleAttribute("data-game-ui-hidden", hidden);
+            }
+            overlayHoverControls.classList.toggle("is-enabled", latestState.gameplayVisible && !hidden);
+
+        }
+
+
         function render(state) {
             const previousState = latestState;
+            // Visibility events do not need to rebuild the entire HUD/settings panel.
+            const layoutState = ({ tabHidden, currencyVisible, ...rest }) => JSON.stringify(rest);
+            if (previousState && layoutState(previousState) === layoutState(state)) {
+                latestState = state;
+                checkGameUIVisibility();
+                return;
+            }
             const keepInlineUntilUpgradesHidden = overlayContainer.classList.contains("is-topbar-inline") && !state.upgradesVisible;
             const keepInlineUntilHeaderHidden = overlayContainer.classList.contains("is-topbar-inline")
                 && state.upgradesVisible
@@ -1455,7 +1481,7 @@
             if (!state.respawnIndicatorVisible) overlayContainer.classList.add("hide-respawn-indicator");
             if (!state.respawnTimerVisible && !state.respawnIndicatorVisible) overlayContainer.classList.add("hide-respawn-status");
             overlayContainer.classList.toggle("is-upgrade-wrap-double", state.upgradeRows === "double");
-            if (state.tabHidden) overlayContainer.classList.add("is-tab-hidden");
+            // Game UI suppression is applied separately, without changing layout.
             if (overlayShouldBeVisible) overlayContainer.classList.add("is-visible");
             overlayHoverControls.classList.toggle("is-enabled", overlayShouldBeVisible && !state.tabHidden);
 
@@ -1525,6 +1551,8 @@
             applySavedPositionsWhenLayoutChanges(state);
             if (majorVisibilityChanged) scheduleLayoutReclamp();
             updateItemDestroyedAlert(state);
+
+            checkGameUIVisibility();
         }
 
         applyViewportScale();

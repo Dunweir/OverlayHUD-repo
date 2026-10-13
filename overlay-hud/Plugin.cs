@@ -196,8 +196,41 @@ namespace OverlayHUD
         private string lastMapValueFingerprint = "";
         private int cachedLocalPlayerViewId = int.MinValue;
         private bool gameplayActive;
-        private bool? lastTabHeld;
+        private string lastGameUiFingerprint;
+
+        private float nextGameUiVisibilityAt;
         private Coroutine pendingGameplayActivation;
+
+        private static class GameUiFields
+        {
+            private static readonly Type MapType = AccessTools.TypeByName("MapToolController");
+            private static readonly Type CurrencyType = AccessTools.TypeByName("CurrencyUI");
+            private static readonly Type SemiUiType = AccessTools.TypeByName("SemiUI");
+
+            private static readonly Type DirectorType = AccessTools.TypeByName("GameDirector");
+            private static readonly Type LoadingType = AccessTools.TypeByName("LoadingUI");
+            private static readonly Type PlayerType = AccessTools.TypeByName("PlayerController");
+
+            internal static readonly FieldInfo MapInstance = Find(MapType, "instance");
+            internal static readonly FieldInfo MapVisual = Find(MapType, "VisualTransform");
+            internal static readonly FieldInfo CurrencyInstance = Find(CurrencyType, "instance");
+            internal static readonly FieldInfo UiText = Find(SemiUiType, "uiText");
+            internal static readonly FieldInfo ShowTimer = Find(SemiUiType, "showTimer");
+            internal static readonly FieldInfo HidePosition = Find(SemiUiType, "hidePosition");
+            internal static readonly FieldInfo HidePositionCurrent = Find(SemiUiType, "hidePositionCurrent");
+
+            internal static readonly FieldInfo DirectorInstance = Find(DirectorType, "instance");
+            internal static readonly FieldInfo DirectorState = Find(DirectorType, "currentState");
+            internal static readonly FieldInfo DisableInput = Find(DirectorType, "DisableInput");
+            internal static readonly FieldInfo LoadingInstance = Find(LoadingType, "instance");
+            internal static readonly FieldInfo PlayerInstance = Find(PlayerType, "instance");
+            internal static readonly FieldInfo InputDisableTimer = Find(PlayerType, "InputDisableTimer");
+
+            private static FieldInfo Find(Type type, string name)
+            {
+                return type == null ? null : AccessTools.Field(type, name);
+            }
+        }
 
         private ConfigEntry<string> endpoint;
         private ConfigEntry<string> levelEndpoint;
@@ -635,8 +668,14 @@ namespace OverlayHUD
         private void Update()
         {
             if (!gameplayActive) return;
-            SyncTabStateIfChanged();
             TickScan();
+        }
+
+        private void LateUpdate()
+        {
+            if (!gameplayActive || Time.realtimeSinceStartup < nextGameUiVisibilityAt) return;
+            nextGameUiVisibilityAt = Time.realtimeSinceStartup + 0.05f;
+            SyncGameUiVisibilityIfChanged();
         }
 
         private static void LevelGeneratedPostfix()
@@ -877,10 +916,12 @@ namespace OverlayHUD
 
         private IEnumerator ActivateGameplayAfterLevelChange(string reason)
         {
-            for (int attempt = 1; attempt <= 10; attempt++)
+            // Loading can take arbitrarily long, especially while waiting for other players.
+            var wait = new WaitForSecondsRealtime(0.1f);
+            while (true)
             {
-                yield return new WaitForSecondsRealtime(0.25f);
-                if (HandleGameplayDetected(reason + " attempt " + attempt))
+                yield return wait;
+                if (IsLocalGameplayReady() && HandleGameplayDetected(reason))
                 {
                     pendingGameplayActivation = null;
                     yield break;
@@ -897,6 +938,20 @@ namespace OverlayHUD
                 Logger.LogInfo("Gameplay activation was not confirmed after " + reason + " (" + details + ").");
             }
             pendingGameplayActivation = null;
+        }
+
+        private static bool IsLocalGameplayReady()
+        {
+            if (!(GameUiFields.DirectorInstance?.GetValue(null) is Component director) || director == null) return false;
+            if (GameUiFields.DirectorState?.GetValue(director)?.ToString() != "Main") return false;
+            if (!(GameUiFields.DisableInput?.GetValue(director) is bool disabled) || disabled) return false;
+
+            if (!(GameUiFields.LoadingInstance?.GetValue(null) is Component loadingUi)
+                || loadingUi == null || loadingUi.gameObject.activeInHierarchy) return false;
+
+            return GameUiFields.PlayerInstance?.GetValue(null) is Behaviour controller
+                && controller != null && controller.isActiveAndEnabled
+                && GameUiFields.InputDisableTimer?.GetValue(controller) is float inputTimer && inputTimer <= 0f;
         }
 
         private bool HandleGameplayDetected(string reason)
@@ -928,6 +983,9 @@ namespace OverlayHUD
             lastMapValueFingerprint = "";
             mapValueInitial = mapValue;
             gameplayActive = true;
+            lastGameUiFingerprint = null;
+            SyncGameUiVisibilityIfChanged();
+            ScheduleMapValueRefresh("local gameplay ready");
 
             int level = ResolveCurrentLevel();
             if (level > 0) SyncLevelToOverlay(level, ResolveCurrentLevelName());
@@ -936,6 +994,11 @@ namespace OverlayHUD
 
         private void HandleLevelChanging()
         {
+            if (pendingGameplayActivation != null)
+            {
+                StopCoroutine(pendingGameplayActivation);
+                pendingGameplayActivation = null;
+            }
             if (!gameplayActive) return;
             gameplayActive = false;
             SyncMapValueIfChanged();
@@ -2026,12 +2089,39 @@ namespace OverlayHUD
             StartCoroutine(PostPlayerUpgrades(json.ToString(), 1));
         }
 
-        private void SyncTabStateIfChanged()
+        private void SyncGameUiVisibilityIfChanged()
         {
-            bool tabHeld = Input.GetKey(KeyCode.Tab);
-            if (lastTabHeld.HasValue && lastTabHeld.Value == tabHeld) return;
-            lastTabHeld = tabHeld;
-            StartCoroutine(PostTabHidden(tabHeld));
+            bool mapVisible = GameUiFields.MapInstance?.GetValue(null) is Behaviour map
+                && map != null && map.isActiveAndEnabled
+                && GameUiFields.MapVisual?.GetValue(map) is Transform visual
+                && visual != null && visual.gameObject.activeInHierarchy;
+            bool quotaVisible = IsCurrencyUiVisible();
+            string json = "{\"hidden\":" + (mapVisible || quotaVisible ? "true" : "false")
+                + ",\"mapHidden\":" + (mapVisible ? "true" : "false")
+                + ",\"currencyVisible\":" + (quotaVisible ? "true" : "false") + "}";
+            if (lastGameUiFingerprint == json) return;
+            lastGameUiFingerprint = json;
+            if (debugLogging.Value)
+            {
+                Logger.LogInfo("Game UI visibility: map=" + mapVisible + ", currency=" + quotaVisible + ".");
+            }
+            // Legacy desktop apps still use hidden; updated apps check the HUD's top anchor locally.
+            StartCoroutine(PostGameUiVisibility(json));
+        }
+
+        private static bool IsCurrencyUiVisible()
+        {
+            if (!(GameUiFields.CurrencyInstance?.GetValue(null) is Behaviour currency)
+                || currency == null || !currency.isActiveAndEnabled) return false;
+            if (!(GameUiFields.UiText?.GetValue(currency) is Behaviour text)
+                || text == null || !text.isActiveAndEnabled) return false;
+
+            // CurrencyUI.Show is requested during extraction. SemiUI can leave text enabled
+            // while parked off-screen, so enabled/isHidden alone are not visibility signals.
+            if (GameUiFields.ShowTimer?.GetValue(currency) is float showTimer && showTimer > 0f) return true;
+            return GameUiFields.HidePositionCurrent?.GetValue(currency) is Vector2 current
+                && GameUiFields.HidePosition?.GetValue(currency) is Vector2 hidden
+                && current != hidden;
         }
 
         private void SyncPlayerUpgradesIfChanged(HashSet<string> onlyKeys = null)
@@ -2880,16 +2970,15 @@ namespace OverlayHUD
             yield break;
         }
 
-        private IEnumerator PostTabHidden(bool hidden)
+        private IEnumerator PostGameUiVisibility(string json)
         {
             string tabEndpoint = BuildSiblingEndpoint(levelEndpoint.Value, "/api/tab-hidden");
-            string json = "{\"hidden\":" + (hidden ? "true" : "false") + "}";
             Task<string> request = QueueNetworkRequest(() => SendHttpPost(tabEndpoint, json));
             while (!request.IsCompleted) yield return null;
             string result = request.IsFaulted ? "ERROR:" + request.Exception.GetBaseException().Message : request.Result;
             if (!IsHttpSuccess(result) && debugLogging.Value)
             {
-                Logger.LogWarning("Failed to sync Tab visibility: " + TrimHttpResult(result));
+                Logger.LogWarning("Failed to sync game UI visibility: " + TrimHttpResult(result));
             }
 
             yield break;

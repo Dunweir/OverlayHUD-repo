@@ -128,6 +128,8 @@ const defaultOverlayState = {
     level: 1,
     gameplayVisible: false,
     tabHidden: false,
+    currencyVisible: false,
+
     ...defaultPlayerUpgrades,
     upgradeVisibility: { ...defaultUpgradeVisibility },
     style: 1,
@@ -193,6 +195,7 @@ function normalizeOverlayState(rawState) {
     if (!rawState) return null;
 
     const source = { ...defaultOverlayState, ...rawState };
+    delete source.currencyRect;
     const sourceSquareSize = Number(source.squareSize);
     const sourceUpgradeSize = Number(source.upgradeSize);
     const shouldMigrateDefaultSizes = Number(source.overlayScaleVersion) < 3;
@@ -257,6 +260,9 @@ function normalizeOverlayState(rawState) {
 
     return {
         ...source,
+        tabHidden: source.tabHidden === true,
+        currencyVisible: source.currencyVisible === true,
+
         style: 1,
         squareSize,
         upgradeSize,
@@ -829,7 +835,9 @@ function setPlayerStrength(rawStrength) {
     return { ok: true, statusCode: 200, payload: { ok: true, strength: overlayState.strength } };
 }
 
-function setTabHidden(rawHidden) {
+function setTabHidden(payload) {
+    const extended = typeof payload.mapHidden === "boolean" && typeof payload.currencyVisible === "boolean";
+    const rawHidden = extended ? payload.mapHidden : (payload.hidden ?? payload.tabHidden);
     if (typeof rawHidden !== "boolean") {
         return { ok: false, statusCode: 422, payload: { error: "Invalid Tab visibility", received: rawHidden } };
     }
@@ -837,9 +845,13 @@ function setTabHidden(rawHidden) {
     overlayState = {
         ...defaultOverlayState,
         ...(normalizeOverlayState(overlayState) || {}),
-        tabHidden: rawHidden
+        tabHidden: rawHidden,
+        currencyVisible: extended && payload.currencyVisible
     };
-    return { ok: true, statusCode: 200, payload: { ok: true, tabHidden: rawHidden } };
+    return { ok: true, statusCode: 200, payload: {
+        ok: true, tabHidden: rawHidden,
+        currencyVisible: overlayState.currencyVisible
+    } };
 }
 
 function setTumbleLaunch(rawTumbleLaunch) {
@@ -1036,7 +1048,7 @@ const server = http.createServer(async (request, response) => {
         if (request.method === "POST" && request.url === "/api/tab-hidden") {
             const body = await readBody(request);
             const payload = JSON.parse(body || "{}");
-            const result = setTabHidden(payload.hidden ?? payload.tabHidden);
+            const result = setTabHidden(payload);
             sendJson(response, result.statusCode, result.payload);
             if (result.ok) {
                 broadcastState();
