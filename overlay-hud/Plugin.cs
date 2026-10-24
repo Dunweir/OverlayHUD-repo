@@ -802,8 +802,8 @@ namespace OverlayHUD
                 bool alreadyAccountedFor = originalValue > 0f && currentValue < originalValue * 0.15f;
                 // Haul membership only means the object is in the extraction room.
                 // Damage destruction sets dead; normal extraction destroys it without doing so.
-                wasSubmittedForExtraction = IsValuableInDollarHaul(valuable)
-                    && !(ReadMember(__instance, "dead") is bool dead && dead);
+                wasSubmittedForExtraction = !(ReadMember(__instance, "dead") is bool dead && dead)
+                    && IsValuableInDollarHaul(valuable);
                 if (!alreadyAccountedFor)
                 {
                     instance?.AddMapValue(-currentValue, "valuable destroyed");
@@ -1906,11 +1906,22 @@ namespace OverlayHUD
             Type valuableType = AccessTools.TypeByName("ValuableObject");
             if (valuableType == null) return 0f;
 
+            long startedAt = Stopwatch.GetTimestamp();
             float total = 0f;
             UnityEngine.Object[] valuables = UnityEngine.Object.FindObjectsOfType(valuableType);
+            long discoveredAt = Stopwatch.GetTimestamp();
             for (int index = 0; index < valuables.Length; index++)
             {
-                total += ReadValuableCurrentValue(valuables[index]);
+                // The search already returns ValuableObject components.
+                total += ReadFloatMember(valuables[index], "dollarValueCurrent");
+            }
+            double elapsedMs = (Stopwatch.GetTimestamp() - startedAt) * 1000.0 / Stopwatch.Frequency;
+            if (elapsedMs >= 8.0 && instance != null)
+            {
+                double searchMs = (discoveredAt - startedAt) * 1000.0 / Stopwatch.Frequency;
+                instance.Logger.LogWarning("[Performance] Map value scan: "
+                    + elapsedMs.ToString("0.0", CultureInfo.InvariantCulture) + " ms, search="
+                    + searchMs.ToString("0.0", CultureInfo.InvariantCulture) + " ms, valuables=" + valuables.Length + ".");
             }
             return Math.Max(0f, total);
         }

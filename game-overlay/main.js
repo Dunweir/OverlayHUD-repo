@@ -1,4 +1,4 @@
-const { app, BrowserWindow, Menu, Tray, dialog, globalShortcut, nativeImage, screen, shell } = require("electron");
+const { app, BrowserWindow, Menu, Tray, dialog, globalShortcut, ipcMain, nativeImage, screen, shell } = require("electron");
 const fs = require("fs");
 const path = require("path");
 const { startGameLifetimeWatcher } = require("./game-lifetime");
@@ -14,6 +14,8 @@ const defaultConfig = {
 };
 
 let overlayWindow = null;
+let gameplayVisible = null;
+let userWantsOverlay = true;
 let tray = null;
 let clickThrough = true;
 let mousePassthrough = true;
@@ -32,6 +34,7 @@ let overlayOpacity = 1;
 let opacityTarget = 1;
 let opacityTimer = null;
 let hoverTick = 0;
+let hoverWasRelevant = true;
 let quitting = false;
 let localServerModule = null;
 let hoverBoundsGeneration = 0;
@@ -99,6 +102,7 @@ function getTargetDisplay(config = displayConfig) {
 
 function invalidateHoverBounds() {
     ++hoverBoundsGeneration;
+    hoverWasRelevant = true;
     overlayContentBounds = null;
     overlayInteractiveBounds = null;
     overlayHotspotBounds = null;
@@ -276,11 +280,37 @@ function applyMousePassthrough(enabled) {
     overlayWindow.setFocusable(!enabled);
 }
 
-function toggleOverlay() {
+function syncWindowVisibility() {
     if (!overlayWindow || overlayWindow.isDestroyed()) return;
-    if (overlayWindow.isVisible()) overlayWindow.hide();
-    else overlayWindow.showInactive();
+    const visible = userWantsOverlay && gameplayVisible !== false;
+    if (visible && !overlayWindow.isVisible()) overlayWindow.showInactive();
+    else if (!visible && overlayWindow.isVisible()) overlayWindow.hide();
     rebuildTrayMenu();
+}
+
+ipcMain.on("overlay:gameplay-visible", (event, visible) => {
+    if (!overlayWindow || overlayWindow.isDestroyed()
+        || event.sender !== overlayWindow.webContents
+        || event.senderFrame !== overlayWindow.webContents.mainFrame
+        || typeof visible !== "boolean") return;
+    gameplayVisible = visible;
+    syncWindowVisibility();
+});
+
+function toggleOverlay() {
+    userWantsOverlay = !userWantsOverlay;
+    syncWindowVisibility();
+}
+
+function stopHoverTracking() {
+    clearInterval(hoverTimer);
+    hoverTimer = null;
+    invalidateHoverBounds();
+    clearInterval(opacityTimer);
+    opacityTimer = null;
+    hoverDimmed = false;
+    overlayOpacity = opacityTarget = 1;
+    if (overlayWindow && !overlayWindow.isDestroyed()) overlayWindow.setOpacity(1);
 }
 
 function reloadOverlay() {
@@ -344,7 +374,7 @@ function getOverlayHotspotFallbackBounds() {
 }
 
 async function setOverlayHoverState(isOpen, cursor) {
-    if (!overlayWindow || overlayWindow.isDestroyed() || overlayWindow.webContents.isLoading()) return;
+    if (!overlayWindow || overlayWindow.isDestroyed() || !overlayWindow.isVisible() || overlayWindow.webContents.isLoading()) return;
     try {
         const windowBounds = overlayWindow.getBounds();
         const zoom = overlayWindow.webContents.getZoomFactor();
@@ -372,7 +402,7 @@ async function setOverlayHoverState(isOpen, cursor) {
 }
 
 async function refreshOverlayContentBounds() {
-    if (!overlayWindow || overlayWindow.isDestroyed() || overlayWindow.webContents.isLoading()) return;
+    if (!overlayWindow || overlayWindow.isDestroyed() || !overlayWindow.isVisible() || overlayWindow.webContents.isLoading()) return;
     const window = overlayWindow;
     const generation = hoverBoundsGeneration;
     try {
@@ -492,6 +522,8 @@ async function refreshOverlayContentBounds() {
 
 function startHoverTracking() {
     clearInterval(hoverTimer);
+    hoverTimer = null;
+    if (!overlayWindow || overlayWindow.isDestroyed() || !overlayWindow.isVisible()) return;
     hoverTick = 0;
     refreshOverlayContentBounds();
     hoverTimer = setInterval(() => {
@@ -522,7 +554,13 @@ function startHoverTracking() {
             && cursor.y >= overlayContentBounds.top
             && cursor.y <= overlayContentBounds.bottom;
         applyMousePassthrough(clickThrough && !isOverControls && !isOverHotspot && !isDragHeld);
-        setOverlayHoverState(isOverControls || isOverHotspot, cursor);
+        const hoverRelevant = Boolean(isOverOverlay || isOverControls || isOverHotspot || isDragHeld);
+        // Clear old tooltips once on exit, but do not wake the renderer on every
+        // cursor tick while the player is aiming outside the HUD.
+        if (hoverRelevant || hoverWasRelevant) {
+            setOverlayHoverState(isOverControls || isOverHotspot, cursor);
+        }
+        hoverWasRelevant = hoverRelevant;
 
         if (!overlayContentBounds) {
             setHoverDimmed(false);
@@ -599,7 +637,7 @@ function rebuildTrayMenu() {
         {
             label: trayText("Прочее", "Other"),
             submenu: [
-                { label: visible ? trayText("Скрыть оверлей", "Hide overlay") : trayText("Показать оверлей", "Show overlay"), click: toggleOverlay },
+                { label: userWantsOverlay ? trayText("Скрыть оверлей", "Hide overlay") : trayText("Показать оверлей", "Show overlay"), click: toggleOverlay },
                 {
                     label: trayText("Взаимодействовать с оверлеем", "Interact with overlay"),
                     type: "checkbox",
@@ -657,7 +695,8 @@ function createOverlayWindow() {
         skipTaskbar: true,
         hasShadow: false,
         webPreferences: {
-            backgroundThrottling: false,
+            preload: path.join(__dirname, "preload.js"),
+                        backgroundThrottling: true,
             contextIsolation: true,
             nodeIntegration: false,
             sandbox: true
@@ -689,12 +728,13 @@ function createOverlayWindow() {
     }
     overlayWindow.on("move", invalidateHoverBounds);
     overlayWindow.on("resize", invalidateHoverBounds);
-    overlayWindow.webContents.on("did-start-loading", invalidateHoverBounds);
+    overlayWindow.on("show", startHoverTracking);
+    overlayWindow.on("hide", stopHoverTracking);
+    overlayWindow.webContents.on("did-start-loading", stopHoverTracking);
     overlayWindow.webContents.on("did-finish-load", () => {
         clearTimeout(retryTimer);
-        overlayWindow.showInactive();
+        syncWindowVisibility();
         startHoverTracking();
-        rebuildTrayMenu();
     });
     overlayWindow.webContents.on("did-fail-load", (_event, errorCode, errorDescription) => {
         if (errorCode === -3) return;
@@ -746,7 +786,8 @@ if (!app.requestSingleInstanceLock()) {
     app.quit();
 } else {
     app.on("second-instance", () => {
-        if (overlayWindow && !overlayWindow.isDestroyed()) overlayWindow.showInactive();
+        userWantsOverlay = true;
+                syncWindowVisibility();
     });
 
     app.whenReady().then(async () => {

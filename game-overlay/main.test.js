@@ -13,6 +13,7 @@ async function boot(config = {}, args = []) {
     const state = {
         config: JSON.stringify(config), displays: [display(10), display(20, -1920)], primary: 10,
         errors: [], writes: [], captures: 0, dialogs: 0, calls: [],
+        intervals: new Map(),
         timers: new Map(), nextTimer: 1, boundsWrites: 0,
         saveResult: { canceled: false, filePath: "overlay.png" }
     };
@@ -34,6 +35,7 @@ async function boot(config = {}, args = []) {
             this.visible = true;
             this.destroyed = false;
             this.webContents = Object.assign(new EventEmitter(), {
+                mainFrame: {},
                 setZoomFactor() {}, getZoomFactor: () => config.zoomFactor || 1,
                 setWindowOpenHandler() {}, isLoading: () => Boolean(state.loading),
                 executeJavaScript: () => state.rectPromise || Promise.resolve(null),
@@ -62,8 +64,8 @@ async function boot(config = {}, args = []) {
         setFocusable() {}
         setOpacity() {}
         loadURL() {}
-        showInactive() { this.visible = true; }
-        hide() { this.visible = false; }
+        showInactive() { this.visible = true; this.emit("show"); }
+        hide() { this.visible = false; this.emit("hide"); }
     }
     function image() {
         return {
@@ -81,6 +83,7 @@ async function boot(config = {}, args = []) {
     });
     const electron = {
         app, screen, BrowserWindow: Window,
+        ipcMain: new EventEmitter(),
         Menu: { buildFromTemplate: (template) => template },
         Tray: class extends EventEmitter {
             setContextMenu(menu) { state.menu = menu; }
@@ -128,12 +131,14 @@ async function boot(config = {}, args = []) {
             throw new Error(`Unexpected dependency: ${name}`);
         },
         __dirname, process: { ...process, argv: ["electron", "app", ...args] }, console: { error() {}, warn() {} },
-        setInterval: () => 1, clearInterval() {},
+        setInterval(callback) { const id = state.nextTimer++; state.intervals.set(id, callback); return id; },
+        clearInterval(id) { state.intervals.delete(id); },
         setTimeout(callback) { const id = state.nextTimer++; state.timers.set(id, callback); return id; },
         clearTimeout(id) { state.timers.delete(id); }
     });
     vm.runInContext(source + `\nthis.api = {
         getTargetDisplay, selectDisplay, saveOverlayScreenshot, refreshOverlayContentBounds, screenshotFileName,
+        toggleOverlay,
         seedBounds() {
             overlayContentBounds = overlayInteractiveBounds = overlayHotspotBounds = { left: 1 };
             overlayDragBounds = [{ left: 1 }]; overlayDragging = true; dragHoldUntil = 999999;
@@ -153,8 +158,88 @@ async function boot(config = {}, args = []) {
             callback();
         }
     }
-    return { state, api: context.api, screen, app, image, runTimers };
+    return { state, api: context.api, screen, app, image, runTimers, ipcMain: electron.ipcMain };
 }
+
+test("hover ticks outside the HUD clear once without repeatedly waking the renderer", async () => {
+    const { state } = await boot();
+    let hoverCalls = 0;
+    state.window.webContents.executeJavaScript = async (script) => {
+        if (script.includes("document.elementFromPoint")) hoverCalls++;
+        return null;
+    };
+    state.window.webContents.emit("did-finish-load");
+    await flush();
+    const tick = [...state.intervals.values()][0];
+    for (let i = 0; i < 20; i++) { tick(); await flush(); }
+    assert.equal(hoverCalls, 1);
+    state.window.emit("resize");
+    tick(); await flush();
+    assert.equal(hoverCalls, 2);
+});
+
+test("loading hides the native window and stops hover polling without losing manual visibility", async () => {
+    const { state, api, ipcMain } = await boot();
+    const window = state.window;
+    const report = (visible) => ipcMain.emit("overlay:gameplay-visible", {
+        sender: window.webContents, senderFrame: window.webContents.mainFrame
+    }, visible);
+    window.webContents.emit("did-finish-load");
+    assert.equal(state.intervals.size, 1);
+    assert.equal(window.options.webPreferences.backgroundThrottling, true);
+    assert.equal(path.basename(window.options.webPreferences.preload), "preload.js");
+    report(false);
+    assert.equal(window.isVisible(), false);
+    assert.equal(state.intervals.size, 0);
+    window.webContents.emit("did-finish-load");
+    assert.equal(window.isVisible(), false);
+    assert.equal(state.intervals.size, 0);
+    report(true);
+    assert.equal(window.isVisible(), true);
+    assert.equal(state.intervals.size, 1);
+    api.toggleOverlay();
+    report(false);
+    report(true);
+    window.webContents.emit("did-finish-load");
+    assert.equal(window.isVisible(), false);
+    assert.equal(state.intervals.size, 0);
+    api.toggleOverlay();
+    assert.equal(window.isVisible(), true);
+    assert.equal(state.intervals.size, 1);
+});
+
+test("visibility IPC ignores other senders, child frames and non-booleans", async () => {
+    const { state, ipcMain } = await boot();
+    const webContents = state.window.webContents;
+    for (const [sender, senderFrame, value] of [
+        [{}, webContents.mainFrame, false],
+        [webContents, {}, false],
+        [webContents, webContents.mainFrame, "false"]
+    ]) {
+        ipcMain.emit("overlay:gameplay-visible", { sender, senderFrame }, value);
+        assert.equal(state.window.isVisible(), true);
+    }
+});
+
+test("preload reports only boolean visibility transitions", () => {
+    let bridge;
+    const messages = [];
+    vm.runInNewContext(fs.readFileSync(path.join(__dirname, "preload.js"), "utf8"), {
+        require: () => ({
+            contextBridge: { exposeInMainWorld(name, value) {
+                assert.equal(name, "OverlayDesktop");
+                bridge = value;
+            } },
+            ipcRenderer: { send: (...args) => messages.push(args) }
+        })
+    });
+    for (const value of [false, false, "true", true, true, false]) bridge.setGameplayVisible(value);
+    assert.deepEqual(messages, [
+        ["overlay:gameplay-visible", false],
+        ["overlay:gameplay-visible", true],
+        ["overlay:gameplay-visible", false]
+    ]);
+});
 
 test("tray changes the shared overlay language and timestamp preference", async () => {
     const { state } = await boot();

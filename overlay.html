@@ -688,9 +688,11 @@
                 upgradesVisible: state.upgradesVisible,
                 monsterIconsVisible: state.monsterIconsVisible,
                 mapValueVisible: state.mapValueVisible,
-                mapValue: state.mapValue,
+                mapValueWidth: getCurrencyWidthCh(state.mapValue),
+                hasMapValue: Number(state.mapValue) > 0,
                 lostValueVisible: state.lostValueVisible,
-                lostValue: state.lostValue,
+                lostValueWidth: getCurrencyWidthCh(state.lostValue),
+                hasLostValue: Number(state.lostValue) > 0,
                 valueWrapEnabled: state.valueWrapEnabled,
                 onlyAliveMonstersVisible: state.onlyAliveMonstersVisible,
                 onlyAliveIncludeUndetected: state.onlyAliveIncludeUndetected,
@@ -1367,12 +1369,29 @@
         }
 
 
+        function updateCurrencyValues(state) {
+            mapValueNumber.textContent = formatCurrency(state.mapValue);
+            mapValueNumber.style.setProperty("--map-value-number-ch", getCurrencyWidthCh(state.mapValue).toFixed(2));
+            lostValueNumber.textContent = formatCurrency(state.lostValue);
+            lostValueNumber.style.setProperty("--lost-value-number-ch", getCurrencyWidthCh(state.lostValue).toFixed(2));
+        }
+
         function render(state) {
+            // Hide the native desktop surface too, not just its transparent DOM content.
+            window.OverlayDesktop?.setGameplayVisible(Boolean(state.gameplayVisible));
             const previousState = latestState;
-            // Visibility events do not need to rebuild the entire HUD/settings panel.
-            const layoutState = ({ tabHidden, currencyVisible, ...rest }) => JSON.stringify(rest);
-            if (previousState && layoutState(previousState) === layoutState(state)) {
+            // Data-only events must not rebuild settings, upgrades and monster tiles.
+            // Crossing zero still uses the full path because it changes header visibility.
+            const layoutState = ({ tabHidden, currencyVisible, mapValue, lostValue, lastDestroyedItem, ...rest }) => JSON.stringify(rest);
+            if (previousState && layoutState(previousState) === layoutState(state)
+                && (Number(previousState.mapValue) > 0) === (Number(state.mapValue) > 0)
+                && (Number(previousState.lostValue) > 0) === (Number(state.lostValue) > 0)) {
                 latestState = state;
+                if (previousState.mapValue !== state.mapValue || previousState.lostValue !== state.lostValue) {
+                    updateCurrencyValues(state);
+                    applySavedPositionsWhenLayoutChanges(state);
+                }
+                updateItemDestroyedAlert(state);
                 checkGameUIVisibility();
                 return;
             }
@@ -1486,10 +1505,7 @@
             overlayHoverControls.classList.toggle("is-enabled", overlayShouldBeVisible && !state.tabHidden);
 
             levelNumber.textContent = state.level;
-            mapValueNumber.textContent = formatCurrency(state.mapValue);
-            mapValueNumber.style.setProperty("--map-value-number-ch", getCurrencyWidthCh(state.mapValue).toFixed(2));
-            lostValueNumber.textContent = formatCurrency(state.lostValue);
-            lostValueNumber.style.setProperty("--lost-value-number-ch", getCurrencyWidthCh(state.lostValue).toFixed(2));
+            updateCurrencyValues(state);
             let visibleUpgradeCount = 0;
             const upgradeVisibility = state.upgradeVisibility || {};
             for (const upgrade of upgradeDefinitions) {
@@ -1644,12 +1660,12 @@
         });
         OverlayApp.subscribe(render);
         setInterval(() => {
-            if (latestState && latestState.running && latestState.timerVisible) {
+            if (latestState && latestState.gameplayVisible && !document.hidden && latestState.running && latestState.timerVisible) {
                 renderTimer(latestState);
             }
         }, 1000);
         setInterval(() => {
-            if (!latestState?.gameplayVisible
+            if (document.hidden || !latestState?.gameplayVisible
                 || (!latestState.respawnTimerVisible && !latestState.respawnIndicatorVisible)) return;
             for (const square of monstersSquares.querySelectorAll('[data-cooldown-active="true"]')) {
                 renderMonsterCooldown(square);
