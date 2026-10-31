@@ -173,6 +173,7 @@ namespace OverlayHUD
         private readonly Dictionary<int, string> lastImmediateStatusBySourceId = new Dictionary<int, string>();
         private readonly Dictionary<int, string> lastTimerStatusBySourceId = new Dictionary<int, string>();
         private readonly Dictionary<int, float> lastTimerStatusSentAtBySourceId = new Dictionary<int, float>();
+        private readonly Dictionary<int, string> lastFallbackStatusBySourceId = new Dictionary<int, string>();
         private readonly Dictionary<int, bool> enemyHasVisionByParentId = new Dictionary<int, bool>();
         private readonly Dictionary<int, bool> enemyHasOnScreenByParentId = new Dictionary<int, bool>();
         private readonly Dictionary<int, VisionEnemyCache> visionEnemyCacheByVisionId = new Dictionary<int, VisionEnemyCache>();
@@ -194,6 +195,7 @@ namespace OverlayHUD
         private string pendingRosterFingerprint = "";
         private int rosterStableScans;
         private int broadEnemyDiscoveryAttempts;
+        private int statusFallbackCursor;
         private bool rosterPublished;
         private bool enemyRosterDirty;
         private bool mapValueDirty;
@@ -873,7 +875,7 @@ namespace OverlayHUD
             if (rosterPublished && now >= nextStatusSyncAt)
             {
                 nextStatusSyncAt = now + Math.Max(10f, statusInterval.Value);
-                SyncMonsterStatuses(new List<ResolvedEnemyCandidate>());
+                SyncMonsterStatuses(new List<ResolvedEnemyCandidate>(), true);
             }
 
             if (!enemyRosterDirty) return;
@@ -1182,6 +1184,7 @@ namespace OverlayHUD
             lastImmediateStatusBySourceId.Clear();
             lastTimerStatusBySourceId.Clear();
             lastTimerStatusSentAtBySourceId.Clear();
+            lastFallbackStatusBySourceId.Clear();
             enemyHasVisionByParentId.Clear();
             enemyHasOnScreenByParentId.Clear();
             visionEnemyCacheByVisionId.Clear();
@@ -1192,6 +1195,7 @@ namespace OverlayHUD
             pendingRosterFingerprint = "";
             rosterStableScans = 0;
             broadEnemyDiscoveryAttempts = 0;
+            statusFallbackCursor = 0;
             rosterPublished = false;
             enemyRosterDirty = true;
             scanPausedUntil = Time.realtimeSinceStartup + 2f;
@@ -1337,7 +1341,7 @@ namespace OverlayHUD
             return true;
         }
 
-        private void SyncMonsterStatuses(List<ResolvedEnemyCandidate> enemies)
+        private void SyncMonsterStatuses(List<ResolvedEnemyCandidate> enemies, bool fallbackSlice = false)
         {
             var json = new StringBuilder("{\"statuses\":[");
             var fingerprint = new StringBuilder();
@@ -1373,6 +1377,14 @@ namespace OverlayHUD
 
             var sourceIds = new List<int>(statusCandidates.Keys);
             sourceIds.Sort();
+            if (fallbackSlice && sourceIds.Count > 1)
+            {
+                int selectedIndex = statusFallbackCursor % sourceIds.Count;
+                statusFallbackCursor = (selectedIndex + 1) % sourceIds.Count;
+                int selectedId = sourceIds[selectedIndex];
+                sourceIds.Clear();
+                sourceIds.Add(selectedId);
+            }
             for (int index = 0; index < sourceIds.Count; index++)
             {
                 int instanceId = sourceIds[index];
@@ -1412,8 +1424,10 @@ namespace OverlayHUD
                     .Append(':').Append(healthText).Append('/').Append(maxHealthText)
                     .Append(':').Append(playerClose ? '1' : '0').Append(':').Append(playerVeryClose ? '1' : '0').Append(';');
 
-                string tierMetadata = ",\"tier\":" + GetEnemyTierJson(candidate);
-                string monsterMetadata = GetMonsterMetadata(candidate);
+                // Tier and strength are immutable for a spawned enemy and were already sent
+                // with the roster. Avoid their reflection-heavy lookup in the periodic fallback.
+                string tierMetadata = fallbackSlice ? "" : ",\"tier\":" + GetEnemyTierJson(candidate);
+                string monsterMetadata = fallbackSlice ? "" : GetMonsterMetadata(candidate);
                 fingerprint.Append(tierMetadata).Append(monsterMetadata);
                 if (statusCount++ > 0) json.Append(',');
                 json.Append("{\"id\":").Append(instanceId)
@@ -1431,8 +1445,18 @@ namespace OverlayHUD
 
             if (statusCount == 0) return;
             string nextFingerprint = fingerprint.ToString();
-            if (nextFingerprint == lastStatusFingerprint) return;
-            lastStatusFingerprint = nextFingerprint;
+            if (fallbackSlice)
+            {
+                int sourceId = sourceIds[0];
+                if (lastFallbackStatusBySourceId.TryGetValue(sourceId, out string previousFingerprint)
+                    && previousFingerprint == nextFingerprint) return;
+                lastFallbackStatusBySourceId[sourceId] = nextFingerprint;
+            }
+            else
+            {
+                if (nextFingerprint == lastStatusFingerprint) return;
+                lastStatusFingerprint = nextFingerprint;
+            }
             json.Append("]}");
             StartCoroutine(PostMonsterStatuses(json.ToString(), true));
         }
