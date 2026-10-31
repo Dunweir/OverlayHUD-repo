@@ -50,7 +50,8 @@ test('initial upgrades, roster and status snapshots are split across Unity frame
         source.indexOf('private void TickScan('),
         source.indexOf('private void ResetSeenMonsters(')
     );
-    assert.match(tick, /SyncPlayerUpgradesIfChanged\(keys\);\s*\/\/[\s\S]*?return;/);
+    assert.match(tick, /if \(pendingUpgradeSnapshot != null\) return;/);
+    assert.match(tick, /pendingUpgradeSnapshot = StartCoroutine\(SyncPlayerUpgradesIfChanged\(keys\)\);\s*return;/);
 
     const known = source.slice(
         source.indexOf('private void SyncKnownEnemies('),
@@ -58,6 +59,16 @@ test('initial upgrades, roster and status snapshots are split across Unity frame
     );
     assert.match(known, /StartCoroutine\(PublishInitialMonsterState\(resolvedEnemies\)\)/);
     assert.match(known, /yield return null;[\s\S]*RevealAllKnownEnemies\(enemies\);[\s\S]*yield return null;[\s\S]*SyncMonsterStatuses\(enemies\)/);
+});
+
+test('initial upgrade reflection reads are limited to one table per frame', () => {
+    const upgrades = source.slice(
+        source.indexOf('private IEnumerator SyncPlayerUpgradesIfChanged('),
+        source.indexOf('private static int? ResolveLocalPlayerUpgrade(')
+    );
+    assert.match(upgrades, /ResolveLocalPlayerUpgrade\(statsManager, steamId, binding\.Value\);\s*yield return null;/);
+    assert.match(upgrades, /pendingUpgradeSnapshot = null;/);
+    assert.match(source, /StopCoroutine\(pendingUpgradeSnapshot\);\s*pendingUpgradeSnapshot = null;/);
 });
 
 test('roster metadata is cached and reused by the initial status snapshot', () => {

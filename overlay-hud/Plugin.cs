@@ -210,6 +210,7 @@ namespace OverlayHUD
 
         private float nextGameUiVisibilityAt;
         private Coroutine pendingGameplayActivation;
+        private Coroutine pendingUpgradeSnapshot;
 
         private static class GameUiFields
         {
@@ -877,13 +878,15 @@ namespace OverlayHUD
             }
             if (now < scanPausedUntil) return;
 
+            // The initial upgrade snapshot intentionally spans several frames. Do not
+            // overlap it with roster discovery on the Unity main thread.
+            if (pendingUpgradeSnapshot != null) return;
+
             if (pendingUpgradeKeys.Count > 0 && now >= nextUpgradeSyncAt)
             {
                 var keys = new HashSet<string>(pendingUpgradeKeys);
                 pendingUpgradeKeys.Clear();
-                SyncPlayerUpgradesIfChanged(keys);
-                // Initial upgrades and the enemy roster become ready at roughly the same
-                // time. Keep their reflection-heavy snapshots out of the same Unity frame.
+                pendingUpgradeSnapshot = StartCoroutine(SyncPlayerUpgradesIfChanged(keys));
                 return;
             }
 
@@ -1183,6 +1186,11 @@ namespace OverlayHUD
 
         private void ResetSeenMonsters(string reason)
         {
+            if (pendingUpgradeSnapshot != null)
+            {
+                StopCoroutine(pendingUpgradeSnapshot);
+                pendingUpgradeSnapshot = null;
+            }
             lock (seenLock)
             {
                 seenMonsters.Clear();
@@ -2249,8 +2257,17 @@ namespace OverlayHUD
                 && current != hidden;
         }
 
-        private void SyncPlayerUpgradesIfChanged(HashSet<string> onlyKeys = null)
+        private IEnumerator SyncPlayerUpgradesIfChanged(HashSet<string> onlyKeys = null)
         {
+            // Start on the next frame and read one upgrade table per frame. Accessing all
+            // StatsManager dictionaries in one Update caused a visible level-start hitch.
+            yield return null;
+            if (!gameplayActive)
+            {
+                pendingUpgradeSnapshot = null;
+                yield break;
+            }
+
             // Resolve live instances once per snapshot, not once for every upgrade.
             object statsManager = ReadMember(PlayerUpgradeTypes.StatsManager, "instance");
             string steamId = ResolveLocalPlayerSteamId();
@@ -2261,6 +2278,12 @@ namespace OverlayHUD
                 KeyValuePair<string, string> binding = TrackedPlayerUpgrades[index];
                 if (onlyKeys != null && !onlyKeys.Contains(binding.Key)) continue;
                 int? value = ResolveLocalPlayerUpgrade(statsManager, steamId, binding.Value);
+                yield return null;
+                if (!gameplayActive)
+                {
+                    pendingUpgradeSnapshot = null;
+                    yield break;
+                }
                 if (!value.HasValue) continue;
                 if (lastSyncedUpgrades.TryGetValue(binding.Key, out int previousValue) && previousValue == value.Value) continue;
 
@@ -2269,9 +2292,12 @@ namespace OverlayHUD
                 json.Append('\"').Append(binding.Key).Append("\":").Append(value.Value);
             }
 
-            if (changedCount == 0) return;
-            json.Append("}}");
-            StartCoroutine(PostPlayerUpgrades(json.ToString(), changedCount));
+            if (changedCount > 0)
+            {
+                json.Append("}}");
+                StartCoroutine(PostPlayerUpgrades(json.ToString(), changedCount));
+            }
+            pendingUpgradeSnapshot = null;
         }
 
         private static int? ResolveLocalPlayerUpgrade(object statsManager, string steamId, string memberName)
