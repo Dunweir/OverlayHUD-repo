@@ -8,7 +8,7 @@ function Get-PluginMethod([string] $name) {
     if ($end -lt 0) { throw "Method end not found: $name" }
     return $source.Substring($match.Index, $end - $match.Index)
 }
-$methods = @('PhysGrabObjectBreakPostfix', 'PhysGrabObjectDestroyedPostfix', 'SyncMonsterRoster') |
+$methods = @('PhysGrabObjectBreakPostfix', 'PhysGrabObjectDestroyingPrefix', 'SyncMonsterRoster') |
     ForEach-Object { Get-PluginMethod $_ }
 $harness = @'
 using System;
@@ -30,12 +30,14 @@ public class PluginRegressionTests
     int rosterStableScans, reports;
     string pendingRosterFingerprint = "", lastRosterFingerprint = "";
     float mapValue = 1000, lostValue;
+    static readonly HashSet<int> destroyedValuablesAccounted = new HashSet<int>();
     readonly List<string> posts = new List<string>();
     static bool IsRunLevel() { return true; }
     static Component GetValuableComponent(object source) { return source as Component; }
     static float ReadValuableCurrentValue(Component value) { return value.Current; }
     static float ReadValuableOriginalValue(Component value) { return value.Original; }
     static bool IsValuableInDollarHaul(Component value) { return value.InHaul; }
+    static int GetValuableKey(object source) { return ((Component)source).Id; }
     static object ReadMember(object source, string name) { return ((Component)source).Dead; }
     void AddMapValue(float value, string reason) { mapValue += value; }
     void AddLostValue(float value, string reason) { lostValue += value; }
@@ -51,6 +53,7 @@ public class PluginRegressionTests
     static PluginRegressionTests Reset()
     {
         instance = new PluginRegressionTests();
+        destroyedValuablesAccounted.Clear();
         return instance;
     }
     public static void Run()
@@ -62,26 +65,33 @@ public class PluginRegressionTests
         Check(p.lostValue == 20 && p.mapValue == 980, "Cosmetic break does not count");
 
         p = Reset();
-        PhysGrabObjectDestroyedPostfix(new Component { InHaul = true });
+        PhysGrabObjectDestroyingPrefix(new Component { InHaul = true });
         Check(p.lostValue == 0 && p.mapValue == 920 && p.reports == 0,
             "Normal submitted valuable leaves map without loss or alert");
 
         p = Reset();
-        PhysGrabObjectDestroyedPostfix(new Component { InHaul = true, Dead = true });
+        PhysGrabObjectDestroyingPrefix(new Component { InHaul = true, Dead = true });
         Check(p.lostValue == 80 && p.mapValue == 920 && p.reports == 1,
             "Destroyed valuable in haul is a loss, not a submission");
 
         p = Reset();
-        PhysGrabObjectDestroyedPostfix(new Component { Dead = true });
+        PhysGrabObjectDestroyingPrefix(new Component { Dead = true });
         Check(p.lostValue == 80 && p.mapValue == 920 && p.reports == 1,
             "Destroyed valuable outside haul counts");
 
         p = Reset();
         // BreakRPC replaces valueLost with the full pre-break remainder below 15%.
         PhysGrabObjectBreakPostfix(new Component { InHaul = true }, 80, true);
-        PhysGrabObjectDestroyedPostfix(new Component { InHaul = true, Dead = true, Current = 10 });
+        PhysGrabObjectDestroyingPrefix(new Component { InHaul = true, Dead = true, Current = 10 });
         Check(p.lostValue == 80 && p.mapValue == 920 && p.reports == 1,
             "Threshold break is not counted twice on removal");
+
+        p = Reset();
+        var destroyed = new Component { Id = 42, Dead = true };
+        PhysGrabObjectDestroyingPrefix(destroyed);
+        PhysGrabObjectDestroyingPrefix(destroyed);
+        Check(p.lostValue == 80 && p.mapValue == 920 && p.reports == 1,
+            "Destroy method and RPC fallback are counted once");
 
         p = Reset();
         var empty = new List<ResolvedEnemyCandidate>();

@@ -28,6 +28,7 @@ namespace OverlayHUD
         private static readonly List<Component> knownEnemyParents = new List<Component>();
         private static readonly HashSet<int> sentEnemyInstanceIds = new HashSet<int>();
         private static readonly HashSet<int> valuablesInDollarHaul = new HashSet<int>();
+        private static readonly HashSet<int> destroyedValuablesAccounted = new HashSet<int>();
         private static readonly object seenLock = new object();
         private static readonly object enemyLock = new object();
         private static readonly object reflectionCacheLock = new object();
@@ -479,6 +480,7 @@ namespace OverlayHUD
                 MethodInfo valuableDollarHaulRemove = AccessTools.Method("ValuableObject:RemoveFromDollarHaulList");
                 MethodInfo valuableDollarHaulRemoveRpc = AccessTools.Method("ValuableObject:RemoveFromDollarHaulListRPC");
                 MethodInfo physGrabObjectBreakRpc = AccessTools.Method("PhysGrabObjectImpactDetector:BreakRPC");
+                MethodInfo physGrabObjectDestroy = AccessTools.Method("PhysGrabObject:DestroyPhysGrabObject");
                 MethodInfo physGrabObjectDestroyRpc = AccessTools.Method("PhysGrabObject:DestroyPhysGrabObjectRPC");
                 MethodInfo physGrabObjectGrabStarted = AccessTools.Method("PhysGrabObject:GrabStarted");
                 MethodInfo physGrabObjectGrabPlayerAddRpc = AccessTools.Method("PhysGrabObject:GrabPlayerAddRPC");
@@ -501,7 +503,7 @@ namespace OverlayHUD
                 HarmonyMethod valuableDollarHaulAddPostfix = new HarmonyMethod(typeof(Plugin).GetMethod(nameof(ValuableDollarHaulAddPostfix), BindingFlags.NonPublic | BindingFlags.Static));
                 HarmonyMethod valuableDollarHaulRemovePostfix = new HarmonyMethod(typeof(Plugin).GetMethod(nameof(ValuableDollarHaulRemovePostfix), BindingFlags.NonPublic | BindingFlags.Static));
                 HarmonyMethod physGrabObjectBreakPostfix = new HarmonyMethod(typeof(Plugin).GetMethod(nameof(PhysGrabObjectBreakPostfix), BindingFlags.NonPublic | BindingFlags.Static));
-                HarmonyMethod physGrabObjectDestroyedPostfix = new HarmonyMethod(typeof(Plugin).GetMethod(nameof(PhysGrabObjectDestroyedPostfix), BindingFlags.NonPublic | BindingFlags.Static));
+                HarmonyMethod physGrabObjectDestroyingPrefix = new HarmonyMethod(typeof(Plugin).GetMethod(nameof(PhysGrabObjectDestroyingPrefix), BindingFlags.NonPublic | BindingFlags.Static));
                 HarmonyMethod physGrabObjectGrabStartedPostfix = new HarmonyMethod(typeof(Plugin).GetMethod(nameof(PhysGrabObjectGrabStartedPostfix), BindingFlags.NonPublic | BindingFlags.Static));
                 HarmonyMethod physGrabObjectGrabPlayerAddRpcPostfix = new HarmonyMethod(typeof(Plugin).GetMethod(nameof(PhysGrabObjectGrabPlayerAddRpcPostfix), BindingFlags.NonPublic | BindingFlags.Static));
                 HarmonyMethod enemyVisionTriggerPostfix = new HarmonyMethod(typeof(Plugin).GetMethod(nameof(EnemyVisionTriggerPostfix), BindingFlags.NonPublic | BindingFlags.Static));
@@ -609,10 +611,16 @@ namespace OverlayHUD
                     Logger.LogInfo("Patched PhysGrabObjectImpactDetector.BreakRPC for map value loss.");
                 }
 
+                if (physGrabObjectDestroy != null)
+                {
+                    harmony.Patch(physGrabObjectDestroy, prefix: physGrabObjectDestroyingPrefix);
+                    Logger.LogInfo("Patched PhysGrabObject.DestroyPhysGrabObject for map value removal.");
+                }
+
                 if (physGrabObjectDestroyRpc != null)
                 {
-                    harmony.Patch(physGrabObjectDestroyRpc, postfix: physGrabObjectDestroyedPostfix);
-                    Logger.LogInfo("Patched PhysGrabObject.DestroyPhysGrabObjectRPC for map value removal.");
+                    harmony.Patch(physGrabObjectDestroyRpc, prefix: physGrabObjectDestroyingPrefix);
+                    Logger.LogInfo("Patched PhysGrabObject.DestroyPhysGrabObjectRPC as a network destruction fallback.");
                 }
 
                 if (physGrabObjectGrabStarted != null)
@@ -795,7 +803,7 @@ namespace OverlayHUD
             instance?.AddLostValue(valueLost, "valuable break");
         }
 
-        private static void PhysGrabObjectDestroyedPostfix(object __instance)
+        private static void PhysGrabObjectDestroyingPrefix(object __instance)
         {
             if (!IsRunLevel()) return;
 
@@ -803,6 +811,9 @@ namespace OverlayHUD
             bool wasSubmittedForExtraction = false;
             if (valuable != null)
             {
+                int valuableKey = GetValuableKey(valuable);
+                if (valuableKey != 0 && !destroyedValuablesAccounted.Add(valuableKey)) return;
+
                 float currentValue = ReadValuableCurrentValue(valuable);
                 float originalValue = ReadValuableOriginalValue(valuable);
                 bool alreadyAccountedFor = originalValue > 0f && currentValue < originalValue * 0.15f;
@@ -1001,6 +1012,7 @@ namespace OverlayHUD
             mapValueInitial = 0f;
             lostValue = 0f;
             valuablesInDollarHaul.Clear();
+            destroyedValuablesAccounted.Clear();
             lastMapValueFingerprint = "";
             mapValueInitial = mapValue;
             gameplayActive = true;
@@ -1033,6 +1045,7 @@ namespace OverlayHUD
             mapValueInitial = 0f;
             lostValue = 0f;
             valuablesInDollarHaul.Clear();
+            destroyedValuablesAccounted.Clear();
             lastMapValueFingerprint = "";
             mapValueDirty = false;
             pendingMapValueRefresh = false;
