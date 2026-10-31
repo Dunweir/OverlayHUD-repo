@@ -214,7 +214,7 @@
                 </section>
 
                 <div class="overlay-control-footer">
-                    <a class="overlay-version-link" id="overlayVersionLink" href="https://github.com/Dunweir/OverlayHUD-repo" target="_blank" rel="noopener noreferrer">OverlayHUD v26.10.0</a>
+                    <a class="overlay-version-link" id="overlayVersionLink" href="https://github.com/Dunweir/OverlayHUD-repo" target="_blank" rel="noopener noreferrer">OverlayHUD v26.10.5</a>
                 </div>
             </div>
             <div class="overlay-control-hotspot" id="overlayControlHotspot" aria-hidden="true"></div>
@@ -923,7 +923,7 @@
             square.classList.remove("is-damaged");
             square.classList.remove("is-cooldown-reduced");
             clearMonsterCooldown(square);
-            square.querySelectorAll(".monster-reveal-image, .monster-damage-pop").forEach((element) => element.remove());
+            square.querySelectorAll(".monster-reveal-image, .monster-damage-pop, .monster-unknown-shimmer").forEach((element) => element.remove());
             const img = square.firstElementChild;
             if (!img.src.includes("assets/monsters/unknown.webp")) {
                 img.src = "assets/monsters/unknown.webp";
@@ -936,7 +936,7 @@
         }
 
         function getMonsterStrengthText(monster) {
-            if (!monster || monster.strength === undefined) return getText("strengthUnknown");
+            if (!monster || monster.strength == null) return getText("strengthUnknown");
             if (monster.strength === "impossible") return getText("strengthImpossible");
             return getText("strengthValue")(monster.strength);
         }
@@ -1133,9 +1133,16 @@
             time.textContent = `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
         }
 
+        function compareMonsterTiers(left, right) {
+            const leftTier = [1, 2, 3].includes(left.tier) ? left.tier : 4;
+            const rightTier = [1, 2, 3].includes(right.tier) ? right.tier : 4;
+            return leftTier - rightTier || String(left.id).localeCompare(String(right.id));
+        }
+
         function updateMonsterSquare(square, level, monster, currentStrength, status = null) {
-            square.classList.remove("level-1", "level-2", "level-3");
-            square.classList.add(`level-${level}`);
+            square.classList.remove("level-1", "level-2", "level-3", "level-unknown");
+            const tier = monster ? monster.tier : level;
+            square.classList.add([1, 2, 3].includes(tier) ? `level-${tier}` : "level-unknown");
             setMonsterProximityState(
                 square,
                 status?.playerClose === true || status?.playerVeryClose === true,
@@ -1153,6 +1160,15 @@
             square.dataset.monsterKey = monsterKey;
             if (shouldReveal) square.dataset.imagePending = monster.image;
             configureMonsterCooldown(square, status);
+            let shimmer = square.querySelector(".monster-unknown-shimmer");
+            if (monster.unknown === true && !shimmer) {
+                shimmer = document.createElement("div");
+                shimmer.className = "monster-unknown-shimmer";
+                shimmer.setAttribute("aria-hidden", "true");
+                square.appendChild(shimmer);
+            } else if (monster.unknown !== true && shimmer) {
+                shimmer.remove();
+            }
 
             let count = square.querySelector(".monster-count");
             if (!monster.count && count) {
@@ -1178,7 +1194,7 @@
             if (monster.strength === "impossible") {
                 required.textContent = "💪X";
                 required.style.color = "";
-            } else if (monster.strength === undefined) {
+            } else if (monster.strength == null) {
                 required.textContent = "?";
                 required.style.color = "";
             } else {
@@ -1523,7 +1539,7 @@
             if (state.rosterPending) {
                 ensureMonsterSquares(0);
             } else if (roster.length > 0) {
-                roster.sort((left, right) => left.level - right.level || String(left.id).localeCompare(String(right.id)));
+                roster.sort(compareMonsterTiers);
                 const revealedBySource = new Map(
                     state.monsters
                         .filter((monster) => monster.sourceId != null)
@@ -1541,17 +1557,18 @@
                 });
             } else {
                 const counts = OverlayApp.getCountsForLevel(state.level);
-                const totalCount = counts.level1 + counts.level2 + counts.level3;
-                ensureMonsterSquares(totalCount);
-
-                let squareIndex = 0;
+                const slots = state.monsters.map((monster) => ({ ...monster, monster }));
                 for (let level = 1; level <= 3; level++) {
-                    const selected = state.monsters.filter((monster) => monster.level === level);
-                    for (let index = 0; index < counts[`level${level}`]; index++) {
-                        updateMonsterSquare(monstersSquares.children[squareIndex], level, selected[index], state.strength);
-                        squareIndex++;
+                    const selectedCount = state.monsters.filter((monster) => monster.level === level).length;
+                    for (let index = selectedCount; index < counts[`level${level}`]; index++) {
+                        slots.push({ id: `placeholder-${level}-${index}`, level, tier: level });
                     }
                 }
+                slots.sort(compareMonsterTiers);
+                ensureMonsterSquares(slots.length);
+                slots.forEach((slot, index) => {
+                    updateMonsterSquare(monstersSquares.children[index], slot.level, slot.monster, state.strength);
+                });
             }
 
             updateTopbarLayout({ keepInlineUntilUpgradesHidden, keepInlineUntilHeaderHidden });

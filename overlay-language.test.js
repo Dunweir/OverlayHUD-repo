@@ -32,14 +32,15 @@ function loadClient({ stored = null, serverState = {}, postResult = async () => 
             setItem: (_, value) => { stored = value; storageWrites.push(JSON.parse(value)); }
         },
         fetch: async (url, options) => {
-            assert.equal(url, '/api/state');
             if (options.method === 'POST') {
-                const state = JSON.parse(options.body).state;
+                assert.equal(url, '/api/settings');
+                const state = JSON.parse(options.body).settings;
                 posts.push(state);
                 const response = await postResult();
-                if (response.ok) remote = state;
+                if (response.ok) remote = { ...remote, ...state };
                 return response;
             }
+            assert.equal(url, '/api/state');
             return { ok: true, json: async () => ({ state: remote }) };
         },
         console
@@ -78,10 +79,10 @@ test('restart restores saved English without restoring stale gameplay', async ()
     assert.equal(restarted.posts.length, 1);
     assert.equal(restarted.posts[0].interfaceLanguage, 'en');
     assertGameplay(restarted.api.getState());
-    assertGameplay(restarted.posts[0]);
+    assert.equal('monsters' in restarted.posts[0], false);
 });
 
-test('initial merged POST completes before opening SSE', async () => {
+test('settings POST does not block live gameplay SSE', async () => {
     let finishPost;
     const client = loadClient({
         stored: JSON.stringify({ interfaceLanguage: 'en', level: 1 }),
@@ -90,7 +91,7 @@ test('initial merged POST completes before opening SSE', async () => {
     });
     await flush();
     assert.equal(client.posts.length, 1);
-    assert.equal(client.streams.length, 0);
+    assert.equal(client.streams.length, 1);
     assert.equal(client.api.getState().interfaceLanguage, 'en');
     assertGameplay(client.api.getState());
     finishPost({ ok: true });
@@ -131,15 +132,15 @@ test('subsequent SSE and local language changes remain synchronized and persiste
     });
     await flush();
     client.streams[0].send({ ...gameplay, interfaceLanguage: 'ru' });
-    assert.equal(client.api.getState().interfaceLanguage, 'ru');
-    assert.equal(JSON.parse(client.stored()).interfaceLanguage, 'ru');
+    assert.equal(client.api.getState().interfaceLanguage, 'en');
+    assert.equal(JSON.parse(client.stored()).interfaceLanguage, 'en');
     assertGameplay(client.api.getState());
     assert.equal(client.posts.length, 1);
     client.api.setInterfaceLanguage('en');
     await flush();
     assert.equal(client.posts.length, 2);
     assert.equal(client.posts[1].interfaceLanguage, 'en');
-    assertGameplay(client.posts[1]);
+    assert.equal('monsters' in client.posts[1], false);
     client.streams[0].send(client.posts[1]);
     assert.equal(client.api.getState().interfaceLanguage, 'en');
     assert.equal(JSON.parse(client.stored()).interfaceLanguage, 'en');
@@ -157,7 +158,7 @@ for (const failure of ['http', 'network']) {
             }
         });
         await flush();
-        assert.equal(client.streams.length, 0);
+        assert.equal(client.streams.length, 1);
         assert.equal(client.api.getState().interfaceLanguage, 'en');
         assert.equal(JSON.parse(client.stored()).interfaceLanguage, 'en');
         assertGameplay(client.api.getState());

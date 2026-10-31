@@ -25,6 +25,85 @@ function render(previous, changes) {
 }
 const base = { gameplayVisible: true, mapValue: 1000, lostValue: 20, level: 1, roster: [], lastDestroyedItem: null };
 
+test('local monster entries do not invent strength and UI distinguishes unknown, zero and impossible', () => {
+    const source = fs.readFileSync(`${__dirname}/overlay-state.js`, 'utf8');
+    const start = source.indexOf('    function createMonsterEntry(');
+    const end = source.indexOf('    function trimMonstersForLevel(', start);
+    const textStart = html.indexOf('        function getMonsterStrengthText(');
+    const textEnd = html.indexOf('\n        }', textStart) + '\n        }'.length;
+    const context = vm.createContext({
+        getMonsterImage: () => 'image', getMonsterFileName: () => 'animal',
+        getMonsterCount: () => null,
+        getText: (key) => ({ strengthUnknown: '?', strengthImpossible: 'impossible', strengthValue: (value) => String(value) })[key]
+    });
+    vm.runInContext(source.slice(start, end) + html.slice(textStart, textEnd), context);
+    for (const name of ['Animal', 'Peeper', 'New Beast']) {
+        assert.equal(context.createMonsterEntry(name, 1).strength, undefined);
+    }
+    for (const [strength, text] of [[undefined, '?'], [null, '?'], [0, '0'], [13, '13'], ['impossible', 'impossible']]) {
+        assert.equal(context.getMonsterStrengthText({ strength }), text);
+    }
+    assert.doesNotMatch(source, /monsterConfig\.strength/);
+});
+
+test("roster and fallback render in game tier order with missing categories last", () => {
+    const start = html.indexOf("function compareMonsterTiers(");
+    const end = html.indexOf("function updateMonsterSquare(", start);
+    const renderStart = html.indexOf("            if (state.rosterPending) {");
+    const renderEnd = html.indexOf("            updateTopbarLayout({", renderStart);
+    assert(start >= 0 && end > start && renderStart >= 0 && renderEnd > renderStart);
+    const monsters = [
+        { id: "new", sourceId: "new", level: 1, tier: 3, unknown: true },
+        { id: "medium", sourceId: "medium", level: 2, tier: 2 },
+        { id: "missing", sourceId: "missing", level: 1, tier: null },
+        { id: "easy", sourceId: "easy", level: 3, tier: 1 }
+    ];
+    for (const withRoster of [true, false]) {
+        const rendered = [];
+        const context = vm.createContext({
+            state: { monsters, strength: 0, level: 1 },
+            roster: withRoster ? monsters.map((monster) => ({ ...monster })) : [],
+            monstersSquares: { children: [] },
+            ensureMonsterSquares: () => {},
+            updateMonsterSquare: (square, level, monster) => rendered.push(monster.id),
+            OverlayApp: { getCountsForLevel: () => ({ level1: 0, level2: 0, level3: 0 }) }
+        });
+        vm.runInContext(html.slice(start, end) + html.slice(renderStart, renderEnd), context);
+        assert.deepEqual(rendered, ["easy", "medium", "new", "missing"]);
+        assert.deepEqual(monsters.map((monster) => monster.id), ["new", "medium", "missing", "easy"]);
+    }
+});
+
+test("game tier controls borders independently of name and layout level", () => {
+    const start = html.indexOf("function updateMonsterSquare(");
+    const end = html.indexOf("            setMonsterProximityState(", start);
+    assert(start >= 0 && end > start);
+    const context = vm.createContext({});
+    vm.runInContext(html.slice(start, end) + "}", context);
+    const classes = new Set(["level-3"]);
+    const square = { classList: {
+        remove: (...names) => names.forEach((name) => classes.delete(name)),
+        add: (name) => classes.add(name)
+    } };
+    for (const [level, monster, expected] of [
+        [1, { unknown: true, tier: 3 }, "level-3"],
+        [3, { tier: 2 }, "level-2"],
+        [2, { unknown: true, tier: 1 }, "level-1"],
+        [1, { unknown: true }, "level-unknown"],
+        [2, {}, "level-unknown"],
+        [3, { tier: null }, "level-unknown"],
+        [1, { tier: 0 }, "level-unknown"],
+        [2, { tier: 4 }, "level-unknown"],
+        [3, { tier: "3" }, "level-unknown"],
+        [1, null, "level-1"]
+    ]) {
+        context.updateMonsterSquare(square, level, monster, 0);
+        assert.deepEqual([...classes], [expected]);
+    }
+    const css = fs.readFileSync(`${__dirname}/overlay.css`, "utf8");
+    assert.match(css, /\.monster-square\.level-unknown\s*\{[^}]*border:[^}]*#dfb85b;[^}]*--glow-color: #dfb85b;/);
+});
+
 test("position cache tracks currency width and zero crossings rather than amount", () => {
     const extract = (name) => {
         const start = html.indexOf(`function ${name}(`);

@@ -798,6 +798,29 @@ body {
     z-index: 1;
 }
 
+.monster-unknown-shimmer {
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    border-radius: inherit;
+    pointer-events: none;
+    -webkit-mask: url("assets/monsters/new.webp") center / cover no-repeat;
+    mask: url("assets/monsters/new.webp") center / cover no-repeat;
+    background: linear-gradient(110deg, transparent 40%, rgba(224, 170, 65, 0.25) 46%, rgba(255, 221, 139, 0.8) 50%, rgba(224, 170, 65, 0.25) 54%, transparent 60%) 150% 0 / 300% 100% no-repeat;
+    animation: monster-unknown-shimmer 8s ease-in-out infinite;
+}
+
+@keyframes monster-unknown-shimmer {
+    0%, 75% { background-position: 150% 0; opacity: 0; }
+    77% { opacity: 1; }
+    96% { background-position: -50% 0; opacity: 1; }
+    100% { background-position: -50% 0; opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .monster-unknown-shimmer { animation: none; opacity: 0; }
+}
+
 .monster-proximity-wave {
     position: absolute;
     inset: calc(-1 * var(--monster-outline-width));
@@ -1310,6 +1333,11 @@ body {
 .monster-square.level-3 {
     border: var(--monster-outline-width) solid #f44336;
     --glow-color: #f44336;
+}
+
+.monster-square.level-unknown {
+    border: var(--monster-outline-width) solid #dfb85b;
+    --glow-color: #dfb85b;
 }
 
 .monster-count {

@@ -10,6 +10,10 @@ const clients = new Set();
 let overlayState = null;
 let timestampSession = null;
 const proximityBySourceId = new Map();
+// Level-scoped cache: status/seen requests can arrive before the roster.
+const statusesBySourceId = new Map();
+const tiersBySourceId = new Map();
+const strengthsBySourceId = new Map();
 
 const monsterConfig = {
     levels: {
@@ -17,38 +21,7 @@ const monsterConfig = {
         2: ["Rugrat", "Animal", "Upscream", "Chef", "Hidden", "Bowtie", "Mentalist", "Banger", "Gambit", "Headgrab", "Heart Hugger", "Oogly"],
         3: ["Headman", "Robe", "Huntsman", "Reaper", "Clown", "Trudge", "Cleanup Crew", "Loom"]
     },
-    strength: {
-        Banger: 0,
-        Gnome: 0,
-        Gnomes: 0,
-        Animal: 4,
-        "Birthday Boy": 4,
-        Headgrab: 4,
-        Mentalist: 4,
-        Hidden: 4,
-        Rugrat: 4,
-        Spewer: 4,
-        Upscream: 4,
-        Bowtie: 7,
-        Bella: 9,
-        Chef: 9,
-        Gambit: 9,
-        "Heart Hugger": 9,
-        Huntsman: 9,
-        Oogly: 9,
-        Reaper: 9,
-        "Shadow Child": 9,
-        "Cleanup Crew": 13,
-        Clown: 13,
-        Headman: 13,
-        Loom: 13,
-        Robe: 13,
-        Trudge: 13,
-        "Apex Predator": "impossible",
-        Elsa: "impossible",
-        Peeper: "impossible",
-        Tick: "impossible"
-    },
+
     aliases: {
         apexpredator: "Apex Predator",
         animal: "Animal",
@@ -177,6 +150,19 @@ const defaultOverlayState = {
     lostValue: 0,
     lastDestroyedItem: null
 };
+
+// Keep this allowlist aligned with overlay-state.js; game fields must never be restored by settings sync.
+const preferenceKeys = [
+    "upgradeVisibility", "style", "interfaceLanguage", "saveTimestampsEnabled",
+    "bgEnabled", "timerVisible", "upgradesVisible", "upgradeLayout", "compactModeEnabled",
+    "upgradeRows", "mapValueVisible", "lostValueVisible", "valueWrapEnabled",
+    "monsterIconsVisible", "levelBadgeVisible", "upgradeTooltipsVisible",
+    "monsterHealthBarsVisible", "monsterProximityWavesVisible", "monsterStrengthVisible",
+    "respawnTimerVisible", "respawnIndicatorVisible", "onlyAliveMonstersVisible",
+    "onlyAliveIncludeUndetected", "itemDestroyedAlertsVisible", "squareSize", "upgradeSize",
+    "overlayScaleVersion", "columnsCount", "columnsLayoutVersion", "overlayDefaultsVersion",
+    "overlayAlignment", "overlayPosition", "controlsPosition", "hoverOpacity"
+];
 
 const levelNameAliases = {
     swiftbroomacademy: "Wizard",
@@ -387,7 +373,7 @@ function normalizeMonsterKey(name) {
 
 function normalizeMonsterName(name) {
     const key = normalizeMonsterKey(name);
-    return monsterConfig.aliases[key] || null;
+    return monsterConfig.aliases[key] || (typeof name === "string" && name.trim() ? name : null);
 }
 
 function getCountsForLevel(level) {
@@ -450,27 +436,66 @@ function getMonsterCount(monsterName, level, isReplacement = false) {
     return null;
 }
 
-function getMonsterStrength(monsterName) {
-    if (monsterConfig.strength[monsterName] !== undefined) return monsterConfig.strength[monsterName];
-    if (monsterName.endsWith("s")) {
-        return monsterConfig.strength[monsterName.slice(0, -1)];
-    }
-    return undefined;
+
+function normalizeDynamicStrength(value, forceMax) {
+    if (value === "impossible") return value;
+    if (typeof value !== "number" || !Number.isFinite(value) || value < 0
+        || typeof forceMax !== "number" || !Number.isFinite(forceMax) || forceMax <= 0) return undefined;
+    // EnemyRigidbody requires displacement >= GrabForce.amount. PhysGrabObject
+    // caps one standing player's displacement at forceMax * (1 + upgrades * 0.2).
+    // forceMax is serialized as 6 in the installed player assets, not its C# default 4.
+    const threshold = Math.fround(value);
+    const maximum = Math.fround(forceMax);
+    if (!Number.isFinite(threshold) || !Number.isFinite(maximum) || maximum <= 0) return undefined;
+    let upgrades = Math.max(0, Math.ceil((threshold / maximum - 1) / 0.2));
+    if (!Number.isSafeInteger(upgrades)) return undefined;
+    const displacement = (count) => Math.fround(maximum * Math.fround(1 + Math.fround(count * Math.fround(0.2))));
+    // Match Unity float boundaries rather than subtracting an arbitrary epsilon.
+    if (upgrades > 0 && displacement(upgrades - 1) >= threshold) upgrades--;
+    if (displacement(upgrades) < threshold) upgrades++;
+    return upgrades;
+}
+
+// Input is a raw game threshold, null, or an explicitly proven impossibility.
+// Missing fields preserve the last observation; invalid explicit values clear it.
+function cacheMonsterStrength(sourceId, payload) {
+    if (!Object.prototype.hasOwnProperty.call(payload, "strength")) return;
+    strengthsBySourceId.set(sourceId, normalizeDynamicStrength(payload.strength, payload.strengthForceMax));
+}
+
+function getSourceStrength(sourceIds) {
+    const values = sourceIds.map((id) => strengthsBySourceId.get(String(id)));
+    if (values.includes("impossible")) return "impossible";
+    const known = values.filter((value) => typeof value === "number");
+    return known.length ? Math.max(...known) : undefined;
+}
+
+function cacheMonsterTier(sourceId, payload) {
+    if (!Object.prototype.hasOwnProperty.call(payload, "tier")) return;
+    tiersBySourceId.set(sourceId, [1, 2, 3].includes(payload.tier) ? payload.tier : null);
+}
+
+function getSourceTier(sourceIds) {
+    const tiers = sourceIds.map((id) => tiersBySourceId.get(String(id)) ?? null);
+    return tiers.length > 0 && tiers.every((tier) => tier === tiers[0]) ? tiers[0] : null;
 }
 
 function createMonsterEntry(monsterName, level, isReplacement, sourceId = null) {
+    const unknown = !monsterConfig.aliases[normalizeMonsterKey(monsterName)];
     return {
         id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
         level,
+        tier: null,
         name: monsterName,
-        image: `assets/monsters/${getMonsterFileName(monsterName)}.webp`,
-        count: getMonsterCount(monsterName, level, isReplacement),
-        strength: getMonsterStrength(monsterName),
+        image: unknown ? "assets/monsters/new.webp" : `assets/monsters/${getMonsterFileName(monsterName)}.webp`,
+        ...(unknown ? { unknown: true } : {}),
+        count: unknown ? null : getMonsterCount(monsterName, level, isReplacement),
+        strength: undefined,
         sourceId
     };
 }
 
-function addSeenMonster(rawName, rawSourceId) {
+function addSeenMonster(rawName, rawSourceId, metadata = {}) {
     const monsterName = normalizeMonsterName(rawName);
     if (!monsterName) {
         return { ok: false, statusCode: 422, payload: { error: "Unknown monster", received: rawName } };
@@ -482,20 +507,26 @@ function addSeenMonster(rawName, rawSourceId) {
         monsters: Array.isArray(overlayState?.monsters) ? overlayState.monsters : [],
         roster: Array.isArray(overlayState?.roster) ? overlayState.roster : []
     };
-    const level = getMonsterLevel(monsterName);
+    const unknown = !monsterConfig.aliases[normalizeMonsterKey(monsterName)];
+    const level = unknown ? 1 : getMonsterLevel(monsterName);
     const isReplacement = level === 3 && !monsterConfig.levels[3].includes(monsterName);
     const monsterCount = getMonsterCount(monsterName, level, isReplacement);
     const rawId = rawSourceId == null ? null : String(rawSourceId);
+    if (rawId != null) {
+        cacheMonsterStrength(rawId, metadata);
+        cacheMonsterTier(rawId, metadata);
+    }
     const rosterSlot = rawId == null ? null : state.roster.find((slot) => Array.isArray(slot.sourceIds) && slot.sourceIds.includes(rawId));
     const sourceId = rosterSlot?.id || (rawId == null ? null : `enemy:${rawId}`);
 
     if ((sourceId != null && state.monsters.some((monster) => monster.sourceId === sourceId))
         || (state.roster.length === 0 && monsterCount != null && state.monsters.some((monster) => normalizeMonsterKey(monster.name) === normalizeMonsterKey(monsterName)))) {
         overlayState = state;
+        updateMonsterStatuses([], true);
         return { ok: true, statusCode: 200, payload: { ok: true, added: false, monster: monsterName, reason: "already-known" } };
     }
 
-    if (state.roster.length === 0) {
+    if (!unknown && state.roster.length === 0) {
         const counts = getCountsForLevel(state.level);
         const currentLevelCount = state.monsters.filter((monster) => monster.level === level).length;
         if (currentLevelCount >= counts[`level${level}`]) {
@@ -506,8 +537,15 @@ function addSeenMonster(rawName, rawSourceId) {
 
     overlayState = {
         ...state,
-        monsters: [...state.monsters, createMonsterEntry(monsterName, level, isReplacement, sourceId)]
+        monsters: [...state.monsters, {
+            ...createMonsterEntry(monsterName, level, isReplacement, sourceId),
+            ...(rosterSlot?.unknown ? { unknown: true, strength: rosterSlot.strength } : {})
+        }]
     };
+    if (unknown && rawId != null && !rosterSlot) {
+        overlayState.roster = [...state.roster, { id: sourceId, level, name: monsterName, unknown: true, sourceIds: [rawId] }];
+    }
+    updateMonsterStatuses([], true);
     return { ok: true, statusCode: 200, payload: { ok: true, added: true, monster: monsterName, level } };
 }
 
@@ -525,13 +563,17 @@ function updateMonsterRoster(rawMonsters) {
     const roster = state.roster.map((slot) => ({ ...slot, sourceIds: Array.isArray(slot.sourceIds) ? [...slot.sourceIds] : [] }));
 
     for (const rawMonster of rawMonsters) {
-        const monsterName = normalizeMonsterName(rawMonster?.name);
+        const monsterName = rawMonster?.unknown === true && typeof rawMonster.name === "string" && rawMonster.name.trim()
+            ? rawMonster.name : normalizeMonsterName(rawMonster?.name);
         if (!monsterName || rawMonster?.id == null) continue;
 
         const sourceId = String(rawMonster.id);
-        const level = getMonsterLevel(monsterName);
+        cacheMonsterTier(sourceId, rawMonster);
+        cacheMonsterStrength(sourceId, rawMonster);
+        const unknown = rawMonster.unknown === true || !monsterConfig.aliases[normalizeMonsterKey(monsterName)];
+        const level = unknown ? 1 : getMonsterLevel(monsterName);
         const isReplacement = level === 3 && !monsterConfig.levels[3].includes(monsterName);
-        const groupSize = getMonsterCount(monsterName, level, isReplacement);
+        const groupSize = unknown ? null : getMonsterCount(monsterName, level, isReplacement);
         const groupKey = groupSize == null ? null : normalizeMonsterKey(monsterName);
         let slot = roster.find((entry) => Array.isArray(entry.sourceIds) && entry.sourceIds.includes(sourceId));
         if (!slot && groupKey != null) {
@@ -549,14 +591,17 @@ function updateMonsterRoster(rawMonsters) {
             roster.push(slot);
         }
         if (!slot.sourceIds.includes(sourceId)) slot.sourceIds.push(sourceId);
+        if (unknown) {
+            slot.name = rawMonster.name;
+            slot.unknown = true;
+
+        }
     }
 
     roster.sort((left, right) => left.level - right.level || left.id.localeCompare(right.id));
-    const rosterSourceIds = new Set(roster.flatMap((slot) => slot.sourceIds || []).map(String));
-    for (const sourceId of proximityBySourceId.keys()) {
-        if (!rosterSourceIds.has(sourceId)) proximityBySourceId.delete(sourceId);
-    }
+
     overlayState = { ...state, roster, rosterPending: false };
+    updateMonsterStatuses([], true);
     return { ok: true, statusCode: 200, payload: { ok: true, slots: roster.length } };
 }
 
@@ -589,16 +634,14 @@ function formatLocalClockTime(date = new Date()) {
 }
 
 function normalizeLevelName(value) {
-    const raw = String(value || "").trim();
+    const name = String(value || "").replace(/^\s*Level\s*-\s*/i, "");
+    const raw = name.trim();
     if (!raw) return "?";
 
     const compact = raw.replace(/[^a-z0-9]/gi, "").toLowerCase();
     if (levelNameAliases[compact]) return levelNameAliases[compact];
 
-    for (const [name, levelName] of Object.entries(levelNameAliases)) {
-        if (compact.includes(name)) return levelName;
-    }
-    return "?";
+    return name;
 }
 
 function createTimestampSession() {
@@ -661,14 +704,15 @@ const timestampMonsterNamesRu = {
 function normalizeTimestampMonsterName(name) {
     const key = normalizeMonsterKey(name);
     const canonical = monsterConfig.aliases[key];
+    if (!canonical && key !== "shadowchildren" && key !== "apexpredators") return name;
     if (Object.prototype.hasOwnProperty.call(timestampMonsterNamesRu, canonical)) return canonical;
     if (key === "shadowchildren") return "Shadow Child";
     return monsterConfig.aliases[key.replace(/s$/, "")] || canonical || name;
 }
 
 function formatMonsterTimestampList(monsters, language) {
-    return getMonsterTotals(monsters).map(({ name, count }) => {
-        const label = language === "ru" ? timestampMonsterNamesRu[name] || name : name;
+    return getMonsterTotals(monsters).map(({ name, count, unknown }) => {
+        const label = language === "ru" && !unknown ? timestampMonsterNamesRu[name] || name : name;
         return count > 1 ? `${label} x${count}` : label;
     });
 }
@@ -676,15 +720,19 @@ function formatMonsterTimestampList(monsters, language) {
 function getMonsterTotals(monsters) {
     const totals = new Map();
     for (const monster of Array.isArray(monsters) ? monsters : []) {
-        const name = normalizeTimestampMonsterName(String(monster?.name || "").trim());
+        const rawName = String(monster?.name || "");
+        const name = monster?.unknown === true ? rawName : normalizeTimestampMonsterName(rawName);
         if (!name) continue;
 
         const count = Number(monster.count);
         const visibleCount = Number.isFinite(count) && count > 1 ? Math.floor(count) : 1;
-        totals.set(name, (totals.get(name) || 0) + visibleCount);
+        const key = JSON.stringify([monster?.unknown === true, name]);
+        const total = totals.get(key) || { name, count: 0, unknown: monster?.unknown === true };
+        total.count += visibleCount;
+        totals.set(key, total);
     }
 
-    return [...totals.entries()].map(([name, count]) => ({ name, count }));
+    return [...totals.values()];
 }
 
 function finalizeActiveTimestampLine() {
@@ -713,7 +761,7 @@ function startTimestampLine(level, rawLevelName) {
     writeTimestampSession();
 }
 
-function updateMonsterStatuses(rawStatuses) {
+function updateMonsterStatuses(rawStatuses, replay = false) {
     if (!Array.isArray(rawStatuses)) {
         return { ok: false, statusCode: 422, payload: { error: "Invalid monster statuses" } };
     }
@@ -724,7 +772,8 @@ function updateMonsterStatuses(rawStatuses) {
         monsters: Array.isArray(overlayState?.monsters) ? overlayState.monsters : [],
         roster: Array.isArray(overlayState?.roster) ? overlayState.roster : []
     };
-    const statuses = new Map();
+    const statuses = statusesBySourceId;
+    const touchedIds = new Set();
     for (const rawStatus of rawStatuses) {
         if (rawStatus?.id == null || typeof rawStatus.alive !== "boolean") continue;
         const remaining = Number(rawStatus.respawnRemaining);
@@ -733,17 +782,25 @@ function updateMonsterStatuses(rawStatuses) {
         const hasHealth = rawStatus.health != null && Number.isFinite(health);
         const hasMaxHealth = rawStatus.maxHealth != null && Number.isFinite(maxHealth);
         const sourceId = String(rawStatus.id);
+        cacheMonsterTier(sourceId, rawStatus);
+        cacheMonsterStrength(sourceId, rawStatus);
         const previousProximity = proximityBySourceId.get(sourceId) || { playerClose: false, playerVeryClose: false };
         const proximity = {
             playerClose: typeof rawStatus.playerClose === "boolean" ? rawStatus.playerClose : previousProximity.playerClose,
             playerVeryClose: typeof rawStatus.playerVeryClose === "boolean" ? rawStatus.playerVeryClose : previousProximity.playerVeryClose
         };
         proximityBySourceId.set(sourceId, proximity);
+        touchedIds.add(sourceId);
+
         statuses.set(sourceId, {
+            ...statuses.get(sourceId),
+            ...(rawStatus.unknown === true ? { unknown: true } : {}),
+
             alive: rawStatus.alive,
             respawnRemaining: Number.isFinite(remaining) ? Math.max(0, remaining) : 0,
-            health: hasHealth ? Math.max(0, health) : null,
-            maxHealth: hasMaxHealth ? Math.max(0, maxHealth) : null,
+            respawnEndsAt: Number.isFinite(remaining) && remaining > 0 ? Date.now() + remaining * 1000 : null,
+            ...(hasHealth ? { health: Math.max(0, health) } : {}),
+            ...(hasMaxHealth ? { maxHealth: Math.max(0, maxHealth) } : {}),
             ...proximity
         });
     }
@@ -752,7 +809,10 @@ function updateMonsterStatuses(rawStatuses) {
     let updatedSlots = 0;
     const roster = state.roster.map((slot) => {
         const sourceIds = Array.isArray(slot.sourceIds) ? slot.sourceIds.map(String) : [];
+        slot = { ...slot, tier: getSourceTier(sourceIds), strength: getSourceStrength(sourceIds) };
+        if (!replay && !sourceIds.some((id) => touchedIds.has(id))) return slot;
         const sourceStatuses = sourceIds.map((id) => statuses.get(id)).filter(Boolean);
+
         const proximityStatuses = sourceIds.map((id) => proximityBySourceId.get(id)).filter(Boolean);
         const proximityPatch = {
             playerClose: proximityStatuses.some((status) => status.playerClose),
@@ -768,21 +828,18 @@ function updateMonsterStatuses(rawStatuses) {
 
         updatedSlots++;
         const healthStatuses = sourceStatuses.filter((status) => status.health != null);
-        const healthPatch = healthStatuses.length > 0
-            ? {
-                health: healthStatuses.reduce((total, status) => total + status.health, 0),
-                maxHealth: healthStatuses.some((status) => status.maxHealth != null)
-                    ? healthStatuses.reduce((total, status) => total + (status.maxHealth || 0), 0)
-                    : null
-            }
-            : {};
+        const maxHealthStatuses = sourceStatuses.filter((status) => status.maxHealth != null);
+        const healthPatch = {
+            ...(healthStatuses.length > 0 ? { health: healthStatuses.reduce((total, status) => total + status.health, 0) } : {}),
+            ...(maxHealthStatuses.length > 0 ? { maxHealth: maxHealthStatuses.reduce((total, status) => total + status.maxHealth, 0) } : {})
+        };
         const clearFlashPatch = { respawnFlashAt: null, respawnFlashUntil: null, respawnFlashAmount: null };
         if (sourceStatuses.some((status) => status.alive)) {
             return { ...slot, ...healthPatch, ...proximityPatch, ...clearFlashPatch, alive: true, respawnEndsAt: null, respawnDuration: null };
         }
 
         const remainingValues = sourceStatuses
-            .map((status) => status.respawnRemaining)
+            .map((status) => status.respawnEndsAt == null ? 0 : Math.max(0, (status.respawnEndsAt - now) / 1000))
             .filter((remaining) => remaining > 0);
         if (remainingValues.length === 0) {
             return { ...slot, ...healthPatch, ...proximityPatch, ...clearFlashPatch, alive: false, respawnEndsAt: null, respawnDuration: null };
@@ -820,7 +877,27 @@ function updateMonsterStatuses(rawStatuses) {
         return { ...slot, ...healthPatch, ...proximityPatch, ...flashPatch, alive: false, respawnEndsAt, respawnDuration };
     });
 
-    overlayState = { ...state, roster };
+    const visibleSourceIds = new Set();
+    const monsters = state.monsters.map((monster) => {
+        const rawId = monster.sourceId?.startsWith("enemy:") ? monster.sourceId.slice(6) : null;
+        const slot = roster.find((entry) => entry.id === monster.sourceId
+            || (rawId != null && entry.sourceIds.includes(rawId)));
+        const tier = slot ? slot.tier : getSourceTier(rawId == null ? [] : [rawId]);
+        return {
+            ...monster, tier, sourceId: slot?.id || monster.sourceId,
+            strength: slot ? slot.strength : getSourceStrength(rawId == null ? [] : [rawId]),
+            ...(slot?.unknown ? {
+                name: slot.name || monster.name, unknown: true, level: 1,
+                image: "assets/monsters/new.webp", count: null, strength: slot.strength
+            } : {})
+        };
+    }).filter((monster) => {
+        if (monster.sourceId == null) return true;
+        if (visibleSourceIds.has(monster.sourceId)) return false;
+        visibleSourceIds.add(monster.sourceId);
+        return true;
+    });
+    overlayState = { ...state, roster, monsters };
     return { ok: true, statusCode: 200, payload: { ok: true, updatedSlots } };
 }
 
@@ -832,6 +909,9 @@ function setGameLevel(rawLevel, rawLevelName) {
 
     startTimestampLine(level, rawLevelName);
     proximityBySourceId.clear();
+    statusesBySourceId.clear();
+    tiersBySourceId.clear();
+    strengthsBySourceId.clear();
 
     overlayState = {
         ...defaultOverlayState,
@@ -1025,10 +1105,32 @@ const server = http.createServer(async (request, response) => {
             return;
         }
 
-        if (request.method === "POST" && request.url === "/api/state") {
+        if (request.method === "POST" && (request.url === "/api/state" || request.url === "/api/settings")) {
             const body = await readBody(request);
-            const payload = JSON.parse(body || "{}");
-            const nextState = normalizeOverlayState(payload.state);
+            let payload;
+            try {
+                payload = JSON.parse(body || "{}");
+            } catch {
+                sendJson(response, 400, { error: "Invalid JSON" });
+                return;
+            }
+            let nextState;
+            if (request.url === "/api/settings") {
+                const settings = payload?.settings;
+                if (!settings || typeof settings !== "object" || Array.isArray(settings)) {
+                    sendJson(response, 422, { error: "settings must be an object" });
+                    return;
+                }
+                const patch = Object.fromEntries(preferenceKeys
+                    .filter((key) => Object.prototype.hasOwnProperty.call(settings, key))
+                    .map((key) => [key, settings[key]]));
+                // Read current state after the body arrives, not before awaiting it.
+                const current = overlayState || defaultOverlayState;
+                const normalized = normalizeOverlayState({ ...current, ...patch });
+                nextState = { ...current, ...Object.fromEntries(preferenceKeys.map((key) => [key, normalized[key]])) };
+            } else {
+                nextState = normalizeOverlayState(payload.state);
+            }
             if (nextState?.saveTimestampsEnabled === false) {
                 finalizeActiveTimestampLine();
                 // Do not resume a partially recorded level when saving is re-enabled.
@@ -1043,9 +1145,9 @@ const server = http.createServer(async (request, response) => {
         if (request.method === "POST" && request.url === "/api/monster-seen") {
             const body = await readBody(request);
             const payload = JSON.parse(body || "{}");
-            const result = addSeenMonster(payload.name || payload.monster || payload.enemy, payload.id ?? payload.instanceId);
+            const result = addSeenMonster(payload.name || payload.monster || payload.enemy, payload.id ?? payload.instanceId, payload);
             sendJson(response, result.statusCode, result.payload);
-            if (result.ok && result.payload.added) {
+            if (result.ok) {
                 broadcastState();
             }
             return;

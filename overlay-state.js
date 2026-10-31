@@ -10,38 +10,7 @@ const OverlayApp = (() => {
             2: { monsters: ["Rugrat", "Animal", "Upscream", "Chef", "Hidden", "Bowtie", "Mentalist", "Banger", "Gambit", "Headgrab", "Heart Hugger", "Oogly"] },
             3: { monsters: ["Headman", "Robe", "Huntsman", "Reaper", "Clown", "Trudge", "Cleanup Crew", "Loom"] }
         },
-        strength: {
-            Banger: 0,
-            Gnome: 0,
-            Gnomes: 0,
-            Animal: 4,
-            "Birthday Boy": 4,
-            Headgrab: 4,
-            Mentalist: 4,
-            Hidden: 4,
-            Rugrat: 4,
-            Spewer: 4,
-            Upscream: 4,
-            Bowtie: 7,
-            Bella: 9,
-            Chef: 9,
-            Gambit: 9,
-            "Heart Hugger": 9,
-            Huntsman: 9,
-            Oogly: 9,
-            Reaper: 9,
-            "Shadow Child": 9,
-            "Cleanup Crew": 13,
-            Clown: 13,
-            Headman: 13,
-            Loom: 13,
-            Robe: 13,
-            Trudge: 13,
-            "Apex Predator": "impossible",
-            Elsa: "impossible",
-            Peeper: "impossible",
-            Tick: "impossible"
-        },
+
         replacements: [
             "Animals", "Upscreams", "Bowties", "Rugrat", "Mentalists", "Peepers",
             "Hidden", "Apex Predators", "Chefs", "Spewers", "Shadow Children",
@@ -135,17 +104,39 @@ const OverlayApp = (() => {
         lastDestroyedItem: null
     };
 
-    let state = defaultState;
-    state = normalizeState(loadState());
+    // Persist only user preferences, never a previous game's live state.
+    const preferenceKeys = [
+        "upgradeVisibility", "style", "interfaceLanguage", "saveTimestampsEnabled",
+        "bgEnabled", "timerVisible", "upgradesVisible", "upgradeLayout", "compactModeEnabled",
+        "upgradeRows", "mapValueVisible", "lostValueVisible", "valueWrapEnabled",
+        "monsterIconsVisible", "levelBadgeVisible", "upgradeTooltipsVisible",
+        "monsterHealthBarsVisible", "monsterProximityWavesVisible", "monsterStrengthVisible",
+        "respawnTimerVisible", "respawnIndicatorVisible", "onlyAliveMonstersVisible",
+        "onlyAliveIncludeUndetected", "itemDestroyedAlertsVisible", "squareSize", "upgradeSize",
+        "overlayScaleVersion", "columnsCount", "columnsLayoutVersion", "overlayDefaultsVersion",
+        "overlayAlignment", "overlayPosition", "controlsPosition", "hoverOpacity"
+    ];
+    function pickPreferences(value) {
+        if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+        return Object.fromEntries(preferenceKeys.filter((key) => Object.prototype.hasOwnProperty.call(value, key))
+            .filter((key) => key !== "interfaceLanguage" || ["ru", "en"].includes(value[key]))
+            .map((key) => [key, value[key]]));
+    }
+    let preferences = loadState();
+    let state = normalizeState({ ...defaultState, ...preferences });
+    // Apply existing layout migrations to saved preferences as well.
+    preferences = Object.fromEntries(Object.keys(preferences).map((key) => [key, state[key]]));
+    let settingsRevision = 0;
+    let settingsPending = false;
+    let settingsPosting = false;
     const listeners = new Set();
     let serverSyncReady = false;
 
-    function loadState(fallbackState = state || defaultState) {
+    function loadState() {
         try {
-            const raw = localStorage.getItem(storageKey);
-            return raw ? JSON.parse(raw) : defaultState;
+            return pickPreferences(JSON.parse(localStorage.getItem(storageKey)));
         } catch {
-            return fallbackState;
+            return {};
         }
     }
 
@@ -293,38 +284,45 @@ const OverlayApp = (() => {
     }
 
     function getState() {
-        state = normalizeState(loadState());
         return { ...state, monsters: [...state.monsters], roster: [...state.roster] };
     }
 
     function saveState(nextState, shouldBroadcast = true) {
         state = normalizeState(nextState);
         try {
-            localStorage.setItem(storageKey, JSON.stringify(state));
+            localStorage.setItem(storageKey, JSON.stringify(preferences));
         } catch {
             // Some file:// or OBS contexts can block storage; live sync can still use BroadcastChannel.
         }
         listeners.forEach((listener) => listener(getState()));
         if (shouldBroadcast && channel) {
-            channel.postMessage(state);
+            channel.postMessage(preferences);
         }
         if (shouldBroadcast && serverSyncEnabled && serverSyncReady) {
-            postStateToServer(state);
+            flushSettings();
         }
     }
 
-    async function postStateToServer(nextState) {
+    async function flushSettings() {
+        if (settingsPosting || !settingsPending || !serverSyncReady) return;
+        settingsPosting = true;
         try {
-            const response = await fetch("/api/state", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ state: nextState })
-            });
-            if (!response.ok) throw new Error("State sync failed");
-            return true;
+            while (settingsPending && serverSyncReady) {
+                const revision = settingsRevision;
+                // A full-state POST can roll back game events received during the request.
+                const response = await fetch("/api/settings", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ settings: preferences })
+                });
+                if (!response.ok) throw new Error("Settings sync failed");
+                settingsPending = revision !== settingsRevision;
+            }
         } catch {
-            serverSyncReady = false;
-            return false;
+            // Keep local preferences and retry on the next edit or SSE reconnect.
+            settingsPending = true;
+        } finally {
+            settingsPosting = false;
         }
     }
 
@@ -336,24 +334,10 @@ const OverlayApp = (() => {
             if (!response.ok) return;
 
             const payload = await response.json();
-            const localState = loadState(null);
-            const savedLanguage = localState !== defaultState
-                && ["ru", "en"].includes(localState?.interfaceLanguage)
-                ? localState.interfaceLanguage
-                : null;
-            if (payload.state) {
-                const nextState = savedLanguage
-                    ? { ...payload.state, interfaceLanguage: savedLanguage }
-                    : payload.state;
-                saveState(nextState, false);
-                // Publish the saved preference before SSE delivers its initial server snapshot.
-                if (savedLanguage && savedLanguage !== payload.state.interfaceLanguage) {
-                    if (!await postStateToServer(state)) return;
-                }
-            } else {
-                if (!await postStateToServer(getState())) return;
-            }
+            settingsPending = Object.keys(preferences).length > 0;
+            receiveServerState(payload.state || defaultState);
             serverSyncReady = true;
+            flushSettings();
         } catch {
             serverSyncReady = false;
             return;
@@ -364,22 +348,34 @@ const OverlayApp = (() => {
             events.onmessage = (event) => {
                 if (!event.data) return;
                 try {
-                    saveState(JSON.parse(event.data), false);
+                    receiveServerState(JSON.parse(event.data));
                 } catch {
                     // Ignore malformed server events.
                 }
             };
             events.onerror = () => {
                 serverSyncReady = false;
+                settingsPending = true;
             };
             events.onopen = () => {
                 serverSyncReady = true;
+                flushSettings();
             };
         }
     }
 
+    function receiveServerState(nextState) {
+        if (!nextState || typeof nextState !== "object" || Array.isArray(nextState)) return;
+        const merged = normalizeState({ ...defaultState, ...nextState, ...preferences });
+        preferences = pickPreferences(merged);
+        saveState(merged, false);
+    }
+
     function updateState(updater) {
-        const nextState = typeof updater === "function" ? updater(getState()) : updater;
+        const nextState = normalizeState(typeof updater === "function" ? updater(getState()) : updater);
+        preferences = pickPreferences(nextState);
+        settingsRevision++;
+        settingsPending = true;
         saveState(nextState);
     }
 
@@ -391,13 +387,21 @@ const OverlayApp = (() => {
 
     if (channel) {
         channel.addEventListener("message", (event) => {
-            saveState(event.data, false);
+            preferences = pickPreferences(normalizeState({ ...state, ...pickPreferences(event.data) }));
+            settingsRevision++;
+            settingsPending = true;
+            saveState({ ...state, ...preferences }, false);
+            if (serverSyncReady) flushSettings();
         });
     }
 
     window.addEventListener("storage", (event) => {
         if (event.key === storageKey) {
-            listeners.forEach((listener) => listener(getState()));
+            preferences = pickPreferences(normalizeState({ ...defaultState, ...loadState() }));
+            settingsRevision++;
+            settingsPending = true;
+            saveState({ ...state, ...preferences }, false);
+            if (serverSyncReady) flushSettings();
         }
     });
 
@@ -450,7 +454,11 @@ const OverlayApp = (() => {
             bangers: "banger"
         };
         const key = monsterName.toLowerCase();
-        return replacements[key] || key;
+        const known = Object.values(monsterConfig.levels).some(({ monsters }) =>
+            monsters.some((name) => name.toLowerCase() === key))
+            || monsterConfig.replacements.some((name) => name.toLowerCase() === key)
+            || key === "gnome";
+        return known ? (replacements[key] || key) : "new";
     }
 
     function getMonsterImage(monsterName) {
@@ -471,13 +479,6 @@ const OverlayApp = (() => {
         return null;
     }
 
-    function getMonsterStrength(monsterName) {
-        if (monsterConfig.strength[monsterName] !== undefined) return monsterConfig.strength[monsterName];
-        if (monsterName.endsWith("s")) {
-            return monsterConfig.strength[monsterName.slice(0, -1)];
-        }
-        return undefined;
-    }
 
     function createMonsterEntry(monsterName, level, isReplacement = false) {
         return {
@@ -485,8 +486,9 @@ const OverlayApp = (() => {
             level,
             name: monsterName,
             image: getMonsterImage(monsterName),
+            unknown: getMonsterFileName(monsterName) === "new",
             count: getMonsterCount(monsterName, level, isReplacement),
-            strength: getMonsterStrength(monsterName)
+            strength: undefined
         };
     }
 

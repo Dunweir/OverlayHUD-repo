@@ -20,7 +20,7 @@ using UnityEngine.SceneManagement;
 
 namespace OverlayHUD
 {
-    [BepInPlugin("local.overlay.overlay_hud", "OverlayHUD", "26.10.0")]
+    [BepInPlugin("local.overlay.overlay_hud", "OverlayHUD", "26.10.5")]
     public sealed class Plugin : BaseUnityPlugin
     {
         private static Plugin instance;
@@ -243,6 +243,7 @@ namespace OverlayHUD
         private ConfigEntry<float> scanInterval;
         private ConfigEntry<float> statusInterval;
         private ConfigEntry<bool> requireLineOfSight;
+        private ConfigEntry<bool> revealUnknownMonsters;
         private ConfigEntry<bool> preferPlayerVisionDetection;
         private ConfigEntry<bool> debugLogging;
         private ConfigEntry<bool> autoStartOverlayApp;
@@ -261,6 +262,7 @@ namespace OverlayHUD
             scanInterval = Config.Bind("Detection", "ScanIntervalSeconds", 3f, "How often pending enemy roster sync is retried.");
             statusInterval = Config.Bind("Detection", "StatusIntervalSeconds", 10f, "How often monster health and respawn status are synced after the roster is known. Event-driven changes remain immediate; values below 10 are raised to 10.");
             requireLineOfSight = Config.Bind("Detection", "RequireLineOfSight", true, "Reveal monsters only after an encounter. Disable to reveal the complete level roster as soon as it is known.");
+            revealUnknownMonsters = Config.Bind("Detection", "RevealUnknownMonsters", false, "Reveal only unknown monsters as soon as they are discovered, regardless of RequireLineOfSight. Known monsters keep their usual detection rules.");
             preferPlayerVisionDetection = Config.Bind("Detection", "PreferPlayerVisionDetection", true, "When enabled, show monsters when the player sees them. When disabled, use the older enemy-vision plus player-very-close detection.");
             debugLogging = Config.Bind("Debug", "Logging", false, "Write periodic bridge debug logs.");
             autoStartOverlayApp = Config.Bind("OverlayApp", "AutoStart", true, "Start the bundled OverlayHUD desktop app when the game starts.");
@@ -724,6 +726,7 @@ namespace OverlayHUD
             if (__instance is Component component)
             {
                 RegisterEnemyParent(component);
+                instance?.TryRevealUnknownEnemy(component);
                 instance?.SyncEnemyParentStatusChanged(component);
             }
         }
@@ -1224,6 +1227,7 @@ namespace OverlayHUD
                     continue;
                 }
                 resolvedEnemies.Add(new ResolvedEnemyCandidate { Candidate = candidate, MonsterName = monsterName });
+                TryRevealUnknownEnemy(GetEnemyParent(candidate));
             }
 
             // Finish the bounded discovery retries before publishing an empty level.
@@ -1241,7 +1245,7 @@ namespace OverlayHUD
                 }
                 return;
             }
-            if (!requireLineOfSight.Value) RevealAllKnownEnemies(resolvedEnemies);
+            RevealAllKnownEnemies(resolvedEnemies);
             SyncMonsterStatuses(resolvedEnemies);
             TryPublishPendingVisionEncounters(resolvedEnemies);
             enemyRosterDirty = false;
@@ -1253,12 +1257,25 @@ namespace OverlayHUD
             }
         }
 
+        private void TryRevealUnknownEnemy(Component enemyParent)
+        {
+            if (!gameplayActive || !revealUnknownMonsters.Value || enemyParent == null) return;
+            GameObject root = GetEnemyRoot(enemyParent);
+            if (root == null || !root.activeInHierarchy) return;
+            var candidate = new EnemyCandidate { Component = enemyParent, Root = root };
+            if (!IsUnknownMonster(candidate)) return;
+            int instanceId = root.GetInstanceID();
+            string monsterName = null;
+            PublishEnemyParentEncounter(enemyParent, ref instanceId, ref monsterName);
+        }
+
         private void RevealAllKnownEnemies(List<ResolvedEnemyCandidate> enemies)
         {
             for (int index = 0; index < enemies.Count; index++)
             {
                 ResolvedEnemyCandidate resolvedEnemy = enemies[index];
                 EnemyCandidate candidate = resolvedEnemy.Candidate;
+                if (requireLineOfSight.Value && !(revealUnknownMonsters.Value && IsUnknownMonster(candidate))) continue;
                 int instanceId = candidate.Root.GetInstanceID();
                 if (!TryMarkEnemySent(instanceId)) continue;
 
@@ -1268,7 +1285,7 @@ namespace OverlayHUD
                 {
                     Logger.LogInfo("Revealed level monster: " + resolvedEnemy.MonsterName + " from " + candidate.Component.GetType().Name + " / " + candidate.Root.name);
                 }
-                StartCoroutine(PostSeenMonster(resolvedEnemy.MonsterName, instanceId));
+                StartCoroutine(PostSeenMonster(resolvedEnemy.MonsterName, instanceId, GetMonsterMetadata(candidate)));
             }
         }
 
@@ -1280,7 +1297,10 @@ namespace OverlayHUD
             {
                 ResolvedEnemyCandidate enemy = enemies[index];
                 int instanceId = enemy.Candidate.Root.GetInstanceID();
-                fingerprint.Append(instanceId).Append(':').Append(enemy.MonsterName).Append(';');
+                fingerprint.Append(instanceId).Append(':').Append(enemy.MonsterName);
+                fingerprint.Append(",\"tier\":").Append(GetEnemyTierJson(enemy.Candidate));
+                AppendMonsterMetadata(fingerprint, enemy.Candidate);
+                fingerprint.Append(';');
             }
 
             string nextFingerprint = fingerprint.ToString();
@@ -1307,7 +1327,10 @@ namespace OverlayHUD
             {
                 ResolvedEnemyCandidate enemy = enemies[index];
                 if (index > 0) json.Append(',');
-                json.Append("{\"id\":").Append(enemy.Candidate.Root.GetInstanceID()).Append(",\"name\":\"").Append(EscapeJson(enemy.MonsterName)).Append("\"}");
+                json.Append("{\"id\":").Append(enemy.Candidate.Root.GetInstanceID()).Append(",\"name\":\"").Append(EscapeJson(enemy.MonsterName)).Append('"');
+                json.Append(",\"tier\":").Append(GetEnemyTierJson(enemy.Candidate));
+                AppendMonsterMetadata(json, enemy.Candidate);
+                json.Append('}');
             }
             json.Append("]}");
             StartCoroutine(PostMonsterRoster(json.ToString()));
@@ -1389,6 +1412,9 @@ namespace OverlayHUD
                     .Append(':').Append(healthText).Append('/').Append(maxHealthText)
                     .Append(':').Append(playerClose ? '1' : '0').Append(':').Append(playerVeryClose ? '1' : '0').Append(';');
 
+                string tierMetadata = ",\"tier\":" + GetEnemyTierJson(candidate);
+                string monsterMetadata = GetMonsterMetadata(candidate);
+                fingerprint.Append(tierMetadata).Append(monsterMetadata);
                 if (statusCount++ > 0) json.Append(',');
                 json.Append("{\"id\":").Append(instanceId)
                     .Append(",\"alive\":").Append(alive ? "true" : "false")
@@ -1400,7 +1426,7 @@ namespace OverlayHUD
                     json.Append(",\"health\":").Append(healthText.Length > 0 ? healthText : "0");
                     if (maxHealthText.Length > 0) json.Append(",\"maxHealth\":").Append(maxHealthText);
                 }
-                json.Append('}');
+                json.Append(tierMetadata).Append(monsterMetadata).Append('}');
             }
 
             if (statusCount == 0) return;
@@ -1490,7 +1516,8 @@ namespace OverlayHUD
 
             float roundedRemaining = alive ? 0f : (float)Math.Ceiling(Math.Max(0f, remaining) * 10f) / 10f;
             string remainingText = roundedRemaining.ToString("0.0", CultureInfo.InvariantCulture);
-            string fingerprint = instanceId + ":" + (alive ? "1" : "0") + ":" + remainingText;
+            string monsterMetadata = GetMonsterMetadata(candidate);
+            string fingerprint = instanceId + ":" + (alive ? "1" : "0") + ":" + remainingText + monsterMetadata;
             bool aliveChanged = !lastAliveBySourceId.TryGetValue(instanceId, out bool previousAlive) || previousAlive != alive;
             if (!aliveChanged
                 && lastTimerStatusBySourceId.TryGetValue(instanceId, out string previousFingerprint)
@@ -1515,6 +1542,7 @@ namespace OverlayHUD
                 .Append(instanceId)
                 .Append(",\"alive\":").Append(alive ? "true" : "false")
                 .Append(",\"respawnRemaining\":").Append(remainingText)
+                .Append(monsterMetadata)
                 .Append("}]}");
             StartCoroutine(PostMonsterStatuses(json.ToString()));
         }
@@ -1546,8 +1574,10 @@ namespace OverlayHUD
             string remainingText = roundedRemaining.ToString("0.0", CultureInfo.InvariantCulture);
             string healthText = hasHealth ? Math.Max(0f, health).ToString("0.#", CultureInfo.InvariantCulture) : "";
             string maxHealthText = hasHealth && maxHealth > 0f ? maxHealth.ToString("0.#", CultureInfo.InvariantCulture) : "";
+            string tierMetadata = ",\"tier\":" + GetEnemyTierJson(candidate);
+            string monsterMetadata = GetMonsterMetadata(candidate);
             string fingerprint = instanceId + ":" + (alive ? "1" : "0") + ":" + remainingText + ":" + healthText + "/" + maxHealthText
-                + ":" + (playerClose ? "1" : "0") + ":" + (playerVeryClose ? "1" : "0");
+                + ":" + (playerClose ? "1" : "0") + ":" + (playerVeryClose ? "1" : "0") + tierMetadata + monsterMetadata;
             if (lastImmediateStatusBySourceId.TryGetValue(instanceId, out string previousFingerprint)
                 && previousFingerprint == fingerprint)
             {
@@ -1566,7 +1596,7 @@ namespace OverlayHUD
                 json.Append(",\"health\":").Append(healthText.Length > 0 ? healthText : "0");
                 if (maxHealthText.Length > 0) json.Append(",\"maxHealth\":").Append(maxHealthText);
             }
-            json.Append("}]}");
+            json.Append(tierMetadata).Append(monsterMetadata).Append("}]}");
             StartCoroutine(PostMonsterStatuses(json.ToString()));
         }
 
@@ -1582,20 +1612,23 @@ namespace OverlayHUD
             health = 0f;
             maxHealth = 0f;
             bool hasHealth = false;
+            bool unknown = IsUnknownMonster(candidate);
 
             foreach (object source in GetEnemyHealthSources(candidate))
             {
                 if (source == null) continue;
 
                 float currentValue;
-                if (!hasHealth && TryReadFirstFloat(source, CurrentHealthMemberNames, out currentValue))
+                if (!hasHealth && TryReadFirstFloat(source, CurrentHealthMemberNames, out currentValue)
+                    && (!unknown || (!float.IsNaN(currentValue) && !float.IsInfinity(currentValue))))
                 {
                     health = Math.Max(0f, currentValue);
                     hasHealth = true;
                 }
 
                 float maxValue;
-                if (maxHealth <= 0f && TryReadFirstFloat(source, MaxHealthMemberNames, out maxValue))
+                if (maxHealth <= 0f && TryReadFirstFloat(source, MaxHealthMemberNames, out maxValue)
+                    && (!unknown || (!float.IsNaN(maxValue) && !float.IsInfinity(maxValue))))
                 {
                     maxHealth = Math.Max(0f, maxValue);
                 }
@@ -1603,7 +1636,8 @@ namespace OverlayHUD
                 if (hasHealth && maxHealth > 0f) return true;
             }
 
-            if (!hasHealth && maxHealth > 0f)
+            // Do not invent full current HP for an unfamiliar health implementation.
+            if (!unknown && !hasHealth && maxHealth > 0f)
             {
                 health = maxHealth;
                 return true;
@@ -2442,7 +2476,84 @@ namespace OverlayHUD
 
             if (enemyParent == null) return null;
             string enemyName = ReadMember(enemyParent, "enemyName") as string;
-            return FindKnownMonster(enemyName);
+            if (!string.IsNullOrWhiteSpace(enemyName)) return FindKnownMonster(enemyName) ?? enemyName;
+
+            // Only actual EnemyParent instances reach this fallback, never arbitrary scene objects.
+            GameObject root = GetEnemyRoot(enemyParent);
+            return root != null ? root.name : enemyParent.name;
+        }
+
+        private static string GetEnemyTierJson(EnemyCandidate candidate)
+        {
+            object difficulty = ReadMember(GetEnemyParent(candidate), "difficulty");
+            // Missing reflection values must not become Difficulty1 via Convert(null).
+            if (difficulty == null || !difficulty.GetType().IsEnum) return "null";
+            try
+            {
+                switch (Convert.ToInt64(difficulty, CultureInfo.InvariantCulture))
+                {
+                    case 0: return "1";
+                    case 1: return "2";
+                    case 2: return "3";
+                    default: return "null";
+                }
+            }
+            catch (OverflowException)
+            {
+                return "null";
+            }
+        }
+
+        private static bool IsUnknownMonster(EnemyCandidate candidate)
+        {
+            Component parent = GetEnemyParent(candidate);
+            if (parent == null) return false;
+            return FindKnownMonster(ReadMember(parent, "enemyName") as string) == null;
+        }
+
+        private static void AppendMonsterMetadata(StringBuilder json, EnemyCandidate candidate)
+        {
+            if (IsUnknownMonster(candidate)) json.Append(",\"unknown\":true");
+            json.Append(",\"strength\":");
+            Component enemy = candidate.Root == null ? null : candidate.Root.GetComponent("Enemy");
+            object body = ReadMember(enemy, "Rigidbody");
+            if (body == null && candidate.Root != null) body = candidate.Root.GetComponent("EnemyRigidbody");
+            // resources.assets defines this GrabForce asset (amount=999999). The game
+            // uses a numeric threshold, not an impossibility flag or a >=100000 cutoff.
+            object grabForce = ReadMember(body, "grabForceNeeded");
+            if (grabForce is UnityEngine.Object asset && asset.name == "Grab Force - Ungrabbable")
+            {
+                json.Append("\"impossible\"");
+                return;
+            }
+            object amount = ReadMember(grabForce, "amount");
+            if (amount != null && TryConvertFloat(amount, out float strength)
+                && !float.IsNaN(strength) && !float.IsInfinity(strength) && strength >= 0f)
+            {
+                json.Append(strength.ToString("R", CultureInfo.InvariantCulture));
+            }
+            else
+            {
+                json.Append("null");
+            }
+
+            // PhysGrabObject caps displacement at this serialized value (vanilla 6),
+            // not the PhysGrabber C# initializer (4). Do not substitute a fallback.
+            object player = InvokeNoArgMethod(AccessTools.TypeByName("SemiFunc"), "PlayerAvatarLocal");
+            object forceMax = ReadMember(ReadMember(player, "physGrabber"), "forceMax");
+            json.Append(",\"strengthForceMax\":");
+            if (forceMax != null && TryConvertFloat(forceMax, out float maxForce)
+                && !float.IsNaN(maxForce) && !float.IsInfinity(maxForce) && maxForce > 0f)
+                json.Append(maxForce.ToString("R", CultureInfo.InvariantCulture));
+            else
+                json.Append("null");
+        }
+
+        private static string GetMonsterMetadata(EnemyCandidate candidate)
+        {
+            var json = new StringBuilder();
+            AppendMonsterMetadata(json, candidate);
+            return json.ToString();
         }
 
         private static bool ShouldUseLegacyVisionFallback(Component enemyParent)
@@ -2567,8 +2678,10 @@ namespace OverlayHUD
 
         private bool PublishEnemyParentEncounter(Component enemyParent, ref int instanceId, ref string monsterName)
         {
-            if (!rosterPublished) return false;
             if (enemyParent == null) return false;
+            // Opted-in unknowns need not wait for the initial roster's stabilization scans.
+            if (!rosterPublished && !(revealUnknownMonsters.Value
+                && IsUnknownMonster(new EnemyCandidate { Component = enemyParent }))) return false;
 
             GameObject root = GetEnemyRoot(enemyParent);
             if (root == null) return false;
@@ -2594,7 +2707,7 @@ namespace OverlayHUD
             {
                 Logger.LogInfo("Encountered nearby monster: " + monsterName + " from " + enemyParent.GetType().Name + " / " + root.name);
             }
-            StartCoroutine(PostSeenMonster(monsterName, instanceId));
+            StartCoroutine(PostSeenMonster(monsterName, instanceId, GetMonsterMetadata(candidate)));
             SyncEnemyParentStatusChanged(enemyParent);
             return true;
         }
@@ -2884,9 +2997,9 @@ namespace OverlayHUD
             }
         }
 
-        private IEnumerator PostSeenMonster(string monsterName, int instanceId)
+        private IEnumerator PostSeenMonster(string monsterName, int instanceId, string metadata)
         {
-            string json = "{\"name\":\"" + EscapeJson(monsterName) + "\",\"id\":" + instanceId + "}";
+            string json = "{\"name\":\"" + EscapeJson(monsterName) + "\",\"id\":" + instanceId + metadata + "}";
             string endpointUrl = endpoint.Value;
             Task<string> request = QueueNetworkRequest(() => SendHttpPost(endpointUrl, json));
             while (!request.IsCompleted) yield return null;
@@ -2956,7 +3069,7 @@ namespace OverlayHUD
             else
             {
                 Logger.LogWarning("Failed to sync level " + level + " to " + endpointUrl + ": " + TrimHttpResult(result) + ". Trying /api/state fallback.");
-                Task<string> fallbackRequest = QueueNetworkRequest(() => SendStateLevelFallback(level, endpointUrl));
+                Task<string> fallbackRequest = QueueNetworkRequest(() => SendStateLevelFallback(level, levelName, endpointUrl));
                 while (!fallbackRequest.IsCompleted) yield return null;
                 string fallbackResult = fallbackRequest.IsFaulted ? "ERROR:" + fallbackRequest.Exception.GetBaseException().Message : fallbackRequest.Result;
                 if (IsHttpSuccess(fallbackResult))
@@ -3070,10 +3183,10 @@ namespace OverlayHUD
             yield break;
         }
 
-        private static string SendStateLevelFallback(int level, string levelEndpointUrl)
+        private static string SendStateLevelFallback(int level, string levelName, string levelEndpointUrl)
         {
             string stateEndpoint = BuildSiblingEndpoint(levelEndpointUrl, "/api/state");
-            string stateJson = BuildFallbackStateJson(level, SendHttpGet(stateEndpoint));
+            string stateJson = BuildFallbackStateJson(level, levelName, SendHttpGet(stateEndpoint));
             return SendHttpPost(stateEndpoint, "{\"state\":" + stateJson + "}");
         }
 
@@ -3090,7 +3203,7 @@ namespace OverlayHUD
             }
         }
 
-        private static string BuildFallbackStateJson(int level, string getStateResult)
+        private static string BuildFallbackStateJson(int level, string levelName, string getStateResult)
         {
             string body = ExtractHttpBody(getStateResult);
             string stateObject = ExtractJsonObjectProperty(body, "state");
@@ -3100,6 +3213,7 @@ namespace OverlayHUD
             }
 
             stateObject = SetJsonNumberProperty(stateObject, "level", level);
+            stateObject = SetJsonRawProperty(stateObject, "levelName", "\"" + EscapeJson(levelName ?? "") + "\"");
             stateObject = SetJsonBooleanProperty(stateObject, "gameplayVisible", true);
             stateObject = SetJsonNumberProperty(stateObject, "seconds", 0);
             stateObject = SetJsonBooleanProperty(stateObject, "running", true);
@@ -3137,7 +3251,7 @@ namespace OverlayHUD
             var regex = new Regex(pattern);
             if (regex.IsMatch(json))
             {
-                return regex.Replace(json, "$1" + value, 1);
+                return regex.Replace(json, match => match.Groups[1].Value + value, 1);
             }
 
             string trimmed = string.IsNullOrWhiteSpace(json) ? "{}" : json.Trim();
@@ -3329,7 +3443,8 @@ namespace OverlayHUD
             string key = Normalize(raw);
             foreach (KeyValuePair<string, string> pair in KnownMonsters)
             {
-                if (key.Contains(pair.Key)) return pair.Value;
+                // Substring matches misclassify new monsters (e.g. "Shadow Beast").
+                if (key == pair.Key || key == Normalize(pair.Value)) return pair.Value;
             }
 
             return null;
@@ -3353,7 +3468,14 @@ namespace OverlayHUD
 
         private static string EscapeJson(string value)
         {
-            return value.Replace("\\", "\\\\").Replace("\"", "\\\"");
+            var json = new StringBuilder();
+            foreach (char ch in value ?? "")
+            {
+                if (ch == '\\' || ch == '"') json.Append('\\').Append(ch);
+                else if (ch < ' ') json.Append("\\u").Append(((int)ch).ToString("x4", CultureInfo.InvariantCulture));
+                else json.Append(ch);
+            }
+            return json.ToString();
         }
 
         private struct EnemyCandidate

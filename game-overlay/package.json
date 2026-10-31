@@ -1,6 +1,6 @@
 {
   "name": "overlay-hud",
-  "version": "26.10.0",
+  "version": "26.10.5",
   "private": true,
   "license": "MIT",
   "description": "Transparent click-through desktop host for the REPO web overlay",

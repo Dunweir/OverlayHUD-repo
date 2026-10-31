@@ -99,18 +99,20 @@ test('legacy flags still hide globally and clear currency visibility', () => {
     assert.equal(server.getNormalizedOverlayState().currencyVisible, false);
 });
 
-test('normalization preserves flags and position but strips obsolete currencyRect', () => {
+test('server preserves live flags; restart restores position but not gameplay flags or currencyRect', () => {
     const server = loadServer();
     const initial = {
-        ...loadClient().getState(), tabHidden: false, currencyVisible: true,
+        ...loadClient().getState(), tabHidden: true, currencyVisible: true,
         overlayPosition: position('bottom'), currencyRect: { x: 0, y: 0, width: 1, height: 1 }
     };
     const state = server.normalizeOverlayState(initial);
     assert.equal('currencyRect' in state, false);
+    assert.equal(state.tabHidden, true);
+    assert.equal(state.currencyVisible, true);
     assert.equal('currencyRect' in initial, true);
     const client = loadClient(initial);
     client.setSquareSize(80);
-    assert.equal(client.getState().currencyVisible, true);
+    assert.equal(client.getState().currencyVisible, false);
     assert.equal(client.getState().tabHidden, false);
     assert.deepEqual(plain(client.getState().overlayPosition), initial.overlayPosition);
     assert.equal('currencyRect' in client.getState(), false);

@@ -101,6 +101,40 @@ for (const [initial, next, heading, monster, nextHeading] of [
     });
 }
 
+test('unknown timestamp names bypass localization and plural inference in both languages', async () => {
+    const { api, writes } = loadServer();
+    for (const language of ['ru', 'en']) {
+        assert.deepEqual(Array.from(api.formatMonsterTimestampList([
+            { name: 'Robes' }, { name: 'Animal', unknown: true },
+            { name: '  Modded / 未知  ', unknown: true }
+        ], language)), ['Robes', 'Animal', '  Modded / 未知  ']);
+        await api.postState({ interfaceLanguage: language });
+        api.setGameLevel(1, '  Modded Museum / 未知  ');
+        assert.ok(writes.at(-1).text.includes('1   Modded Museum / 未知  \n'));
+        api.setGameLevel(2, 'Museum of Human Arts');
+        assert.match(writes.at(-1).text, /2 Museum\n$/);
+    }
+});
+
+test('timestamp locations omit the game Level prefix in both languages', async () => {
+    for (const language of ['ru', 'en']) {
+        const { api, writes } = loadServer();
+        await api.postState({ interfaceLanguage: language });
+        api.setGameLevel(1, 'Level - New Map');
+        assert.match(writes.at(-1).text, /1 New Map\n$/);
+        assert.doesNotMatch(writes.at(-1).text, /Level -/);
+        api.setGameLevel(2, 'Level - Museum of Human Arts');
+        assert.match(writes.at(-1).text, /2 Museum\n$/);
+        api.setGameLevel(3, 'Mod Level - Annex');
+        assert.match(writes.at(-1).text, /3 Mod Level - Annex\n$/);
+    }
+});
+
+test('line-of-sight detection remains enabled by default', () => {
+    const plugin = fs.readFileSync(`${__dirname}/overlay-hud/Plugin.cs`, 'utf8');
+    assert.match(plugin, /Config\.Bind\("Detection", "RequireLineOfSight", true,/);
+});
+
 test('disabled from startup creates no files, including on shutdown', async () => {
     const { api, writes, directories } = loadServer();
     await api.postState({ saveTimestampsEnabled: false });
