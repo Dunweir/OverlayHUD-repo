@@ -889,7 +889,9 @@ namespace OverlayHUD
             float now = Time.realtimeSinceStartup;
             if (mapValueDirty && now >= nextMapValueSyncAt)
             {
+                long stageStartedAt = Stopwatch.GetTimestamp();
                 SyncMapValueIfChanged();
+                LogSlowScanStage("map value update", stageStartedAt);
             }
             if (now < scanPausedUntil) return;
 
@@ -899,16 +901,20 @@ namespace OverlayHUD
 
             if (pendingUpgradeKeys.Count > 0 && now >= nextUpgradeSyncAt)
             {
+                long stageStartedAt = Stopwatch.GetTimestamp();
                 var keys = new HashSet<string>(pendingUpgradeKeys);
                 pendingUpgradeKeys.Clear();
                 pendingUpgradeSnapshot = StartCoroutine(SyncPlayerUpgradesIfChanged(keys));
+                LogSlowScanStage("upgrade coroutine launch", stageStartedAt);
                 return;
             }
 
             if (rosterPublished && now >= nextStatusSyncAt)
             {
+                long stageStartedAt = Stopwatch.GetTimestamp();
                 nextStatusSyncAt = now + Math.Max(10f, statusInterval.Value);
                 SyncMonsterStatuses(new List<ResolvedEnemyCandidate>(), true);
+                LogSlowScanStage("fallback monster status", stageStartedAt);
             }
 
             if (!enemyRosterDirty) return;
@@ -917,12 +923,22 @@ namespace OverlayHUD
 
             try
             {
+                long stageStartedAt = Stopwatch.GetTimestamp();
                 SyncKnownEnemies();
+                LogSlowScanStage("monster discovery and roster", stageStartedAt);
             }
             catch (Exception error)
             {
                 Logger.LogWarning("Enemy sync failed: " + error.GetType().Name + ": " + error.Message + "\n" + error.StackTrace);
             }
+        }
+
+        private void LogSlowScanStage(string stage, long startedAt)
+        {
+            double elapsedMs = (Stopwatch.GetTimestamp() - startedAt) * 1000.0 / Stopwatch.Frequency;
+            if (elapsedMs >= 4.0)
+                Logger.LogWarning("[Performance] Scan stage " + stage + ": "
+                    + elapsedMs.ToString("0.00", CultureInfo.InvariantCulture) + " ms.");
         }
 
         private void OnDestroy()

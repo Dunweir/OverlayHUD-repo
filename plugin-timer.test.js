@@ -51,7 +51,7 @@ test('initial upgrades, roster and status snapshots are split across Unity frame
         source.indexOf('private void ResetSeenMonsters(')
     );
     assert.match(tick, /if \(pendingUpgradeSnapshot != null\) return;/);
-    assert.match(tick, /pendingUpgradeSnapshot = StartCoroutine\(SyncPlayerUpgradesIfChanged\(keys\)\);\s*return;/);
+    assert.match(tick, /pendingUpgradeSnapshot = StartCoroutine\(SyncPlayerUpgradesIfChanged\(keys\)\);\s*LogSlowScanStage\("upgrade coroutine launch", stageStartedAt\);\s*return;/);
 
     const known = source.slice(
         source.indexOf('private void SyncKnownEnemies('),
