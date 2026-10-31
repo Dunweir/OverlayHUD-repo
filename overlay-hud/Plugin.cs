@@ -166,6 +166,7 @@ namespace OverlayHUD
 
         private readonly Dictionary<string, float> lastSeenLoggedAt = new Dictionary<string, float>();
         private readonly Dictionary<int, string> resolvedMonsterNames = new Dictionary<int, string>();
+        private readonly Dictionary<int, string> rosterMetadataBySourceId = new Dictionary<int, string>();
         private readonly Dictionary<int, int> sourceIdsByEnemyParent = new Dictionary<int, int>();
         private readonly Dictionary<int, bool> lastAliveBySourceId = new Dictionary<int, bool>();
         private readonly Dictionary<int, string> lastHealthDebugBySourceId = new Dictionary<int, string>();
@@ -870,6 +871,9 @@ namespace OverlayHUD
                 var keys = new HashSet<string>(pendingUpgradeKeys);
                 pendingUpgradeKeys.Clear();
                 SyncPlayerUpgradesIfChanged(keys);
+                // Initial upgrades and the enemy roster become ready at roughly the same
+                // time. Keep their reflection-heavy snapshots out of the same Unity frame.
+                return;
             }
 
             if (rosterPublished && now >= nextStatusSyncAt)
@@ -1177,6 +1181,7 @@ namespace OverlayHUD
             }
             lastSeenLoggedAt.Clear();
             resolvedMonsterNames.Clear();
+            rosterMetadataBySourceId.Clear();
             sourceIdsByEnemyParent.Clear();
             lastAliveBySourceId.Clear();
             lastHealthDebugBySourceId.Clear();
@@ -1249,16 +1254,32 @@ namespace OverlayHUD
                 }
                 return;
             }
-            RevealAllKnownEnemies(resolvedEnemies);
-            SyncMonsterStatuses(resolvedEnemies);
-            TryPublishPendingVisionEncounters(resolvedEnemies);
             enemyRosterDirty = false;
+            StartCoroutine(PublishInitialMonsterState(resolvedEnemies));
 
             if (debugLogging.Value && Time.realtimeSinceStartup >= nextDebugSummaryAt)
             {
                 nextDebugSummaryAt = Time.realtimeSinceStartup + 30f;
                 Logger.LogInfo("Enemy sync summary: candidates=" + candidates + ", resolved=" + resolvedEnemies.Count + ".");
             }
+        }
+
+        private IEnumerator PublishInitialMonsterState(List<ResolvedEnemyCandidate> enemies)
+        {
+            // Roster construction is already a sizeable main-thread job. Spread the
+            // remaining initial snapshots so level activation never performs them all
+            // in the frame in which the HUD first becomes visible.
+            yield return null;
+            if (!gameplayActive || !rosterPublished) yield break;
+            RevealAllKnownEnemies(enemies);
+
+            yield return null;
+            if (!gameplayActive || !rosterPublished) yield break;
+            SyncMonsterStatuses(enemies);
+
+            yield return null;
+            if (!gameplayActive || !rosterPublished) yield break;
+            TryPublishPendingVisionEncounters(enemies);
         }
 
         private void TryRevealUnknownEnemy(Component enemyParent)
@@ -1301,9 +1322,13 @@ namespace OverlayHUD
             {
                 ResolvedEnemyCandidate enemy = enemies[index];
                 int instanceId = enemy.Candidate.Root.GetInstanceID();
+                if (!rosterMetadataBySourceId.TryGetValue(instanceId, out string metadata))
+                {
+                    metadata = ",\"tier\":" + GetEnemyTierJson(enemy.Candidate) + GetMonsterMetadata(enemy.Candidate);
+                    rosterMetadataBySourceId[instanceId] = metadata;
+                }
                 fingerprint.Append(instanceId).Append(':').Append(enemy.MonsterName);
-                fingerprint.Append(",\"tier\":").Append(GetEnemyTierJson(enemy.Candidate));
-                AppendMonsterMetadata(fingerprint, enemy.Candidate);
+                fingerprint.Append(metadata);
                 fingerprint.Append(';');
             }
 
@@ -1331,9 +1356,9 @@ namespace OverlayHUD
             {
                 ResolvedEnemyCandidate enemy = enemies[index];
                 if (index > 0) json.Append(',');
-                json.Append("{\"id\":").Append(enemy.Candidate.Root.GetInstanceID()).Append(",\"name\":\"").Append(EscapeJson(enemy.MonsterName)).Append('"');
-                json.Append(",\"tier\":").Append(GetEnemyTierJson(enemy.Candidate));
-                AppendMonsterMetadata(json, enemy.Candidate);
+                int instanceId = enemy.Candidate.Root.GetInstanceID();
+                json.Append("{\"id\":").Append(instanceId).Append(",\"name\":\"").Append(EscapeJson(enemy.MonsterName)).Append('"');
+                json.Append(rosterMetadataBySourceId[instanceId]);
                 json.Append('}');
             }
             json.Append("]}");
@@ -1426,9 +1451,13 @@ namespace OverlayHUD
 
                 // Tier and strength are immutable for a spawned enemy and were already sent
                 // with the roster. Avoid their reflection-heavy lookup in the periodic fallback.
-                string tierMetadata = fallbackSlice ? "" : ",\"tier\":" + GetEnemyTierJson(candidate);
-                string monsterMetadata = fallbackSlice ? "" : GetMonsterMetadata(candidate);
-                fingerprint.Append(tierMetadata).Append(monsterMetadata);
+                string statusMetadata = "";
+                if (!fallbackSlice && !rosterMetadataBySourceId.TryGetValue(instanceId, out statusMetadata))
+                {
+                    statusMetadata = ",\"tier\":" + GetEnemyTierJson(candidate) + GetMonsterMetadata(candidate);
+                    rosterMetadataBySourceId[instanceId] = statusMetadata;
+                }
+                fingerprint.Append(statusMetadata);
                 if (statusCount++ > 0) json.Append(',');
                 json.Append("{\"id\":").Append(instanceId)
                     .Append(",\"alive\":").Append(alive ? "true" : "false")
@@ -1440,7 +1469,7 @@ namespace OverlayHUD
                     json.Append(",\"health\":").Append(healthText.Length > 0 ? healthText : "0");
                     if (maxHealthText.Length > 0) json.Append(",\"maxHealth\":").Append(maxHealthText);
                 }
-                json.Append(tierMetadata).Append(monsterMetadata).Append('}');
+                json.Append(statusMetadata).Append('}');
             }
 
             if (statusCount == 0) return;

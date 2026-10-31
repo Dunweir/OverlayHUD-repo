@@ -41,6 +41,28 @@ test('periodic fallback checks one enemy without rebuilding immutable metadata',
     );
     assert.match(snapshot, /if \(fallbackSlice && sourceIds\.Count > 1\)/);
     assert.match(snapshot, /sourceIds\.Clear\(\);\s*sourceIds\.Add\(selectedId\)/);
-    assert.match(snapshot, /fallbackSlice \? "" : GetMonsterMetadata\(candidate\)/);
+    assert.match(snapshot, /if \(!fallbackSlice && !rosterMetadataBySourceId\.TryGetValue/);
     assert.match(snapshot, /lastFallbackStatusBySourceId/);
+});
+
+test('initial upgrades, roster and status snapshots are split across Unity frames', () => {
+    const tick = source.slice(
+        source.indexOf('private void TickScan('),
+        source.indexOf('private void ResetSeenMonsters(')
+    );
+    assert.match(tick, /SyncPlayerUpgradesIfChanged\(keys\);\s*\/\/[\s\S]*?return;/);
+
+    const known = source.slice(
+        source.indexOf('private void SyncKnownEnemies('),
+        source.indexOf('private void TryRevealUnknownEnemy(')
+    );
+    assert.match(known, /StartCoroutine\(PublishInitialMonsterState\(resolvedEnemies\)\)/);
+    assert.match(known, /yield return null;[\s\S]*RevealAllKnownEnemies\(enemies\);[\s\S]*yield return null;[\s\S]*SyncMonsterStatuses\(enemies\)/);
+});
+
+test('roster metadata is cached and reused by the initial status snapshot', () => {
+    assert.match(source, /rosterMetadataBySourceId\.TryGetValue\(instanceId, out string metadata\)/);
+    assert.match(source, /rosterMetadataBySourceId\[instanceId\] = metadata/);
+    assert.match(source, /!rosterMetadataBySourceId\.TryGetValue\(instanceId, out statusMetadata\)/);
+    assert.match(source, /rosterMetadataBySourceId\.Clear\(\)/);
 });
