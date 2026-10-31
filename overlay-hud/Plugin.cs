@@ -114,8 +114,8 @@ namespace OverlayHUD
 
         private static class PlayerUpgradeTypes
         {
-            internal static readonly Type StatsManager = AccessTools.TypeByName("StatsManager");
-            internal static readonly Type PlayerController = AccessTools.TypeByName("PlayerController");
+            internal static readonly Type StatsManager = ResolveGameType("StatsManager");
+            internal static readonly Type PlayerController = ResolveGameType("PlayerController");
         }
 
         private static readonly Dictionary<string, string> UpgradeStateKeyByPunMethod = new Dictionary<string, string>
@@ -214,13 +214,13 @@ namespace OverlayHUD
 
         private static class GameUiFields
         {
-            private static readonly Type MapType = AccessTools.TypeByName("MapToolController");
-            private static readonly Type CurrencyType = AccessTools.TypeByName("CurrencyUI");
-            private static readonly Type SemiUiType = AccessTools.TypeByName("SemiUI");
+            private static readonly Type MapType = ResolveGameType("MapToolController");
+            private static readonly Type CurrencyType = ResolveGameType("CurrencyUI");
+            private static readonly Type SemiUiType = ResolveGameType("SemiUI");
 
-            private static readonly Type DirectorType = AccessTools.TypeByName("GameDirector");
-            private static readonly Type LoadingType = AccessTools.TypeByName("LoadingUI");
-            private static readonly Type PlayerType = AccessTools.TypeByName("PlayerController");
+            private static readonly Type DirectorType = ResolveGameType("GameDirector");
+            private static readonly Type LoadingType = ResolveGameType("LoadingUI");
+            private static readonly Type PlayerType = ResolveGameType("PlayerController");
 
             internal static readonly FieldInfo MapInstance = Find(MapType, "instance");
             internal static readonly FieldInfo MapVisual = Find(MapType, "VisualTransform");
@@ -261,6 +261,8 @@ namespace OverlayHUD
         private void Awake()
         {
             instance = this;
+            foreach (string typeName in new[] { "StatsManager", "PlayerController", "MapToolController", "CurrencyUI", "SemiUI", "GameDirector", "LoadingUI", "RunManager", "LevelGenerator", "SemiFunc", "ValuableObject", "RoundDirector", "PlayerAvatar" })
+                ResolveGameType(typeName);
             KeepPluginObjectAlive();
             endpoint = Config.Bind("Overlay", "Endpoint", "http://127.0.0.1:8787/api/monster-seen", "Monster endpoint on this PC.");
             levelEndpoint = Config.Bind("Overlay", "LevelEndpoint", "http://127.0.0.1:8787/api/level", "Level sync endpoint on this PC.");
@@ -1876,7 +1878,7 @@ namespace OverlayHUD
 
         private int ResolveCurrentLevel()
         {
-            Type runManagerType = AccessTools.TypeByName("RunManager");
+            Type runManagerType = ResolveGameType("RunManager");
             object runManager = ReadMember(runManagerType, "instance");
             object levelsCompletedValue = ReadMember(runManager, "levelsCompleted");
             if (levelsCompletedValue != null)
@@ -1901,7 +1903,7 @@ namespace OverlayHUD
 
         private static bool IsRegularGameplayLevel()
         {
-            Type runManagerType = AccessTools.TypeByName("RunManager");
+            Type runManagerType = ResolveGameType("RunManager");
             object runManager = ReadMember(runManagerType, "instance");
             object currentLevel = ReadMember(runManager, "levelCurrent");
             object levelsValue = ReadMember(runManager, "levels");
@@ -1912,7 +1914,7 @@ namespace OverlayHUD
 
         private static bool IsGameplayLevelCandidate(out string details, bool allowExpensiveFallback = false)
         {
-            Type runManagerType = AccessTools.TypeByName("RunManager");
+            Type runManagerType = ResolveGameType("RunManager");
             object runManager = ReadMember(runManagerType, "instance");
             object currentLevel = ReadMember(runManager, "levelCurrent");
             object levelsValue = ReadMember(runManager, "levels");
@@ -1950,7 +1952,7 @@ namespace OverlayHUD
 
         private static bool HasActiveLevelGenerator()
         {
-            Type levelGeneratorType = AccessTools.TypeByName("LevelGenerator");
+            Type levelGeneratorType = ResolveGameType("LevelGenerator");
             if (levelGeneratorType == null) return false;
             UnityEngine.Object[] generators = Resources.FindObjectsOfTypeAll(levelGeneratorType);
             for (int index = 0; index < generators.Length; index++)
@@ -1965,7 +1967,7 @@ namespace OverlayHUD
 
         private static bool IsLevelGenerated()
         {
-            Type levelGeneratorType = AccessTools.TypeByName("LevelGenerator");
+            Type levelGeneratorType = ResolveGameType("LevelGenerator");
             object levelGenerator = ReadMember(levelGeneratorType, "Instance") ?? ReadMember(levelGeneratorType, "instance");
             object generated = ReadMember(levelGenerator, "Generated");
             return generated is bool value && value;
@@ -2009,7 +2011,7 @@ namespace OverlayHUD
 
         private static bool IsNonGameplayContext()
         {
-            Type runManagerType = AccessTools.TypeByName("RunManager");
+            Type runManagerType = ResolveGameType("RunManager");
             object runManager = ReadMember(runManagerType, "instance");
             string currentLevelName = DescribeLevelObject(ReadMember(runManager, "levelCurrent"));
             string activeSceneName = SceneManager.GetActiveScene().name;
@@ -2030,21 +2032,21 @@ namespace OverlayHUD
 
         private static bool IsRunLevel()
         {
-            Type semiFuncType = AccessTools.TypeByName("SemiFunc");
+            Type semiFuncType = ResolveGameType("SemiFunc");
             object result = InvokeNoArgMethod(semiFuncType, "RunIsLevel");
             return result is bool value && value;
         }
 
         private static bool IsMasterClientOrSingleplayer()
         {
-            Type semiFuncType = AccessTools.TypeByName("SemiFunc");
+            Type semiFuncType = ResolveGameType("SemiFunc");
             object result = InvokeNoArgMethod(semiFuncType, "IsMasterClientOrSingleplayer");
             return !(result is bool value) || value;
         }
 
         private static float CalculateMapValue()
         {
-            Type valuableType = AccessTools.TypeByName("ValuableObject");
+            Type valuableType = ResolveGameType("ValuableObject");
             if (valuableType == null) return 0f;
 
             long startedAt = Stopwatch.GetTimestamp();
@@ -2069,7 +2071,7 @@ namespace OverlayHUD
 
         private static int? ResolveExtractionGoal()
         {
-            Type roundDirectorType = AccessTools.TypeByName("RoundDirector");
+            Type roundDirectorType = ResolveGameType("RoundDirector");
             object roundDirector = ReadMember(roundDirectorType, "instance");
             object goal = ReadMember(roundDirector, "extractionHaulGoal");
             if (goal == null) return null;
@@ -2121,7 +2123,7 @@ namespace OverlayHUD
             int key = GetValuableKey(source);
             if (key != 0 && valuablesInDollarHaul.Contains(key)) return true;
 
-            object roundDirector = ReadMember(AccessTools.TypeByName("RoundDirector"), "instance");
+            object roundDirector = ReadMember(ResolveGameType("RoundDirector"), "instance");
             if (!(ReadMember(roundDirector, "dollarHaulList") is IEnumerable dollarHaulList)) return false;
 
             foreach (object item in dollarHaulList)
@@ -2213,7 +2215,7 @@ namespace OverlayHUD
 
         private string ResolveCurrentLevelName()
         {
-            Type runManagerType = AccessTools.TypeByName("RunManager");
+            Type runManagerType = ResolveGameType("RunManager");
             object runManager = ReadMember(runManagerType, "instance");
             object currentLevel = ReadMember(runManager, "levelCurrent");
             string levelName = DescribeLevelObject(currentLevel);
@@ -2680,7 +2682,7 @@ namespace OverlayHUD
 
             // PhysGrabObject caps displacement at this serialized value (vanilla 6),
             // not the PhysGrabber C# initializer (4). Do not substitute a fallback.
-            object player = InvokeNoArgMethod(AccessTools.TypeByName("SemiFunc"), "PlayerAvatarLocal");
+            object player = InvokeNoArgMethod(ResolveGameType("SemiFunc"), "PlayerAvatarLocal");
             object forceMax = ReadMember(ReadMember(player, "physGrabber"), "forceMax");
             json.Append(",\"strengthForceMax\":");
             if (forceMax != null && TryConvertFloat(forceMax, out float maxForce)
@@ -3000,7 +3002,7 @@ namespace OverlayHUD
 
         private static int ResolveLocalPlayerViewId()
         {
-            object localViewId = InvokeNoArgMethod(AccessTools.TypeByName("SemiFunc"), "PhotonViewIDPlayerAvatarLocal");
+            object localViewId = InvokeNoArgMethod(ResolveGameType("SemiFunc"), "PhotonViewIDPlayerAvatarLocal");
             if (localViewId != null)
             {
                 try
@@ -3012,10 +3014,23 @@ namespace OverlayHUD
                 }
             }
 
-            object player = InvokeNoArgMethod(AccessTools.TypeByName("SemiFunc"), "PlayerAvatarLocal");
-            if (player == null) player = ReadMember(AccessTools.TypeByName("PlayerAvatar"), "instance");
+            object player = InvokeNoArgMethod(ResolveGameType("SemiFunc"), "PlayerAvatarLocal");
+            if (player == null) player = ReadMember(ResolveGameType("PlayerAvatar"), "instance");
             object photonView = ReadMember(player, "photonView");
             return ReadIntMember(photonView, "ViewID");
+        }
+
+        private static readonly Dictionary<string, Type> gameTypeCache = new Dictionary<string, Type>();
+
+        private static Type ResolveGameType(string name)
+        {
+            lock (gameTypeCache)
+            {
+                if (gameTypeCache.TryGetValue(name, out Type cached)) return cached;
+                Type resolved = Type.GetType(name + ", Assembly-CSharp") ?? AccessTools.TypeByName(name);
+                if (resolved != null) gameTypeCache[name] = resolved;
+                return resolved;
+            }
         }
 
         private static object ReadMember(object source, string memberName)
