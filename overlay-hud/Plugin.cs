@@ -20,7 +20,7 @@ using UnityEngine.SceneManagement;
 
 namespace OverlayHUD
 {
-    [BepInPlugin("local.overlay.overlay_hud", "OverlayHUD", "26.10.5")]
+    [BepInPlugin("local.overlay.overlay_hud", "OverlayHUD", "26.11.0")]
     public sealed class Plugin : BaseUnityPlugin
     {
         private static Plugin instance;
@@ -1514,22 +1514,25 @@ namespace OverlayHUD
 
             if (!TryGetEnemyRespawnStatus(candidate, out bool alive, out float remaining)) return;
 
-            float roundedRemaining = alive ? 0f : (float)Math.Ceiling(Math.Max(0f, remaining) * 10f) / 10f;
-            string remainingText = roundedRemaining.ToString("0.0", CultureInfo.InvariantCulture);
-            string monsterMetadata = GetMonsterMetadata(candidate);
-            string fingerprint = instanceId + ":" + (alive ? "1" : "0") + ":" + remainingText + monsterMetadata;
             bool aliveChanged = !lastAliveBySourceId.TryGetValue(instanceId, out bool previousAlive) || previousAlive != alive;
-            if (!aliveChanged
-                && lastTimerStatusBySourceId.TryGetValue(instanceId, out string previousFingerprint)
-                && previousFingerprint == fingerprint)
-            {
-                return;
-            }
+            // Live enemies have no countdown. Metadata is synced by roster/status updates,
+            // not by this frequent timer hook.
+            if (!aliveChanged && alive) return;
 
             float now = Time.realtimeSinceStartup;
             if (!aliveChanged
                 && lastTimerStatusSentAtBySourceId.TryGetValue(instanceId, out float lastSentAt)
                 && now - lastSentAt < 0.5f)
+            {
+                return;
+            }
+
+            float roundedRemaining = alive ? 0f : (float)Math.Ceiling(Math.Max(0f, remaining) * 10f) / 10f;
+            string remainingText = roundedRemaining.ToString("0.0", CultureInfo.InvariantCulture);
+            string fingerprint = instanceId + ":" + (alive ? "1" : "0") + ":" + remainingText;
+            if (!aliveChanged
+                && lastTimerStatusBySourceId.TryGetValue(instanceId, out string previousFingerprint)
+                && previousFingerprint == fingerprint)
             {
                 return;
             }
@@ -1542,7 +1545,6 @@ namespace OverlayHUD
                 .Append(instanceId)
                 .Append(",\"alive\":").Append(alive ? "true" : "false")
                 .Append(",\"respawnRemaining\":").Append(remainingText)
-                .Append(monsterMetadata)
                 .Append("}]}");
             StartCoroutine(PostMonsterStatuses(json.ToString()));
         }
