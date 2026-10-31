@@ -66,7 +66,7 @@ test('initial upgrade reflection reads are limited to one table per frame', () =
         source.indexOf('private IEnumerator SyncPlayerUpgradesIfChanged('),
         source.indexOf('private static int? ResolveLocalPlayerUpgrade(')
     );
-    assert.match(upgrades, /ResolveLocalPlayerUpgrade\(statsManager, steamId, binding\.Value\);\s*yield return null;/);
+    assert.match(upgrades, /ResolveLocalPlayerUpgrade\(statsManager, steamId, binding\.Value\);[^]*?yield return null;\s*if \(!gameplayActive\)/);
     assert.match(upgrades, /pendingUpgradeSnapshot = null;/);
     assert.match(source, /StopCoroutine\(pendingUpgradeSnapshot\);\s*pendingUpgradeSnapshot = null;/);
 });

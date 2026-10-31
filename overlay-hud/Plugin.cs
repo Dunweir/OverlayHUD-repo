@@ -870,6 +870,21 @@ namespace OverlayHUD
 
         private void TickScan()
         {
+            long startedAt = Stopwatch.GetTimestamp();
+            try
+            {
+                TickScanCore();
+            }
+            finally
+            {
+                double elapsedMs = (Stopwatch.GetTimestamp() - startedAt) * 1000.0 / Stopwatch.Frequency;
+                if (elapsedMs >= 8.0)
+                    Logger.LogWarning("[Performance] TickScan: " + elapsedMs.ToString("0.00", CultureInfo.InvariantCulture) + " ms.");
+            }
+        }
+
+        private void TickScanCore()
+        {
             if (!gameplayActive) return;
             float now = Time.realtimeSinceStartup;
             if (mapValueDirty && now >= nextMapValueSyncAt)
@@ -2259,8 +2274,7 @@ namespace OverlayHUD
 
         private IEnumerator SyncPlayerUpgradesIfChanged(HashSet<string> onlyKeys = null)
         {
-            // Start on the next frame and read one upgrade table per frame. Accessing all
-            // StatsManager dictionaries in one Update caused a visible level-start hitch.
+            // Spread the initial reads across frames to limit their per-frame cost.
             yield return null;
             if (!gameplayActive)
             {
@@ -2269,15 +2283,28 @@ namespace OverlayHUD
             }
 
             // Resolve live instances once per snapshot, not once for every upgrade.
+            long setupStartedAt = Stopwatch.GetTimestamp();
             object statsManager = ReadMember(PlayerUpgradeTypes.StatsManager, "instance");
             string steamId = ResolveLocalPlayerSteamId();
+            double setupMs = (Stopwatch.GetTimestamp() - setupStartedAt) * 1000.0 / Stopwatch.Frequency;
+            double totalReadMs = 0;
+            double maxReadMs = 0;
+            string slowestKey = "none";
             var json = new StringBuilder("{\"upgrades\":{");
             int changedCount = 0;
             for (int index = 0; index < TrackedPlayerUpgrades.Length; index++)
             {
                 KeyValuePair<string, string> binding = TrackedPlayerUpgrades[index];
                 if (onlyKeys != null && !onlyKeys.Contains(binding.Key)) continue;
+                long readStartedAt = Stopwatch.GetTimestamp();
                 int? value = ResolveLocalPlayerUpgrade(statsManager, steamId, binding.Value);
+                double readMs = (Stopwatch.GetTimestamp() - readStartedAt) * 1000.0 / Stopwatch.Frequency;
+                totalReadMs += readMs;
+                if (readMs > maxReadMs)
+                {
+                    maxReadMs = readMs;
+                    slowestKey = binding.Key;
+                }
                 yield return null;
                 if (!gameplayActive)
                 {
@@ -2298,6 +2325,10 @@ namespace OverlayHUD
                 StartCoroutine(PostPlayerUpgrades(json.ToString(), changedCount));
             }
             pendingUpgradeSnapshot = null;
+            Logger.LogInfo("[Performance] Initial upgrades: setup=" + setupMs.ToString("0.00", CultureInfo.InvariantCulture)
+                + " ms, total reads=" + totalReadMs.ToString("0.00", CultureInfo.InvariantCulture)
+                + " ms, max read=" + maxReadMs.ToString("0.00", CultureInfo.InvariantCulture)
+                + " ms (" + slowestKey + "), changed=" + changedCount + ".");
         }
 
         private static int? ResolveLocalPlayerUpgrade(object statsManager, string steamId, string memberName)
