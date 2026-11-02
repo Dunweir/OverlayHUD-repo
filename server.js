@@ -400,6 +400,7 @@ function getMonsterLevel(monsterName) {
 }
 
 function getMonsterFileName(monsterName) {
+    if (["snatcher", "pony", "пони"].includes(monsterName.toLowerCase())) return "snatcher";
     const replacements = {
         peeper: "eye_monster",
         peepers: "eye_monster",
@@ -487,7 +488,7 @@ function createMonsterEntry(monsterName, level, isReplacement, sourceId = null) 
         level,
         tier: null,
         name: monsterName,
-        image: unknown ? "assets/monsters/new.webp" : `assets/monsters/${getMonsterFileName(monsterName)}.webp`,
+        image: unknown && getMonsterFileName(monsterName) !== "snatcher" ? "assets/monsters/new.webp" : `assets/monsters/${getMonsterFileName(monsterName)}.webp`,
         ...(unknown ? { unknown: true } : {}),
         count: unknown ? null : getMonsterCount(monsterName, level, isReplacement),
         strength: undefined,
@@ -883,7 +884,7 @@ function updateMonsterStatuses(rawStatuses, replay = false) {
             strength: slot ? slot.strength : getSourceStrength(rawId == null ? [] : [rawId]),
             ...(slot?.unknown ? {
                 name: slot.name || monster.name, unknown: true, level: 1,
-                image: "assets/monsters/new.webp", count: null, strength: slot.strength
+                image: getMonsterFileName(slot.name || monster.name) === "snatcher" ? "assets/monsters/snatcher.webp" : "assets/monsters/new.webp", count: null, strength: slot.strength
             } : {})
         };
     }).filter((monster) => {

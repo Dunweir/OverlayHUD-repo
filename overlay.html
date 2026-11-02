@@ -1160,13 +1160,14 @@
             square.dataset.monsterKey = monsterKey;
             if (shouldReveal) square.dataset.imagePending = monster.image;
             configureMonsterCooldown(square, status);
+            const usesUnknownIcon = monster.image === "assets/monsters/new.webp";
             let shimmer = square.querySelector(".monster-unknown-shimmer");
-            if (monster.unknown === true && !shimmer) {
+            if (usesUnknownIcon && !shimmer) {
                 shimmer = document.createElement("div");
                 shimmer.className = "monster-unknown-shimmer";
                 shimmer.setAttribute("aria-hidden", "true");
                 square.appendChild(shimmer);
-            } else if (monster.unknown !== true && shimmer) {
+            } else if (!usesUnknownIcon && shimmer) {
                 shimmer.remove();
             }
 

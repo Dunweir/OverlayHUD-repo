@@ -435,6 +435,7 @@ const OverlayApp = (() => {
     }
 
     function getMonsterFileName(monsterName) {
+        if (["snatcher", "pony", "пони"].includes(monsterName.toLowerCase())) return "snatcher";
         const replacements = {
             peeper: "eye_monster",
             peepers: "eye_monster",
