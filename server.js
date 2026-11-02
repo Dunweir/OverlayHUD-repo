@@ -712,7 +712,9 @@ function normalizeTimestampMonsterName(name) {
 
 function formatMonsterTimestampList(monsters, language) {
     return getMonsterTotals(monsters).map(({ name, count, unknown }) => {
-        const label = language === "ru" && !unknown ? timestampMonsterNamesRu[name] || name : name;
+        const label = normalizeMonsterKey(name) === "snatcher"
+            ? (language === "ru" ? "Пони" : "Pony")
+            : language === "ru" && !unknown ? timestampMonsterNamesRu[name] || name : name;
         return count > 1 ? `${label} x${count}` : label;
     });
 }

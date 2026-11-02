@@ -20,7 +20,7 @@ using UnityEngine.SceneManagement;
 
 namespace OverlayHUD
 {
-    [BepInPlugin("local.overlay.overlay_hud", "OverlayHUD", "26.11.0")]
+    [BepInPlugin("local.overlay.overlay_hud", "OverlayHUD", "26.11.1")]
     public sealed class Plugin : BaseUnityPlugin
     {
         private static Plugin instance;
@@ -969,7 +969,7 @@ namespace OverlayHUD
         private void OnSceneLoaded(Scene scene, LoadSceneMode mode)
         {
             if (!gameplayActive) return;
-            if (IsRunLevel() || IsRunLevelName(scene.name)) return;
+            if (!IsNonGameplayContext() && (IsRunLevel() || IsRunLevelName(scene.name))) return;
             HandleLevelChanging();
         }
 
@@ -1919,7 +1919,7 @@ namespace OverlayHUD
             object currentLevel = ReadMember(runManager, "levelCurrent");
             object levelsValue = ReadMember(runManager, "levels");
             string currentLevelName = DescribeLevelObject(currentLevel);
-            bool nonGameplayCurrent = IsNonGameplayLevelName(currentLevelName);
+            bool nonGameplayCurrent = IsNonGameplayContext();
             bool listedLevel = !nonGameplayCurrent && currentLevel != null && levelsValue is IList levels && levels.Contains(currentLevel);
             bool namedLevel = IsNamedRunLevel(currentLevel);
             bool runLevel = !nonGameplayCurrent && IsRunLevel();
@@ -2006,6 +2006,8 @@ namespace OverlayHUD
                 && (levelName.IndexOf("Lobby", StringComparison.OrdinalIgnoreCase) >= 0
                     || levelName.IndexOf("Menu", StringComparison.OrdinalIgnoreCase) >= 0
                     || levelName.IndexOf("Shop", StringComparison.OrdinalIgnoreCase) >= 0
+                    || levelName.IndexOf("Tutorial", StringComparison.OrdinalIgnoreCase) >= 0
+                    || levelName.IndexOf("Arena", StringComparison.OrdinalIgnoreCase) >= 0
                     || levelName.IndexOf("Splash", StringComparison.OrdinalIgnoreCase) >= 0);
         }
 
@@ -2013,7 +2015,13 @@ namespace OverlayHUD
         {
             Type runManagerType = ResolveGameType("RunManager");
             object runManager = ReadMember(runManagerType, "instance");
-            string currentLevelName = DescribeLevelObject(ReadMember(runManager, "levelCurrent"));
+            object currentLevel = ReadMember(runManager, "levelCurrent");
+            // The game's classification excludes tutorial and all death arenas, even
+            // when their assets have ordinary "Level - ..." names.
+            if (currentLevel != null
+                && InvokeNoArgMethod(ResolveGameType("SemiFunc"), "RunIsLevel") is bool runLevel
+                && !runLevel) return true;
+            string currentLevelName = DescribeLevelObject(currentLevel);
             string activeSceneName = SceneManager.GetActiveScene().name;
             return IsNonGameplayLevelName(currentLevelName) || IsNonGameplayLevelName(activeSceneName);
         }
@@ -2658,6 +2666,12 @@ namespace OverlayHUD
         {
             if (IsUnknownMonster(candidate)) json.Append(",\"unknown\":true");
             json.Append(",\"strength\":");
+            // Peeper cannot be grabbed and has no usable grab-force metadata.
+            if (ResolveMonsterName(GetEnemyParent(candidate)) == "Peeper")
+            {
+                json.Append("\"impossible\"");
+                return;
+            }
             Component enemy = candidate.Root == null ? null : candidate.Root.GetComponent("Enemy");
             object body = ReadMember(enemy, "Rigidbody");
             if (body == null && candidate.Root != null) body = candidate.Root.GetComponent("EnemyRigidbody");

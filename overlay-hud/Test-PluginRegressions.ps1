@@ -32,6 +32,9 @@ public class PluginRegressionTests
     float mapValue = 1000, lostValue;
     static readonly HashSet<int> destroyedValuablesAccounted = new HashSet<int>();
     readonly List<string> posts = new List<string>();
+    readonly Dictionary<int, string> rosterMetadataBySourceId = new Dictionary<int, string>();
+    static string GetEnemyTierJson(EnemyCandidate candidate) { return "1"; }
+    static string GetMonsterMetadata(EnemyCandidate candidate) { return ""; }
     static bool IsRunLevel() { return true; }
     static Component GetValuableComponent(object source) { return source as Component; }
     static float ReadValuableCurrentValue(Component value) { return value.Current; }
@@ -129,7 +132,46 @@ $project = Join-Path $testDirectory 'PluginRegressionTests.csproj'
 </Project>
 '@ | Set-Content $project -Encoding UTF8
 $code = $harness.Replace('// METHODS', ($methods -join "`n"))
-$code += "`npublic static class Program { public static void Main() { PluginRegressionTests.Run(); } }"
+$contextHarness = @'
+public class GameplayContextTests
+{
+    static object runLevel;
+    static string levelName;
+    static string sceneName;
+    static System.Type ResolveGameType(string name) { return typeof(GameplayContextTests); }
+    static object ReadMember(object source, string name) { return name == "levelCurrent" ? levelName : (object)typeof(GameplayContextTests); }
+    static object InvokeNoArgMethod(object source, string name) { return runLevel; }
+    static string DescribeLevelObject(object level) { return (string)level; }
+    static class SceneManager
+    {
+        public struct Scene { public string name; }
+        public static Scene GetActiveScene() { return new Scene { name = sceneName }; }
+    }
+    static void Check(string level, string scene, object classification, bool expected)
+    {
+        levelName = level; sceneName = scene; runLevel = classification;
+        if (IsNonGameplayContext() != expected) throw new Exception("Context failed: " + level);
+        Console.WriteLine("PASS: gameplay context " + level + " / " + scene);
+    }
+    public static void Run()
+    {
+        Check("Level - Manor", "Main", true, false);
+        Check("Level - Tutorial", "Main", false, true);
+        Check("Level - Arena", "Main", false, true);
+        Check("Level - Custom Death Arena", "Main", false, true);
+        Check("Level - Special", "Main", false, true);
+        Check("Level - Tutorial", "Main", null, true);
+        Check("Level - Arena", "Main", null, true);
+        Check("Level - Manor", "Level - Arena", true, true);
+        Check("Level - Modded", "Main", null, false);
+        Check("Level - Shop", "Main", false, true);
+    }
+    // CONTEXT METHODS
+}
+'@
+$contextMethods = @('IsNonGameplayContext', 'IsNonGameplayLevelName') | ForEach-Object { Get-PluginMethod $_ }
+$code += $contextHarness.Replace('// CONTEXT METHODS', ($contextMethods -join "`n"))
+$code += "`npublic static class Program { public static void Main() { PluginRegressionTests.Run(); GameplayContextTests.Run(); } }"
 $code | Set-Content (Join-Path $testDirectory 'Program.cs') -Encoding UTF8
 & dotnet build $project -c Release --nologo
 if ($LASTEXITCODE -ne 0) { throw 'Regression harness build failed' }
