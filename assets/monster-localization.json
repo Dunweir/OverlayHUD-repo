@@ -1,0 +1,122 @@
+{
+  "ENEMY.ANIMAL": {
+    "en": "Animal",
+    "ru": "Животное"
+  },
+  "ENEMY.BANG": {
+    "en": "Banger",
+    "ru": "Взрывник"
+  },
+  "ENEMY.BEAMER": {
+    "en": "Clown",
+    "ru": "Шут"
+  },
+  "ENEMY.BIRTHDAY_BOY": {
+    "en": "Birthday Boy",
+    "ru": "Именинник"
+  },
+  "ENEMY.BOMB_THROWER": {
+    "en": "Cleanup Crew",
+    "ru": "Уборочная бригада"
+  },
+  "ENEMY.BOWTIE": {
+    "en": "Bowtie",
+    "ru": "Бабочкин"
+  },
+  "ENEMY.CEILING_EYE": {
+    "en": "Peeper",
+    "ru": "Смотритель"
+  },
+  "ENEMY.DUCK": {
+    "en": "Apex Predator",
+    "ru": "Высший хищник"
+  },
+  "ENEMY.ELSA": {
+    "en": "Elsa",
+    "ru": "Эльза"
+  },
+  "ENEMY.FLOATER": {
+    "en": "Mentalist",
+    "ru": "Телепат"
+  },
+  "ENEMY.GNOME": {
+    "en": "Gnome",
+    "ru": "Гном"
+  },
+  "ENEMY.HEAD": {
+    "en": "Headman",
+    "ru": "Главарь"
+  },
+  "ENEMY.HEAD_GRABBER": {
+    "en": "Headgrab",
+    "ru": "Главохват"
+  },
+  "ENEMY.HEART_HUGGER": {
+    "en": "Heart Hugger",
+    "ru": "Сердцежим"
+  },
+  "ENEMY.HIDDEN": {
+    "en": "Hidden",
+    "ru": "Неизвестный"
+  },
+  "ENEMY.HUNTER": {
+    "en": "Huntsman",
+    "ru": "Охотник"
+  },
+  "ENEMY.OOGLY": {
+    "en": "Oogly",
+    "ru": "Чердачник"
+  },
+  "ENEMY.ROBE": {
+    "en": "Robe",
+    "ru": "Мантия"
+  },
+  "ENEMY.RUNNER": {
+    "en": "Reaper",
+    "ru": "Пугалка"
+  },
+  "ENEMY.SHADOW": {
+    "en": "Loom",
+    "ru": "Иллюзия"
+  },
+  "ENEMY.SLOW_MOUTH": {
+    "en": "Spewer",
+    "ru": "Блевотник"
+  },
+  "ENEMY.SLOW_WALKER": {
+    "en": "Trudge",
+    "ru": "Шагатель"
+  },
+  "ENEMY.SPINNY": {
+    "en": "Gambit",
+    "ru": "Рулетка"
+  },
+  "ENEMY.THIN_MAN": {
+    "en": "Shadow Child",
+    "ru": "Дитя Тени"
+  },
+  "ENEMY.TICK": {
+    "en": "Tick",
+    "ru": "Клещ"
+  },
+  "ENEMY.TRICYCLE": {
+    "en": "Bella",
+    "ru": "Динь"
+  },
+  "ENEMY.TUMBLER": {
+    "en": "Chef",
+    "ru": "Повар"
+  },
+  "ENEMY.UPSCREAM": {
+    "en": "Upscream",
+    "ru": "Крикун"
+  },
+  "ENEMY.VALUABLE_THROWER": {
+    "en": "Rugrat",
+    "ru": "Спиногрыз"
+  },
+  "ENEMY.SNATCHER": {
+    "en": "Pony",
+    "ru": "Пони"
+  }
+}

@@ -21,7 +21,7 @@ using UnityEngine.SceneManagement;
 namespace OverlayHUD
 {
     [BepInPlugin("local.overlay.overlay_hud", "OverlayHUD", "26.11.1")]
-    public sealed class Plugin : BaseUnityPlugin
+    public sealed partial class Plugin : BaseUnityPlugin
     {
         private static Plugin instance;
         private static readonly List<string> seenMonsters = new List<string>();
@@ -311,6 +311,7 @@ namespace OverlayHUD
 
             StartOverlayAppIfNeeded();
             PatchGameUpdates();
+            StartCoroutine(SyncMonsterLocalization());
         }
 
         private void StartOverlayAppIfNeeded()

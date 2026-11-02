@@ -272,7 +272,7 @@ test('known monsters use game strength and retain image, localization and partia
     assert.equal(current.roster[0].health, 25);
     await request('monster-seen', { id: 9, name: '  New Beast / 未知  ' });
     await request('level', { level: 2, levelName: 'Swiftbroom Academy' });
-    assert.ok(writes.at(-1).includes('Modded Museum Annex / 地下 [Зверь,   New Beast / 未知  ]'));
+    assert.ok(writes.at(-1).includes('Modded Museum Annex / 地下 [Животное,   New Beast / 未知  ]'));
     assert.match(writes.at(-1), /Уровень 2 Wizard\n$/);
 });
 

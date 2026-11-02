@@ -19,6 +19,10 @@ Content-Type: application/json
 
 It also posts level changes, overlay visibility, Tab hide state, player upgrades, map value, monster roster, and monster health/respawn status to sibling `/api/...` endpoints.
 
+`POST /api/monster-localization` sends `{ "names": { "ENEMY.SNATCHER": { "en": "Pony", "ru": "Пони" } } }` from the game's `HUD` string tables. The plugin asynchronously loads `en-US` and `ru-RU` without changing the selected game locale, retries delivery on failure, and republishes every minute so a restarted desktop server receives the current names. Internal monster identities and counts are unchanged.
+
+The fallback in `assets/monster-localization.json` is extracted from the installed game bundles (30 enemies in the current snapshot). Refresh it with `uv run --with UnityPy==1.25.4 python tools/extract-monster-localization.py "C:/Program Files (x86)/Steam/steamapps/common/REPO/REPO_Data"` from the repository root. The extraction joins shared string IDs with both locales and fails if either translation is missing. The normal Electron packaging command includes this file through `assets/`.
+
 ## Config
 
 BepInEx creates `local.overlay.overlay_hud.cfg` after first launch. Current settings are:

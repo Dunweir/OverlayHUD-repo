@@ -20,31 +20,67 @@ function loadServer() {
             getNormalizedOverlayState };
     `, context);
     const api = context.api;
-    api.postState = (state) => new Promise((resolve, reject) => {
-        const request = Readable.from([JSON.stringify({ state })]);
+    api.post = (url, payload) => new Promise((resolve) => {
+        const request = Readable.from([JSON.stringify(payload)]);
         request.method = 'POST';
-        request.url = '/api/state';
+        request.url = url;
+        let status;
         api.server.emit('request', request, {
-            writeHead(code) { if (code !== 200) reject(new Error(`HTTP ${code}`)); },
-            end(body) { resolve(JSON.parse(body)); }
+            writeHead(code) { status = code; },
+            end(body) { resolve({ status, body: JSON.parse(body) }); }
         });
     });
+    api.postState = async (state) => {
+        const result = await api.post('/api/state', { state });
+        assert.equal(result.status, 200);
+        return result.body;
+    };
     api.patchState = (patch) => api.postState({ ...api.getNormalizedOverlayState(), ...patch });
     return { api, writes, directories };
 }
 
 const translations = {
-    'Animal': 'Зверь', 'Apex Predator': 'Утка', 'Banger': 'Черепа',
-    'Bella': 'Белла', 'Birthday Boy': 'Именинник', 'Bowtie': 'Бабочка',
-    'Chef': 'Повар', 'Cleanup Crew': 'Уборщик', 'Clown': 'Клоун',
-    'Elsa': 'Эльза', 'Gambit': 'Гамбит', 'Gnomes': 'Гномы',
-    'Headgrab': 'Хэдграб', 'Headman': 'Хэдмен', 'Heart Hugger': 'Сердцеед',
-    'Hidden': 'Невидимка', 'Huntsman': 'Охотник', 'Loom': 'Лум',
-    'Mentalist': 'Менталист', 'Oogly': 'Угли', 'Peeper': 'Глаз',
-    'Reaper': 'Жнец', 'Robe': 'Роба', 'Rugrat': 'Карапуз',
-    'Shadow Child': 'Теневой ребёнок', 'Spewer': 'Плевун',
-    'Tick': 'Клещ', 'Trudge': 'Топтун', 'Upscream': 'Крикун'
+    'Animal': 'Животное', 'Apex Predator': 'Высший хищник', 'Banger': 'Взрывник',
+    'Bella': 'Динь', 'Birthday Boy': 'Именинник', 'Bowtie': 'Бабочкин',
+    'Chef': 'Повар', 'Cleanup Crew': 'Уборочная бригада', 'Clown': 'Шут',
+    'Elsa': 'Эльза', 'Gambit': 'Рулетка', 'Gnomes': 'Гном',
+    'Headgrab': 'Главохват', 'Headman': 'Главарь', 'Heart Hugger': 'Сердцежим',
+    'Hidden': 'Неизвестный', 'Huntsman': 'Охотник', 'Loom': 'Иллюзия',
+    'Mentalist': 'Телепат', 'Oogly': 'Чердачник', 'Peeper': 'Смотритель',
+    'Reaper': 'Пугалка', 'Robe': 'Мантия', 'Rugrat': 'Спиногрыз',
+    'Shadow Child': 'Дитя Тени', 'Spewer': 'Блевотник',
+    'Tick': 'Клещ', 'Trudge': 'Шагатель', 'Upscream': 'Крикун', 'Snatcher': 'Пони'
 };
+
+test('live game tables update both languages without changing identity or counts', async () => {
+    const { api, writes } = loadServer();
+    api.setGameLevel(1, 'Manor');
+    await api.patchState({ monsters: [{ name: 'Gnomes', count: 4 }] });
+    const result = await api.post('/api/monster-localization', { names: {
+        'ENEMY.GNOME': { en: 'Updated Gnome', ru: 'Новый гном' },
+        'ENEMY.SNATCHER': { en: 'Updated Pony', ru: 'Новая пони' }
+    } });
+    assert.equal(result.status, 200);
+    assert.equal(api.formatMonsterTimestampList([{ name: 'Gnomes', count: 4 }], 'en')[0], 'Updated Gnome x4');
+    assert.equal(api.formatMonsterTimestampList([{ name: 'Snatcher', unknown: true }], 'ru')[0], 'Новая пони');
+    assert.equal(api.formatMonsterTimestampList([{ name: 'Animal' }], 'ru')[0], 'Животное');
+    api.setGameLevel(2, 'Manor');
+    assert.match(writes.at(-1).text, /\[Новый гном x4\]/);
+});
+
+test('invalid localization is rejected atomically and missing translations fall back', async () => {
+    const { api } = loadServer();
+    assert.equal((await api.post('/api/monster-localization', { names: {
+        'ENEMY.ANIMAL': { en: 'Updated Animal' }
+    } })).status, 200);
+    assert.equal(api.formatMonsterTimestampList([{ name: 'Animal' }], 'ru')[0], 'Животное');
+    for (const names of [null, [], { 'ENEMY.ANIMAL': { en: 'Bad\nName' } },
+        { 'ENEMY.ANIMAL': { ru: 'Changed' }, invalid: { en: 'Invalid' } }]) {
+        assert.equal((await api.post('/api/monster-localization', { names })).status, 422);
+        assert.equal(api.formatMonsterTimestampList([{ name: 'Animal' }], 'en')[0], 'Updated Animal');
+        assert.equal(api.formatMonsterTimestampList([{ name: 'Animal' }], 'ru')[0], 'Животное');
+    }
+});
 
 test('timestamp setting defaults to true and normalizes only booleans', async () => {
     const { api } = loadServer();
@@ -57,11 +93,12 @@ test('timestamp setting defaults to true and normalizes only booleans', async ()
     }
 });
 
-test('all exact Russian translations and English canonical names', () => {
+test('all official Russian and English names from game bundles', () => {
     const { api } = loadServer();
     for (const [name, translation] of Object.entries(translations)) {
         assert.equal(api.formatMonsterTimestampList([{ name }], 'ru')[0], translation);
-        assert.equal(api.formatMonsterTimestampList([{ name }], 'en')[0], name);
+        assert.equal(api.formatMonsterTimestampList([{ name }], 'en')[0],
+            name === 'Gnomes' ? 'Gnome' : name === 'Snatcher' ? 'Pony' : name);
     }
 });
 
@@ -77,13 +114,13 @@ test('timestamp aliases combine counts and preserve unknown names', () => {
         { name: 'Unknown' }, { name: '' }
     ];
     assert.deepEqual(Array.from(api.formatMonsterTimestampList(monsters, 'ru')), [
-        'Гномы x4', 'Утка x2', 'Теневой ребёнок', 'Повар', 'Клоун',
-        'Зверь x2', 'Черепа', 'Бабочка', 'Менталист', 'Глаз', 'Плевун', 'Крикун', 'Unknown'
+        'Гном x4', 'Высший хищник x2', 'Дитя Тени', 'Повар', 'Шут',
+        'Животное x2', 'Взрывник', 'Бабочкин', 'Телепат', 'Смотритель', 'Блевотник', 'Крикун', 'Unknown'
     ]);
 });
 
 for (const [initial, next, heading, monster, nextHeading] of [
-    ['ru', 'en', 'Уровень', 'Зверь', 'Level'],
+    ['ru', 'en', 'Уровень', 'Животное', 'Level'],
     ['en', 'ru', 'Level', 'Animal', 'Уровень']
 ]) {
     test(`active line retains ${initial} after switching to ${next}`, async () => {
@@ -153,7 +190,7 @@ test('disable finalizes once, stops writes and resumes only on the next level', 
     api.setGameLevel(1, 'Headman Manor');
     await api.patchState({ monsters: [{ name: 'Gnome', count: 4 }] });
     await api.patchState({ saveTimestampsEnabled: false });
-    assert.match(writes.at(-1).text, /Уровень 1 Manor \[Гномы x4\]\n$/);
+    assert.match(writes.at(-1).text, /Уровень 1 Manor \[Гном x4\]\n$/);
     const saved = writes.at(-1);
     const count = writes.length;
     await api.patchState({ monsters: [{ name: 'Animal' }] });

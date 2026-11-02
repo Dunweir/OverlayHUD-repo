@@ -13,6 +13,14 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Reference Include="Unity.Localization">
+      <HintPath>C:\Program Files (x86)\Steam\steamapps\common\REPO\REPO_Data\Managed\Unity.Localization.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="Unity.ResourceManager">
+      <HintPath>C:\Program Files (x86)\Steam\steamapps\common\REPO\REPO_Data\Managed\Unity.ResourceManager.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
     <Reference Include="BepInEx">
       <HintPath>lib\BepInEx.dll</HintPath>
       <Private>false</Private>

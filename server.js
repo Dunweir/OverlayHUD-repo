@@ -669,52 +669,45 @@ function writeTimestampSession() {
     }
 }
 
-const timestampMonsterNamesRu = {
-    "Animal": "Зверь",
-    "Apex Predator": "Утка",
-    "Banger": "Черепа",
-    "Bella": "Белла",
-    "Birthday Boy": "Именинник",
-    "Bowtie": "Бабочка",
-    "Chef": "Повар",
-    "Cleanup Crew": "Уборщик",
-    "Clown": "Клоун",
-    "Elsa": "Эльза",
-    "Gambit": "Гамбит",
-    "Gnomes": "Гномы",
-    "Headgrab": "Хэдграб",
-    "Headman": "Хэдмен",
-    "Heart Hugger": "Сердцеед",
-    "Hidden": "Невидимка",
-    "Huntsman": "Охотник",
-    "Loom": "Лум",
-    "Mentalist": "Менталист",
-    "Oogly": "Угли",
-    "Peeper": "Глаз",
-    "Reaper": "Жнец",
-    "Robe": "Роба",
-    "Rugrat": "Карапуз",
-    "Shadow Child": "Теневой ребёнок",
-    "Spewer": "Плевун",
-    "Tick": "Клещ",
-    "Trudge": "Топтун",
-    "Upscream": "Крикун"
-};
+// Extracted from the game's HUD string tables; refreshed by the plugin at runtime.
+const bundledMonsterNames = require(path.join(__dirname, "assets/monster-localization.json"));
+let localizedMonsterNames = { ...bundledMonsterNames };
+// Stable internal identity must not depend on a later change to an English display name.
+const monsterLocalizationKeys = new Map(Object.entries(bundledMonsterNames).map(([key, names]) => [
+    normalizeMonsterKey(key === "ENEMY.SNATCHER" ? "Snatcher" : names.en), key
+]));
+
+function updateMonsterLocalization(names) {
+    if (!names || typeof names !== "object" || Array.isArray(names)) return false;
+    const next = {};
+    for (const [key, entry] of Object.entries(names)) {
+        if (!/^ENEMY\.[A-Z0-9_]+$/.test(key) || !entry || typeof entry !== "object") return false;
+        next[key] = { ...bundledMonsterNames[key] };
+        for (const language of ["en", "ru"]) {
+            const label = entry[language];
+            if (label == null) continue;
+            if (typeof label !== "string" || !label.trim() || label.length > 200 || /[\r\n\x00-\x1f]/.test(label)) return false;
+            next[key][language] = label.trim();
+        }
+    }
+    localizedMonsterNames = { ...bundledMonsterNames, ...next };
+    return true;
+}
 
 function normalizeTimestampMonsterName(name) {
     const key = normalizeMonsterKey(name);
     const canonical = monsterConfig.aliases[key];
     if (!canonical && key !== "shadowchildren" && key !== "apexpredators") return name;
-    if (Object.prototype.hasOwnProperty.call(timestampMonsterNamesRu, canonical)) return canonical;
+    if (canonical === "Gnomes" || monsterLocalizationKeys.has(normalizeMonsterKey(canonical || ""))) return canonical;
     if (key === "shadowchildren") return "Shadow Child";
     return monsterConfig.aliases[key.replace(/s$/, "")] || canonical || name;
 }
 
 function formatMonsterTimestampList(monsters, language) {
     return getMonsterTotals(monsters).map(({ name, count, unknown }) => {
-        const label = normalizeMonsterKey(name) === "snatcher"
-            ? (language === "ru" ? "Пони" : "Pony")
-            : language === "ru" && !unknown ? timestampMonsterNamesRu[name] || name : name;
+        const key = monsterLocalizationKeys.get(normalizeMonsterKey(name === "Gnomes" ? "Gnome" : name));
+        const names = (!unknown || key === "ENEMY.SNATCHER") ? localizedMonsterNames[key] : null;
+        const label = names?.[language] || names?.en || name;
         return count > 1 ? `${label} x${count}` : label;
     });
 }
@@ -1102,6 +1095,15 @@ function serveFile(request, response) {
 
 const server = http.createServer(async (request, response) => {
     try {
+        if (request.method === "POST" && request.url === "/api/monster-localization") {
+            const body = await readBody(request);
+            let payload;
+            try { payload = JSON.parse(body); }
+            catch { sendJson(response, 400, { error: "Invalid JSON" }); return; }
+            const ok = updateMonsterLocalization(payload?.names);
+            sendJson(response, ok ? 200 : 422, ok ? { ok: true } : { error: "Invalid monster localization" });
+            return;
+        }
         if (request.method === "GET" && request.url === "/api/state") {
             sendJson(response, 200, { state: getNormalizedOverlayState() });
             return;

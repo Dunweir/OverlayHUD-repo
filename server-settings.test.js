@@ -139,7 +139,7 @@ test('settings disable finalizes the original-language line once and resumes onl
     api.setGameLevel(1, 'Headman Manor');
     await post('/api/state', { state: { ...get(), monsters: [{ name: 'Gnome', count: 4 }] } });
     await settings({ interfaceLanguage: 'en', saveTimestampsEnabled: false });
-    assert.match(writes.at(-1).text, /Уровень 1 Manor \[Гномы x4\]\n$/);
+    assert.match(writes.at(-1).text, /Уровень 1 Manor \[Гном x4\]\n$/);
     const saved = writes.at(-1).text;
     const count = writes.length;
     await settings({ saveTimestampsEnabled: false });
