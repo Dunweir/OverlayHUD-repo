@@ -269,7 +269,7 @@ namespace OverlayHUD
             scanInterval = Config.Bind("Detection", "ScanIntervalSeconds", 3f, "How often pending enemy roster sync is retried.");
             statusInterval = Config.Bind("Detection", "StatusIntervalSeconds", 10f, "How often monster health and respawn status are synced after the roster is known. Event-driven changes remain immediate; values below 10 are raised to 10.");
             requireLineOfSight = Config.Bind("Detection", "RequireLineOfSight", true, "Reveal monsters only after an encounter. Disable to reveal the complete level roster as soon as it is known.");
-            revealUnknownMonsters = Config.Bind("Detection", "RevealUnknownMonsters", false, "Reveal only unknown monsters as soon as they are discovered, regardless of RequireLineOfSight. Known monsters keep their usual detection rules.");
+            revealUnknownMonsters = Config.Bind("Detection", "RevealUnknownMonsters", false, "Reveal monsters using the four-pointed star placeholder icon as soon as they are discovered, regardless of RequireLineOfSight. Monsters with their own icons keep their usual detection rules.");
             preferPlayerVisionDetection = Config.Bind("Detection", "PreferPlayerVisionDetection", true, "When enabled, show monsters when the player sees them. When disabled, use the older enemy-vision plus player-very-close detection.");
             debugLogging = Config.Bind("Debug", "Logging", false, "Write periodic bridge debug logs.");
             autoStartOverlayApp = Config.Bind("OverlayApp", "AutoStart", true, "Start the bundled OverlayHUD desktop app when the game starts.");
@@ -1343,7 +1343,7 @@ namespace OverlayHUD
             GameObject root = GetEnemyRoot(enemyParent);
             if (root == null || !root.activeInHierarchy) return;
             var candidate = new EnemyCandidate { Component = enemyParent, Root = root };
-            if (!IsUnknownMonster(candidate)) return;
+            if (!ShouldRevealUnknownMonster(candidate)) return;
             int instanceId = root.GetInstanceID();
             string monsterName = null;
             PublishEnemyParentEncounter(enemyParent, ref instanceId, ref monsterName);
@@ -1355,7 +1355,7 @@ namespace OverlayHUD
             {
                 ResolvedEnemyCandidate resolvedEnemy = enemies[index];
                 EnemyCandidate candidate = resolvedEnemy.Candidate;
-                if (requireLineOfSight.Value && !(revealUnknownMonsters.Value && IsUnknownMonster(candidate))) continue;
+                if (requireLineOfSight.Value && !ShouldRevealUnknownMonster(candidate)) continue;
                 int instanceId = candidate.Root.GetInstanceID();
                 if (!TryMarkEnemySent(instanceId)) continue;
 
@@ -2663,6 +2663,31 @@ namespace OverlayHUD
             return FindKnownMonster(ReadMember(parent, "enemyName") as string) == null;
         }
 
+        private bool ShouldRevealUnknownMonster(EnemyCandidate candidate)
+        {
+            if (!revealUnknownMonsters.Value || GetEnemyParent(candidate) == null) return false;
+            return UsesPlaceholderMonsterIcon(ResolveMonsterName(GetEnemyParent(candidate)));
+        }
+
+        private static bool UsesPlaceholderMonsterIcon(string monsterName)
+        {
+            if (string.IsNullOrWhiteSpace(monsterName)) return false;
+            // Match the icon selection in server.js and overlay-state.js. Icon availability
+            // is separate from IsUnknownMonster, which controls dynamic game metadata.
+            if (FindKnownMonster(monsterName) != null) return false;
+            return !MonsterIconAliases.ContainsKey(monsterName);
+        }
+
+        // Dedicated icons for monsters outside KnownMonsters; keep in sync with
+        // getMonsterFileName in server.js and overlay-state.js.
+        private static readonly Dictionary<string, string> MonsterIconAliases =
+            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                { "Snatcher", "snatcher" },
+                { "Pony", "snatcher" },
+                { "Пони", "snatcher" }
+            };
+
         private static void AppendMonsterMetadata(StringBuilder json, EnemyCandidate candidate)
         {
             if (IsUnknownMonster(candidate)) json.Append(",\"unknown\":true");
@@ -2838,8 +2863,8 @@ namespace OverlayHUD
         {
             if (enemyParent == null) return false;
             // Opted-in unknowns need not wait for the initial roster's stabilization scans.
-            if (!rosterPublished && !(revealUnknownMonsters.Value
-                && IsUnknownMonster(new EnemyCandidate { Component = enemyParent }))) return false;
+            if (!rosterPublished && !ShouldRevealUnknownMonster(
+                new EnemyCandidate { Component = enemyParent })) return false;
 
             GameObject root = GetEnemyRoot(enemyParent);
             if (root == null) return false;

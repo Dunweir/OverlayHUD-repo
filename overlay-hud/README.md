@@ -38,7 +38,7 @@ Older LAN endpoints and earlier app folder names are migrated to the current loc
 
 ## Build Notes
 
-1. Install BepInEx for R.E.P.O. through Gale/r2modman/Thunderstore or manually.
+1. Install BepInEx for R.E.P.O. through r2modman/Thunderstore or manually.
 2. Copy the needed DLL references into `../lib/` or change `OverlayHUD.csproj` `HintPath` values to point at your game install.
 3. Build with `dotnet build overlay-hud/OverlayHUD.csproj -c Release`.
 4. Copy `bin/Release/net472/OverlayHUD.dll` into the package folders before building a flat package.
