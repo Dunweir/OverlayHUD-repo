@@ -4,7 +4,7 @@
     <LangVersion>latest</LangVersion>
     <Nullable>disable</Nullable>
     <AssemblyName>OverlayHUD</AssemblyName>
-    <Version>26.11.1</Version>
+    <Version>26.11.3</Version>
     <RootNamespace>OverlayHUD</RootNamespace>
   </PropertyGroup>
 
@@ -13,6 +13,18 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Reference Include="PhotonUnityNetworking">
+      <HintPath>C:\Program Files (x86)\Steam\steamapps\common\REPO\REPO_Data\Managed\PhotonUnityNetworking.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="PhotonRealtime">
+      <HintPath>C:\Program Files (x86)\Steam\steamapps\common\REPO\REPO_Data\Managed\PhotonRealtime.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="Photon3Unity3D">
+      <HintPath>C:\Program Files (x86)\Steam\steamapps\common\REPO\REPO_Data\Managed\Photon3Unity3D.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
     <Reference Include="Unity.Localization">
       <HintPath>C:\Program Files (x86)\Steam\steamapps\common\REPO\REPO_Data\Managed\Unity.Localization.dll</HintPath>
       <Private>false</Private>

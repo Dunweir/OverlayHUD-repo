@@ -20,7 +20,7 @@ using UnityEngine.SceneManagement;
 
 namespace OverlayHUD
 {
-    [BepInPlugin("local.overlay.overlay_hud", "OverlayHUD", "26.11.1")]
+    [BepInPlugin("local.overlay.overlay_hud", "OverlayHUD", "26.11.3")]
     public sealed partial class Plugin : BaseUnityPlugin
     {
         private static Plugin instance;
@@ -677,6 +677,7 @@ namespace OverlayHUD
 
         private void Update()
         {
+            TickRespawnNetwork();
             if (!gameplayActive) return;
             TickScan();
         }
@@ -721,7 +722,9 @@ namespace OverlayHUD
         {
             if (__instance is Component component)
             {
+                instance?.networkRespawns.Remove(component);
                 RegisterEnemyParent(component);
+                instance?.SendEnemyHealth(component);
                 instance?.TryRevealUnknownEnemy(component);
                 instance?.SyncEnemyParentStatusChanged(component);
             }
@@ -731,6 +734,7 @@ namespace OverlayHUD
         {
             if (__instance is Component component)
             {
+                instance?.networkRespawns.Remove(component);
                 instance?.ScheduleEnemyParentStatusChanged(component);
             }
         }
@@ -927,6 +931,7 @@ namespace OverlayHUD
 
         private void OnDestroy()
         {
+            StopRespawnNetwork();
             SceneManager.sceneLoaded -= OnSceneLoaded;
             harmony?.UnpatchSelf();
             if (gameplayActive) HandleLevelChanging();
@@ -1201,6 +1206,7 @@ namespace OverlayHUD
 
         private void ResetSeenMonsters(string reason)
         {
+            ResetRespawnNetwork();
             if (pendingUpgradeSnapshot != null)
             {
                 StopCoroutine(pendingUpgradeSnapshot);
@@ -1533,6 +1539,13 @@ namespace OverlayHUD
             Component enemyParent = GetEnemyParent(candidate);
             if (enemyParent == null) return false;
 
+            if (Photon.Pun.PhotonNetwork.InRoom && !Photon.Pun.PhotonNetwork.IsMasterClient)
+            {
+                alive = ReadEnemySpawned(enemyParent);
+                remaining = instance != null ? instance.ReadNetworkRespawnRemaining(enemyParent, alive) : 0f;
+                return true;
+            }
+
             object timerValue = ReadMember(enemyParent, "DespawnedTimer");
             if (!TryConvertFloat(timerValue, out remaining)) return false;
 
@@ -1570,6 +1583,7 @@ namespace OverlayHUD
 
             Component enemy = ReadMember(enemyHealthSource, "enemy") as Component;
             Component enemyParent = ReadMember(enemy, "EnemyParent") as Component;
+            SendEnemyHealth(enemyParent);
             SyncEnemyParentStatusChanged(enemyParent);
         }
 
@@ -1702,6 +1716,8 @@ namespace OverlayHUD
         {
             health = 0f;
             maxHealth = 0f;
+            if (Photon.Pun.PhotonNetwork.InRoom && !Photon.Pun.PhotonNetwork.IsMasterClient)
+                return TryReadNetworkHealth(GetEnemyParent(candidate), out health, out maxHealth);
             bool hasHealth = false;
             bool unknown = IsUnknownMonster(candidate);
 
@@ -1735,6 +1751,17 @@ namespace OverlayHUD
             }
 
             return hasHealth;
+        }
+
+        private bool ReadHostHealth(Component parent, out float health, out float maxHealth)
+        {
+            return TryGetEnemyHealth(new EnemyCandidate { Component = parent, Root = GetEnemyRoot(parent), Center = Vector3.zero }, out health, out maxHealth);
+        }
+
+        private void PublishNetworkHealth(Component parent)
+        {
+            GameObject root = GetEnemyRoot(parent);
+            if (root != null && IsEnemySent(root.GetInstanceID())) SyncEnemyParentStatusChanged(parent);
         }
 
         private IEnumerable<object> GetEnemyHealthSources(EnemyCandidate candidate)

@@ -25,6 +25,17 @@ function render(previous, changes) {
 }
 const base = { gameplayVisible: true, mapValue: 1000, lostValue: 20, level: 1, roster: [], lastDestroyedItem: null };
 
+test('authoritative HP updates show successive and lethal damage, but not snapshots or healing', () => {
+    const start = html.indexOf('function updateMonsterDamageFeedback(');
+    const end = html.indexOf('function updateMonsterTooltip(', start);
+    const pops = [];
+    const square = { dataset: {}, classList: { add() {}, remove() {} }, appendChild: node => pops.push(node.textContent) };
+    const context = vm.createContext({ document: { createElement: () => ({ remove() {} }) }, setTimeout() {} });
+    vm.runInContext(html.slice(start, end), context);
+    for (const health of [100, 70, 40, 40, 0, 100]) context.updateMonsterDamageFeedback(square, { health }, 'enemy-7');
+    assert.deepEqual(pops, ['-30 HP', '-30 HP', '-40 HP']);
+});
+
 test('local monster entries do not invent strength and UI distinguishes unknown, zero and impossible', () => {
     const source = fs.readFileSync(`${__dirname}/overlay-state.js`, 'utf8');
     const start = source.indexOf('    function createMonsterEntry(');

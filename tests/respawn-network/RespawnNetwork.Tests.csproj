@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../../overlay-hud/Plugin.RespawnNetwork.cs" Link="Plugin.RespawnNetwork.cs" />
+    <Compile Include="../../overlay-hud/Plugin.HealthNetwork.cs" Link="Plugin.HealthNetwork.cs" />
+  </ItemGroup>
+</Project>
