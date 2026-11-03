@@ -309,9 +309,10 @@ namespace OverlayHUD
 
             Logger.LogInfo("OverlayHUD is running. MonsterEndpoint=" + endpoint.Value + ", LevelEndpoint=" + levelEndpoint.Value + ", Logging=" + debugLogging.Value);
 
-            StartOverlayAppIfNeeded();
+            InitializeNativeHud();
+            if (!nativeMode) StartOverlayAppIfNeeded();
             PatchGameUpdates();
-            StartCoroutine(SyncMonsterLocalization());
+            if (!nativeMode) StartCoroutine(SyncMonsterLocalization());
         }
 
         private void StartOverlayAppIfNeeded()
@@ -677,6 +678,7 @@ namespace OverlayHUD
 
         private void Update()
         {
+            TickNativeHud();
             TickRespawnNetwork();
             if (!gameplayActive) return;
             TickScan();
@@ -931,6 +933,8 @@ namespace OverlayHUD
 
         private void OnDestroy()
         {
+            DisposeNativeConfig();
+            nativeHud?.Dispose();
             StopRespawnNetwork();
             SceneManager.sceneLoaded -= OnSceneLoaded;
             harmony?.UnpatchSelf();
@@ -3204,6 +3208,7 @@ namespace OverlayHUD
         private IEnumerator PostSeenMonster(string monsterName, int instanceId, string metadata)
         {
             string json = "{\"name\":\"" + EscapeJson(monsterName) + "\",\"id\":" + instanceId + metadata + "}";
+            if (DispatchNative("monster-seen", json)) yield break;
             string endpointUrl = endpoint.Value;
             Task<string> request = QueueNetworkRequest(() => SendHttpPost(endpointUrl, json));
             while (!request.IsCompleted) yield return null;
@@ -3222,6 +3227,7 @@ namespace OverlayHUD
 
         private IEnumerator PostMonsterRoster(string json)
         {
+            if (DispatchNative("roster", json)) yield break;
             string rosterEndpoint = BuildSiblingEndpoint(levelEndpoint.Value, "/api/roster");
             Task<string> request = QueueNetworkRequest(() => SendHttpPost(rosterEndpoint, json));
             while (!request.IsCompleted) yield return null;
@@ -3240,6 +3246,7 @@ namespace OverlayHUD
 
         private IEnumerator PostMonsterStatuses(string json, bool coalesce = false)
         {
+            if (DispatchNative("monster-status", json)) yield break;
             string statusEndpoint = BuildSiblingEndpoint(levelEndpoint.Value, "/api/monster-status");
             int requestVersion = coalesce ? Interlocked.Increment(ref latestMonsterStatusRequestVersion) : 0;
             Task<string> request = QueueNetworkRequest(() => !coalesce || requestVersion == Volatile.Read(ref latestMonsterStatusRequestVersion)
@@ -3259,6 +3266,7 @@ namespace OverlayHUD
         private IEnumerator PostLevel(int level, string levelName)
         {
             string json = "{\"level\":" + level + ",\"levelName\":\"" + EscapeJson(levelName ?? "") + "\"}";
+            if (DispatchNative("level", json)) yield break;
             string endpointUrl = levelEndpoint.Value;
             Task<string> request = QueueNetworkRequest(() => SendHttpPost(endpointUrl, json));
             while (!request.IsCompleted) yield return null;
@@ -3291,6 +3299,7 @@ namespace OverlayHUD
 
         private IEnumerator PostVisibility(bool visible)
         {
+            if (nativeMode) { nativeState.Visible = visible; yield break; }
             string visibilityEndpoint = BuildSiblingEndpoint(levelEndpoint.Value, "/api/visibility");
             string json = "{\"visible\":" + (visible ? "true" : "false") + "}";
             Task<string> request = QueueNetworkRequest(() => SendHttpPost(visibilityEndpoint, json));
@@ -3310,6 +3319,7 @@ namespace OverlayHUD
 
         private IEnumerator PostGameUiVisibility(string json)
         {
+            if (DispatchNative("tab-hidden", json)) yield break;
             string tabEndpoint = BuildSiblingEndpoint(levelEndpoint.Value, "/api/tab-hidden");
             Task<string> request = QueueNetworkRequest(() => SendHttpPost(tabEndpoint, json));
             while (!request.IsCompleted) yield return null;
@@ -3324,6 +3334,7 @@ namespace OverlayHUD
 
         private IEnumerator PostPlayerUpgrades(string json, int changedCount)
         {
+            if (DispatchNative("upgrades", json)) yield break;
             string upgradesEndpoint = BuildSiblingEndpoint(levelEndpoint.Value, "/api/upgrades");
             Task<string> request = QueueNetworkRequest(() => SendHttpPost(upgradesEndpoint, json));
             while (!request.IsCompleted) yield return null;
@@ -3349,6 +3360,8 @@ namespace OverlayHUD
             if (goal.HasValue) json += ",\"goal\":" + goal.Value.ToString(CultureInfo.InvariantCulture);
             json += "}";
 
+            if (DispatchNative("map-value", json)) yield break;
+
             int requestVersion = Interlocked.Increment(ref latestMapValueRequestVersion);
             Task<string> request = QueueNetworkRequest(() => requestVersion == Volatile.Read(ref latestMapValueRequestVersion)
                 ? SendHttpPost(mapValueEndpoint, json)
@@ -3370,8 +3383,9 @@ namespace OverlayHUD
 
         private IEnumerator PostItemDestroyed(string playerName, string itemName)
         {
-            string itemDestroyedEndpoint = BuildSiblingEndpoint(levelEndpoint.Value, "/api/item-destroyed");
             string json = "{\"player\":\"" + EscapeJson(playerName) + "\",\"item\":\"" + EscapeJson(itemName) + "\"}";
+            if (DispatchNative("item-destroyed", json)) yield break;
+            string itemDestroyedEndpoint = BuildSiblingEndpoint(levelEndpoint.Value, "/api/item-destroyed");
             Task<string> request = QueueNetworkRequest(() => SendHttpPost(itemDestroyedEndpoint, json));
             while (!request.IsCompleted) yield return null;
             string result = request.IsFaulted ? "ERROR:" + request.Exception.GetBaseException().Message : request.Result;
