@@ -58,6 +58,11 @@ namespace OverlayHUD
             return (float)Math.Max(0, Math.Min(1, remaining / duration));
         }
 
+        // CanvasScaler matches height. Correct its requested scale so the physical
+        // baseline matches the web's min(width / 1920, height / 1080), not height alone.
+        internal static float ViewportScale(float requested, int screenWidth, int screenHeight) =>
+            requested * Math.Min(1, 1080f * Math.Max(1, screenWidth) / (1920f * Math.Max(1, screenHeight)));
+
         internal static float FitScale(float requested, int screenWidth, int screenHeight, float width, float height)
         {
             float availableWidth = 1080f * Math.Max(1, screenWidth) / Math.Max(1, screenHeight);

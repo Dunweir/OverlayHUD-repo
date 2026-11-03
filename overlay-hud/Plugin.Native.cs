@@ -16,7 +16,7 @@ namespace OverlayHUD
         private ConfigEntry<float> nativeScale, nativeOffsetX, nativeOffsetY, nativeMonsterSize, nativeUpgradeSize;
         private ConfigEntry<int> nativeColumns, nativeStripColumns, nativeUpgradeRows;
         private ConfigEntry<string> nativeLanguage, nativeAlignment;
-        private ConfigEntry<bool> nativeHorizontal, nativeEnabled;
+        private ConfigEntry<bool> nativeHorizontal, nativeEnabled, nativeGameUIEffects;
         private ConfigEntry<bool> nativeLevel, nativeTimer, nativeMapValue, nativeLostValue;
         private ConfigEntry<bool> nativeMonsters, nativeProximityWaves, nativeRespawnIndicator, nativeDestroyedItemAlerts;
         private ConfigEntry<bool> nativeHealth, nativeRespawn, nativeUpgrades, nativeStrength;
@@ -73,7 +73,9 @@ namespace OverlayHUD
             nativeOnlyAliveMonsters = BindNativeToggle("OnlyAliveMonsters", false, "Hide dead detected monsters until they respawn; does not reveal undetected monsters.");
             nativeFilterUndetectedMonsters = BindNativeToggle("FilterUndetectedMonsters", false, "When OnlyAliveMonsters is true, also remove dead undetected placeholders. False keeps all undetected placeholders. Ignored when OnlyAliveMonsters is false.");
             nativeWrapValueLabels = BindNativeToggle("WrapValueLabels", true, "Place map/loss labels above their amounts; false keeps labels and amounts on one line.");
-            nativeTooltips = BindNativeToggle("ShowTooltips", false, "Show monster and upgrade tooltips on hover while the game cursor is unlocked. Does not unlock or capture the cursor.");
+            nativeTooltips = BindNativeToggle("ShowTooltips", false, "Show monster and upgrade tooltips on hover while the game cursor is unlocked. Does not unlock or capture the cursor. Tooltips are disabled while UseGameUIEffects is active.");
+            nativeGameUIEffects = BindNativeToggle("UseGameUIEffects", false,
+                "Experimental: render the native HUD through the game's UI camera and compositor to inherit real game HUD effects. The game's lower-resolution render texture reduces HUD sharpness; hover tooltips are disabled while active. Falls back to the normal HUD while the game UI is unavailable.");
 
             BindNativeUpgrade("strength", "Strength");
             BindNativeUpgrade("tumbleLaunch", "Tumble Launch");
@@ -95,7 +97,8 @@ namespace OverlayHUD
             try
             {
                 NativeHudOptions options = GetNativeOptions();
-                nativeHud = new NativeHud(nativeState, options.Columns, options.HorizontalLayout);
+                nativeHud = new NativeHud(nativeState, options.Columns, options.HorizontalLayout,
+                    message => Logger.LogInfo(message));
                 nativeHud.Configure(options);
                 nativeTimestamps = new NativeTimestampWriter(nativeState,
                     System.IO.Path.Combine(BepInEx.Paths.PluginPath, "OverlayHUD", "timestamps"),
@@ -167,7 +170,8 @@ namespace OverlayHUD
                 OnlyAliveMonsters = nativeOnlyAliveMonsters.Value,
                 FilterUndetectedMonsters = nativeFilterUndetectedMonsters.Value,
                 WrapValueLabels = nativeWrapValueLabels.Value,
-                ShowTooltips = nativeTooltips.Value
+                ShowTooltips = nativeTooltips.Value,
+                UseGameUIEffects = nativeGameUIEffects.Value
             };
             foreach (var upgrade in nativeUpgradeVisibility)
                 if (!upgrade.Value.Value) options.HiddenUpgrades.Add(upgrade.Key);

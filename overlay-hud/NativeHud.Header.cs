@@ -71,6 +71,8 @@ namespace OverlayHUD
                 var item = CreateHeaderPill(UpgradeKeys[i], headerUpgradePanel, size, background, 5);
                 item.Order = i;
                 item.TooltipKey = UpgradeKeys[i];
+                // A rounded backing alone does not clip the rectangular upgrade artwork.
+                item.Root.gameObject.AddComponent<Mask>().showMaskGraphic = true;
                 item.Icon = Rect("Icon", item.Root, 0, 0, size * .82f, size)
                     .gameObject.AddComponent<RawImage>();
                 item.Icon.texture = Texture("upgrade-" + UpgradeFiles[i] + ".png");
@@ -177,7 +179,7 @@ namespace OverlayHUD
             headerTimer.gameObject.SetActive(options.ShowTimer);
             headerTimerSeparator.gameObject.SetActive(options.ShowLevel && options.ShowTimer);
             string caption = options.Translate("УРОВЕНЬ", "LEVEL");
-            SetHeaderCaption(headerLevelCaption, caption, 28, 20);
+            SetHeaderCaption(headerLevelCaption, caption, 28);
             if (!visible) { headerLevel.Positioned = false; return; }
             double elapsed = now - state.StartedAt;
             if (double.IsNaN(elapsed) || double.IsInfinity(elapsed)) elapsed = 0;
@@ -227,7 +229,7 @@ namespace OverlayHUD
         {
             bool visible = enabled && amount > 0;
             item.Root.gameObject.SetActive(visible);
-            SetHeaderCaption(item.Caption, caption, 22, 14);
+            SetHeaderCaption(item.Caption, caption, 22);
             if (!visible) { item.Positioned = false; return; }
             string value = "$" + amount.ToString("N0", CultureInfo.InvariantCulture);
             item.Number.Value = value;
@@ -250,10 +252,10 @@ namespace OverlayHUD
             pills.Add(item);
         }
 
-        private void SetHeaderCaption(NativeBitmapText label, string value, float englishSize, float russianSize)
+        private void SetHeaderCaption(NativeBitmapText label, string value, float size)
         {
-            bool english = options.Language == "en";
-            SetHeaderFont(label, english ? teko : robotoBold, english ? englishSize : russianSize);
+            // The bundled Teko contains the Russian caption glyphs, just like the web UI.
+            SetHeaderFont(label, teko, size);
             label.Value = value;
         }
 

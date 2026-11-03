@@ -11,6 +11,7 @@ namespace OverlayHUD
     internal sealed partial class NativeHud : IDisposable
     {
         private readonly NativeHudState state;
+        private readonly Action<string> logRenderingStatus;
         private int columns;
         private bool horizontal;
         private NativeHudOptions options = new NativeHudOptions();
@@ -29,9 +30,10 @@ namespace OverlayHUD
         private readonly Dictionary<int, Tile> tiles = new Dictionary<int, Tile>();
         private float nextRefresh;
 
-        internal NativeHud(NativeHudState state, int columns, bool horizontal)
+        internal NativeHud(NativeHudState state, int columns, bool horizontal, Action<string> log = null)
         {
             this.state = state;
+            logRenderingStatus = log;
             this.columns = columns;
             this.horizontal = horizontal;
             layoutWidth = NativeHudLayout.Width(horizontal, horizontal ? stripColumns : columns);
@@ -67,6 +69,7 @@ namespace OverlayHUD
         {
             var rect = new GameObject(name, typeof(RectTransform)).GetComponent<RectTransform>();
             rect.SetParent(parent, false);
+            rect.gameObject.layer = parent.gameObject.layer;
             rect.anchorMin = rect.anchorMax = new Vector2(0, 1);
             rect.pivot = new Vector2(0, 1);
             rect.anchoredPosition = new Vector2(x, -y);
@@ -113,19 +116,23 @@ namespace OverlayHUD
 
         private void FitToScreen()
         {
-            float scale = NativeHudLayout.FitScale(requestedScale, Screen.width, Screen.height, layoutWidth, panel.sizeDelta.y);
+            int viewportPixelWidth = Mathf.Max(1, Mathf.RoundToInt(Screen.height * HudViewportAspect));
+            float viewportScale = NativeHudLayout.ViewportScale(requestedScale, viewportPixelWidth, Screen.height);
+            float scale = NativeHudLayout.FitScale(viewportScale, viewportPixelWidth, Screen.height, layoutWidth, panel.sizeDelta.y);
             scaler.referenceResolution = new Vector2(1920 / scale, 1080 / scale);
             float viewportHeight = 1080 / scale;
-            float viewportWidth = viewportHeight * Screen.width / Math.Max(1, Screen.height);
+            float viewportWidth = viewportHeight * HudViewportAspect;
             float edgeOffset = Mathf.Max(0, (viewportWidth - layoutWidth) / 2 - 20);
             float anchorOffset = options.Alignment == "Left" ? -edgeOffset : options.Alignment == "Right" ? edgeOffset : 0;
             panel.anchoredPosition = new Vector2(
                 NativeHudLayout.ClampX(anchorOffset + offsetX, viewportWidth, layoutWidth),
                 -NativeHudLayout.ClampY(offsetY, viewportHeight, panel.sizeDelta.y) - 18 * (1 - visibilityAlpha));
+            ApplyGameUIEffects();
         }
 
         internal void Tick(float now)
         {
+            UpdateGameUIEffects();
             UpdateAlerts(now);
             // Game UI suppression and the user's master switch must be immediate.
             if (state.Hidden || !options.Enabled)

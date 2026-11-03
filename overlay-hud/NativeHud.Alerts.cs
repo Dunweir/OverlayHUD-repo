@@ -49,7 +49,7 @@ namespace OverlayHUD
             alertPanel.SetAsLastSibling();
             // FitToScreen uses height matching; all positions here are canvas units.
             float viewportHeight = scaler.referenceResolution.y;
-            float viewportWidth = viewportHeight * Screen.width / Math.Max(1, Screen.height);
+            float viewportWidth = viewportHeight * HudViewportAspect;
             const float margin = 2;
             float width = Mathf.Max(0, Mathf.Min(640, Mathf.Min(Mathf.Max(360, layoutWidth), viewportWidth - margin * 2)));
             float height = Mathf.Max(0, Mathf.Min(AlertHeight, viewportHeight - margin * 2));

@@ -44,7 +44,8 @@ namespace OverlayHUD
         // Call once per visible Tick, after animations, layout and FitToScreen.
         private void UpdateTooltips()
         {
-            if (options == null || !options.Enabled || !options.ShowTooltips
+            // The game's lens distortion invalidates ordinary screen-space hit tests.
+            if (gameUIEffectsActive || options == null || !options.Enabled || !options.ShowTooltips
                 || root == null || !root.activeSelf || !root.activeInHierarchy
                 || state.Hidden || !state.Visible || Cursor.lockState == CursorLockMode.Locked)
             {

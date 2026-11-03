@@ -20,7 +20,8 @@ Check(defaults.HorizontalLayout && defaults.Enabled && defaults.ShowLevel && def
     && defaults.ShowRespawnIndicator && defaults.ShowDestroyedItemAlerts && defaults.ShowHealth
     && defaults.ShowRespawnTimer && defaults.ShowStrength && defaults.ShowUpgrades && defaults.ShowMonsterCounts
     && defaults.ShowDamageNumbers && defaults.Animations && defaults.WrapValueLabels
-    && !defaults.OnlyAliveMonsters && !defaults.FilterUndetectedMonsters && !defaults.ShowTooltips,
+    && !defaults.OnlyAliveMonsters && !defaults.FilterUndetectedMonsters && !defaults.ShowTooltips
+    && !defaults.UseGameUIEffects,
     "Native HUD toggle defaults changed");
 Check(defaults.Translate("Уровень", "Level") == "Уровень", "Russian translation failed");
 defaults.Language = "en";
@@ -807,6 +808,15 @@ static void Near(float actual, float expected, string message)
     Check(Math.Abs(actual - expected) <= .001f, $"{message}: expected {expected}, got {actual}");
 }
 
+foreach (var viewport in new[] { (W: 1920, H: 1080), (W: 2560, H: 1440), (W: 1920, H: 1200),
+    (W: 1280, H: 1024), (W: 3440, H: 1440), (W: 1080, H: 1920) })
+{
+    float expected = Math.Min(viewport.W / 1920f, viewport.H / 1080f);
+    float physicalScale = viewport.H / 1080f * NativeHudLayout.ViewportScale(1, viewport.W, viewport.H);
+    Near(physicalScale, expected, "Native baseline must match both viewport dimensions");
+    Near(viewport.H / 1080f * NativeHudLayout.ViewportScale(.8f, viewport.W, viewport.H), expected * .8f,
+        "User scale must multiply the viewport baseline once");
+}
 Near(NativeHudLayout.MonsterRowPitch(70, true), 102, "Health strip must reserve space");
 Near(NativeHudLayout.MonsterRowPitch(70, false), 84, "Hidden health must release space");
 Near(NativeHudLayout.MonsterRowPitch(35, false), 42, "Row spacing must follow configured monster size");
