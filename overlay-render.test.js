@@ -111,6 +111,11 @@ test("game tier controls borders independently of name and layout level", () => 
         context.updateMonsterSquare(square, level, monster, 0);
         assert.deepEqual([...classes], [expected]);
     }
+    // Unseen roster slots must use the same game tier as sorting, including Pony.
+    for (const [tier, expected] of [[3, "level-3"], [2, "level-2"], [1, "level-1"], [null, "level-unknown"], [undefined, "level-unknown"]]) {
+        context.updateMonsterSquare(square, 1, undefined, 0, { tier });
+        assert.deepEqual([...classes], [expected]);
+    }
     const css = fs.readFileSync(`${__dirname}/overlay.css`, "utf8");
     assert.match(css, /\.monster-square\.level-unknown\s*\{[^}]*border:[^}]*#dfb85b;[^}]*--glow-color: #dfb85b;/);
 });

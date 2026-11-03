@@ -1141,7 +1141,7 @@
 
         function updateMonsterSquare(square, level, monster, currentStrength, status = null) {
             square.classList.remove("level-1", "level-2", "level-3", "level-unknown");
-            const tier = monster ? monster.tier : level;
+            const tier = monster ? monster.tier : status ? status.tier : level;
             square.classList.add([1, 2, 3].includes(tier) ? `level-${tier}` : "level-unknown");
             setMonsterProximityState(
                 square,

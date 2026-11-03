@@ -20,7 +20,7 @@ using UnityEngine.SceneManagement;
 
 namespace OverlayHUD
 {
-    [BepInPlugin("local.overlay.overlay_hud", "OverlayHUD", "26.11.3")]
+    [BepInPlugin("local.overlay.overlay_hud", "OverlayHUD", "26.11.4")]
     public sealed partial class Plugin : BaseUnityPlugin
     {
         private static Plugin instance;
