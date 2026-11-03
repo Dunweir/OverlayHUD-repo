@@ -1,6 +1,20 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const { parseGamePid, startGameLifetimeWatcher } = require("./game-lifetime");
+const { parseGamePid, startGameLifetimeWatcher, canAdoptGame } = require("./game-lifetime");
+
+test("adoption requires a live new game and never replaces a live or inaccessible owner", () => {
+    const args = (pid) => [`--overlay-game-pid=${pid}`];
+    const alive = () => {};
+    assert.equal(canAdoptGame([], args(2), alive), true);
+    assert.equal(canAdoptGame(args(1), args(2), alive), false);
+    assert.equal(canAdoptGame(args(1), [], alive), false);
+    assert.equal(canAdoptGame(args(1), undefined, alive), false);
+    for (const code of ["ESRCH", "EPERM", "EACCES"]) {
+        const probe = (pid) => { if (pid === 1) throw { code }; };
+        assert.equal(canAdoptGame(args(1), args(2), probe), code === "ESRCH");
+        assert.equal(canAdoptGame([], args(1), probe), false);
+    }
+});
 
 function watch(argv = ["--overlay-game-pid=1234"], initialError) {
     const state = { probes: [], quits: 0, clears: 0, unrefs: 0, error: initialError };

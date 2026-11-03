@@ -1,6 +1,7 @@
 const GAME_PID_FLAG = "--overlay-game-pid";
 
 function parseGamePid(argv) {
+    if (!Array.isArray(argv) || argv.some((arg) => typeof arg !== "string")) return null;
     const flags = argv.filter((arg) => arg === GAME_PID_FLAG || arg.startsWith(`${GAME_PID_FLAG}=`));
     // Ambiguous or malformed ownership must never close a standalone overlay.
     if (flags.length !== 1) return null;
@@ -47,4 +48,14 @@ function startGameLifetimeWatcher({
     return stop;
 }
 
-module.exports = { parseGamePid, startGameLifetimeWatcher };
+function canAdoptGame(currentArgv, incomingArgv, kill = process.kill.bind(process)) {
+    const incoming = parseGamePid(incomingArgv);
+    const current = parseGamePid(currentArgv);
+    if (incoming === null || incoming === current) return false;
+    try { kill(incoming, 0); } catch { return false; }
+    if (current === null) return true;
+    try { kill(current, 0); } catch (error) { return error?.code === "ESRCH"; }
+    return false;
+}
+
+module.exports = { parseGamePid, startGameLifetimeWatcher, canAdoptGame };

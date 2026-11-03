@@ -328,12 +328,8 @@ namespace OverlayHUD
                     return;
                 }
 
-                string processName = Path.GetFileNameWithoutExtension(exePath);
-                if (IsProcessAlreadyRunning(processName))
-                {
-                    Logger.LogInfo("OverlayHUD desktop app is already running; leaving the existing process alone.");
-                    return;
-                }
+                // Electron forwards this launch to its existing instance, if any.
+                // A process name is neither an ownership check nor proof of a working app.
 
                 launchedOverlayProcess = Process.Start(new ProcessStartInfo
                 {
@@ -418,21 +414,6 @@ namespace OverlayHUD
             return string.IsNullOrWhiteSpace(pluginPath)
                 ? Paths.PluginPath
                 : Path.GetDirectoryName(pluginPath);
-        }
-
-        private static bool IsProcessAlreadyRunning(string processName)
-        {
-            if (string.IsNullOrWhiteSpace(processName)) return false;
-
-            try
-            {
-                Process[] processes = Process.GetProcessesByName(processName);
-                return processes != null && processes.Length > 0;
-            }
-            catch
-            {
-                return false;
-            }
         }
 
         private void StopOverlayAppIfNeeded()

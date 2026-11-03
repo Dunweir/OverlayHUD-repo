@@ -24,7 +24,8 @@ async function boot(config = {}, args = []) {
         whenReady() { state.calls.push("ready"); return Promise.resolve(); },
         commandLine: { hasSwitch: (name) => args.some((arg) => arg === `--${name}` || arg.startsWith(`--${name}=`)) },
         relaunch(options) { state.relaunch = options; state.calls.push("relaunch"); },
-        quit() { state.calls.push("quit"); }
+        quit() { state.calls.push("quit"); },
+        exit(code) { state.calls.push(`exit:${code}`); }
     });
     class Window extends EventEmitter {
         constructor(options) {
@@ -122,6 +123,7 @@ async function boot(config = {}, args = []) {
             if (name === "fs") return fakeFS;
             if (name === "path") return path;
             if (name === "./game-lifetime") return {
+                ...require("./game-lifetime"),
                 startGameLifetimeWatcher(options) {
                     state.lifetimeWatcher = options;
                     return () => { state.lifetimeStopped = true; };
@@ -427,7 +429,10 @@ test("rapid monitor switches cancel stale corrections and quitting cancels pendi
     assert.deepEqual(state.window.bounds, state.displays[0].bounds);
     api.selectDisplay(20);
     app.emit("before-quit");
-    assert.equal(state.timers.size, 0);
+    assert.equal(state.timers.size, 1); // Only the forced-exit deadline remains.
+    const writes = state.boundsWrites;
+    runTimers();
+    assert.equal(state.boundsWrites, writes);
     assert.equal(state.lifetimeStopped, true);
 });
 
@@ -560,4 +565,24 @@ test("hidden/loading overlays are not captured", async () => {
         assert.equal(state.errors.length, 1);
         assert.equal(api.busy(), false);
     }
+});
+
+test("shutdown arms one forced self-exit even when normal quitting stalls", async () => {
+    const { state, app, runTimers } = await boot();
+    app.emit("before-quit");
+    app.emit("before-quit");
+    assert.equal(state.lifetimeStopped, true);
+    assert.equal(state.calls.includes("exit:0"), false);
+    runTimers();
+    assert.equal(state.calls.filter((call) => call === "exit:0").length, 1);
+});
+
+test("second launch attaches standalone overlay to game without accepting other launch options", async () => {
+    const { state, app } = await boot();
+    app.emit("second-instance", {}, ["OverlayHUD.exe", `--overlay-game-pid=${process.pid}`, "--disable-gpu"]);
+    assert.equal(state.lifetimeStopped, true);
+    assert.equal(state.lifetimeWatcher.argv.includes(`--overlay-game-pid=${process.pid}`), true);
+    assert.equal(state.lifetimeWatcher.argv.includes("--disable-gpu"), false);
+    app.emit("second-instance", {}, ["OverlayHUD.exe"]);
+    assert.equal(state.lifetimeWatcher.argv.includes(`--overlay-game-pid=${process.pid}`), true);
 });

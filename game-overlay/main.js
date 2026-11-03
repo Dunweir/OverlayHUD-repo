@@ -1,7 +1,7 @@
 const { app, BrowserWindow, Menu, Tray, dialog, globalShortcut, ipcMain, nativeImage, screen, shell } = require("electron");
 const fs = require("fs");
 const path = require("path");
-const { startGameLifetimeWatcher } = require("./game-lifetime");
+const { parseGamePid, startGameLifetimeWatcher, canAdoptGame } = require("./game-lifetime");
 
 const portableRoot = app.isPackaged ? path.dirname(process.execPath) : __dirname;
 const configPath = path.join(portableRoot, "overlay-config.json");
@@ -41,6 +41,8 @@ let hoverBoundsGeneration = 0;
 let screenshotInProgress = false;
 let overlayPreferences = { interfaceLanguage: "ru", saveTimestampsEnabled: true };
 let stopGameLifetimeWatcher = () => {};
+let lifetimeArgv = process.argv;
+let forceExitTimer = null;
 let displaySettleTimer = null;
 let displayTransitionGeneration = 0;
 let displayTransitionActive = false;
@@ -217,7 +219,7 @@ function setHardwareAcceleration(enabled) {
         if (choice !== 0) return;
         saveConfig({ hardwareAcceleration: enabled });
         // An explicit disable-gpu argument would otherwise survive re-enabling via the tray.
-        const args = process.argv.slice(1).filter((arg) => !enabled || !/^--disable-gpu(?:=.*)?$/.test(arg));
+        const args = lifetimeArgv.slice(1).filter((arg) => !enabled || !/^--disable-gpu(?:=.*)?$/.test(arg));
         app.relaunch({ args });
         app.quit();
     } catch (error) {
@@ -785,9 +787,17 @@ function createTray() {
 if (!app.requestSingleInstanceLock()) {
     app.quit();
 } else {
-    app.on("second-instance", () => {
+    app.on("second-instance", (_event, argv) => {
+        if (quitting) return;
+        if (canAdoptGame(lifetimeArgv, argv)) {
+            stopGameLifetimeWatcher();
+            // Preserve this instance's launch options; accept only the validated PID.
+            lifetimeArgv = lifetimeArgv.filter((arg) => !arg.startsWith("--overlay-game-pid"));
+            lifetimeArgv.push(`--overlay-game-pid=${parseGamePid(argv)}`);
+            stopGameLifetimeWatcher = startGameLifetimeWatcher({ argv: lifetimeArgv, quit: () => app.quit() });
+        }
         userWantsOverlay = true;
-                syncWindowVisibility();
+        syncWindowVisibility();
     });
 
     app.whenReady().then(async () => {
@@ -804,11 +814,17 @@ if (!app.requestSingleInstanceLock()) {
         screen.on("display-added", repositionOverlay);
         screen.on("display-removed", repositionOverlay);
         screen.on("display-metrics-changed", repositionOverlay);
-        stopGameLifetimeWatcher = startGameLifetimeWatcher({ quit: () => app.quit() });
+        stopGameLifetimeWatcher();
+        stopGameLifetimeWatcher = startGameLifetimeWatcher({ argv: lifetimeArgv, quit: () => app.quit() });
     });
 }
 
 app.on("before-quit", () => {
+    // A renderer can stall/cancel normal shutdown. Only terminate our own app.
+    if (forceExitTimer === null) {
+        forceExitTimer = setTimeout(() => app.exit(0), 5000);
+        forceExitTimer.unref?.();
+    }
     quitting = true;
     stopGameLifetimeWatcher();
     cancelDisplayTransition();
