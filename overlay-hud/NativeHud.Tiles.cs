@@ -11,6 +11,9 @@ namespace OverlayHUD
         private const float CardBorder = NativeHudLayout.BorderWidth;
         private const float ArtworkSize = CardSize - 2 * CardBorder;
         private const float HealthHeight = CardSize * .145f;
+        private const float CooldownTop = CardSize * .07f + 3;
+
+        private const float CooldownPillAlpha = .64f;
 
         private sealed class Tile
         {
@@ -100,11 +103,12 @@ namespace OverlayHUD
             var track = Fill("HealthTrack", tile.Content, -1, CardSize + 14 - HealthHeight, 72, HealthHeight, new Color(0, 0, 0, .76f));
             tile.HealthGroup = track.gameObject.AddComponent<CanvasGroup>();
             tile.Bar = Fill("Health", track.transform, 2, 2, 68, HealthHeight - 4, Color.green);
-            tile.TimerPill = Fill("CooldownPill", tile.Content, 6, CardSize * .07f, 58, 18.7f, new Color(0, 0, 0, .52f));
+            tile.TimerPill = Fill("CooldownPill", tile.Content, 6, CooldownTop, 58, 18.7f, new Color(0, 0, 0, CooldownPillAlpha));
             tile.LabelBacking = tile.TimerPill.rectTransform;
             tile.CooldownGroup = tile.LabelBacking.gameObject.AddComponent<CanvasGroup>();
             tile.Label = Text(tile.LabelBacking, roboto, CardSize * .21f, 5, 2, 48, 14.7f);
             tile.Label.Centered = true;
+
             var textShadow = tile.Label.gameObject.AddComponent<Shadow>();
             textShadow.effectColor = Color.black;
             textShadow.effectDistance = new Vector2(0, -1);
@@ -268,11 +272,11 @@ namespace OverlayHUD
             tile.LabelBacking.sizeDelta = new Vector2(width + 10, 18.7f);
             float reduction = Mathf.Clamp01((float)(now - tile.CooldownReducedAt) / 1.05f);
             float pulse = !options.Animations ? 0 : reduction < .16f ? reduction / .16f : 1 - (reduction - .16f) / .84f;
-            tile.TimerPill.color = Color.Lerp(new Color(0, 0, 0, .52f), new Color(.74f, .043f, .039f, .96f), pulse);
+            tile.TimerPill.color = Color.Lerp(new Color(0, 0, 0, CooldownPillAlpha), new Color(.74f, .043f, .039f, .96f), pulse);
             float scale = Mathf.Lerp(.9f, 1, tile.CooldownAlpha) * (1 + .14f * pulse);
             tile.LabelBacking.localScale = new Vector3(scale, scale, 1);
             tile.LabelBacking.anchoredPosition = new Vector2((CardSize - (width + 10) * scale) / 2,
-                -CardSize * .07f + 3 * (1 - tile.CooldownAlpha) + pulse);
+                -CooldownTop + 3 * (1 - tile.CooldownAlpha) + pulse);
         }
 
         private void AnimateDamage(Tile tile, float now)
