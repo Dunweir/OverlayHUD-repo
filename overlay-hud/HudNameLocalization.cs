@@ -118,13 +118,17 @@ namespace OverlayHUD
             return fallback;
         }
 
-        internal Dictionary<string, Dictionary<string, string>> EnemyNames()
+        internal Dictionary<string, Dictionary<string, string>> EnemyNames() => ExportNames("ENEMY.");
+
+        internal Dictionary<string, Dictionary<string, string>> UpgradeNames() => ExportNames("STATS.UPGRADE.");
+
+        private Dictionary<string, Dictionary<string, string>> ExportNames(string prefix)
         {
             var result = new Dictionary<string, Dictionary<string, string>>(StringComparer.Ordinal);
             foreach (var table in tables)
                 foreach (var entry in table.Value)
                 {
-                    if (!entry.Key.StartsWith("ENEMY.", StringComparison.Ordinal)) continue;
+                    if (!entry.Key.StartsWith(prefix, StringComparison.Ordinal)) continue;
                     if (!result.TryGetValue(entry.Key, out var translations))
                         result[entry.Key] = translations = new Dictionary<string, string>(StringComparer.Ordinal);
                     translations[table.Key] = entry.Value;

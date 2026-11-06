@@ -58,8 +58,9 @@ namespace OverlayHUD
             // Native uses the cache directly. It must never start a desktop HTTP loop.
             if (nativeMode) yield break;
             var names = LocalizedHudNames.EnemyNames();
-            if (names.Count == 0) yield break;
-            string json = JsonConvert.SerializeObject(new { names });
+            var upgradeNames = LocalizedHudNames.UpgradeNames();
+            if (names.Count == 0 && upgradeNames.Count == 0) yield break;
+            string json = JsonConvert.SerializeObject(new { names, upgradeNames });
 
             // Retry startup races and republish after a desktop-server restart.
             while (true)

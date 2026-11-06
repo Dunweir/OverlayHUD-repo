@@ -127,7 +127,7 @@ const defaultOverlayState = {
     respawnIndicatorVisible: true,
     onlyAliveMonstersVisible: false,
     onlyAliveIncludeUndetected: false,
-    itemDestroyedAlertsVisible: true,
+    itemDestroyedAlertsVisible: false,
     squareSize: 70,
     upgradeSize: 38,
     overlayScaleVersion: 3,
@@ -364,6 +364,8 @@ function broadcastState() {
 
 function getNormalizedOverlayState() {
     overlayState = normalizeOverlayState(overlayState) || { ...defaultOverlayState };
+    // Runtime tables are authoritative, never restored from client preferences/state.
+    overlayState.hudNames = getHudNames();
     return overlayState;
 }
 
@@ -673,26 +675,56 @@ function writeTimestampSession() {
 // Extracted from the game's HUD string tables; refreshed by the plugin at runtime.
 const bundledMonsterNames = require(path.join(__dirname, "assets/monster-localization.json"));
 let localizedMonsterNames = { ...bundledMonsterNames };
+const bundledUpgradeNames = require(path.join(__dirname, "assets/upgrade-localization.json"));
+const upgradeLocalizationFallbacks = Object.fromEntries(Object.values(bundledUpgradeNames)
+    .map(({ key, ru, en }) => [key, { ru, en }]));
+let localizedUpgradeNames = { ...upgradeLocalizationFallbacks };
 // Stable internal identity must not depend on a later change to an English display name.
 const monsterLocalizationKeys = new Map(Object.entries(bundledMonsterNames).map(([key, names]) => [
     normalizeMonsterKey(key === "ENEMY.SNATCHER" ? "Snatcher" : names.en), key
 ]));
 
-function updateMonsterLocalization(names) {
-    if (!names || typeof names !== "object" || Array.isArray(names)) return false;
+function normalizeLocalizationNames(names, fallbacks, keyPattern) {
+    if (!names || typeof names !== "object" || Array.isArray(names)) return null;
     const next = {};
     for (const [key, entry] of Object.entries(names)) {
-        if (!/^ENEMY\.[A-Z0-9_]+$/.test(key) || !entry || typeof entry !== "object") return false;
-        next[key] = { ...bundledMonsterNames[key] };
+        if (!keyPattern.test(key) || !entry || typeof entry !== "object" || Array.isArray(entry)) return null;
+        next[key] = { ...fallbacks[key] };
         for (const language of ["en", "ru"]) {
             const label = entry[language];
             if (label == null) continue;
-            if (typeof label !== "string" || !label.trim() || label.length > 200 || /[\r\n\x00-\x1f]/.test(label)) return false;
+            if (typeof label !== "string" || !label.trim() || label.length > 200 || /[\r\n\x00-\x1f]/.test(label)) return null;
             next[key][language] = label.trim();
         }
     }
-    localizedMonsterNames = { ...bundledMonsterNames, ...next };
+    return { ...fallbacks, ...next };
+}
+
+function updateMonsterLocalization(names, upgradeNames) {
+    const monsters = normalizeLocalizationNames(names, bundledMonsterNames, /^ENEMY\.[A-Z0-9_]+$/);
+    const upgrades = upgradeNames === undefined ? localizedUpgradeNames
+        : normalizeLocalizationNames(upgradeNames, upgradeLocalizationFallbacks, /^STATS\.UPGRADE\.[A-Z0-9_]+$/);
+    if (!monsters || !upgrades) return false;
+    localizedMonsterNames = monsters;
+    localizedUpgradeNames = upgrades;
     return true;
+}
+
+function getHudNames() {
+    const monsters = {};
+    for (const [key, names] of Object.entries(bundledMonsterNames)) {
+        const canonical = normalizeMonsterName(key === "ENEMY.SNATCHER" ? "Snatcher" : names.en);
+        monsters[canonical] = { ...localizedMonsterNames[key] };
+        // Also support singular/legacy identities without renaming gameplay entries.
+        monsters[names.en] = { ...localizedMonsterNames[key] };
+    }
+    for (const alias of Object.values(monsterConfig.aliases)) {
+        const canonical = normalizeTimestampMonsterName(alias);
+        if (monsters[canonical]) monsters[alias] = { ...monsters[canonical] };
+    }
+    const upgrades = Object.fromEntries(Object.entries(bundledUpgradeNames)
+        .map(([upgrade, { key }]) => [upgrade, { ...localizedUpgradeNames[key] }]));
+    return { monsters, upgrades };
 }
 
 function normalizeTimestampMonsterName(name) {
@@ -1101,8 +1133,10 @@ const server = http.createServer(async (request, response) => {
             let payload;
             try { payload = JSON.parse(body); }
             catch { sendJson(response, 400, { error: "Invalid JSON" }); return; }
-            const ok = updateMonsterLocalization(payload?.names);
+            const previous = JSON.stringify(getHudNames());
+            const ok = updateMonsterLocalization(payload?.names, payload?.upgradeNames);
             sendJson(response, ok ? 200 : 422, ok ? { ok: true } : { error: "Invalid monster localization" });
+            if (ok && previous !== JSON.stringify(getHudNames())) broadcastState();
             return;
         }
         if (request.method === "GET" && request.url === "/api/state") {

@@ -110,11 +110,44 @@ for (const stored of [null, '{}', '{invalid', 'null', '{"interfaceLanguage":"de"
     });
 }
 
-test('missing local and server language falls back to Russian', async () => {
+test('fresh Electron defaults match Native language, tooltips and alerts', async () => {
     const client = loadClient();
     await flush();
     assert.equal(client.api.getState().interfaceLanguage, 'ru');
+    assert.equal(client.api.getState().upgradeTooltipsVisible, false);
+    assert.equal(client.api.getState().itemDestroyedAlertsVisible, false);
     assert.equal(client.posts.length, 0);
+});
+
+for (const enabled of [false, true]) {
+    test(`saved destroyed-item alert preference survives startup: ${enabled}`, async () => {
+        const client = loadClient({
+            stored: JSON.stringify({ itemDestroyedAlertsVisible: enabled }),
+            serverState: { itemDestroyedAlertsVisible: !enabled }
+        });
+        await flush();
+        assert.equal(client.api.getState().itemDestroyedAlertsVisible, enabled);
+        assert.equal(client.posts[0].itemDestroyedAlertsVisible, enabled);
+    });
+}
+
+test('HUD names arrive through GET/SSE but never become saved preferences', async () => {
+    const hudNames = { monsters: { Banger: { ru: 'Взрывник', en: 'Banger' } },
+        upgrades: { extraJump: { ru: 'Ещё один прыжок', en: 'Extra Jump' } } };
+    const client = loadClient({ serverState: { ...gameplay, hudNames },
+        stored: JSON.stringify({ interfaceLanguage: 'ru', hudNames: { monsters: {} } }) });
+    await flush();
+    assert.deepEqual(plain(client.api.getState().hudNames), hudNames);
+    const changed = plain(hudNames);
+    changed.monsters.Banger.ru = 'Обновлённое имя';
+    client.streams[0].send({ ...gameplay, hudNames: changed });
+    assert.deepEqual(plain(client.api.getState().hudNames), changed);
+    assertGameplay(client.api.getState());
+    client.api.setInterfaceLanguage('en');
+    await flush();
+    assert.deepEqual(plain(client.api.getState().hudNames), changed);
+    assert.ok(client.posts.every((settings) => !('hudNames' in settings)));
+    assert.equal('hudNames' in JSON.parse(client.stored()), false);
 });
 
 test('saved Russian also takes precedence over initial server English', async () => {

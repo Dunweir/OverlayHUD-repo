@@ -53,6 +53,13 @@ Check(names.MonsterName("Modded Enemy", "ru", true, false) == "Modded Enemy", "U
 Check(names.UpgradeName("tumbleLaunch", "de") == "Рывок при кувырке", "Native's default language must remain ru");
 Check(names.EnemyNames().Count == monsters.Count, "Desktop payload includes upgrade labels");
 Check(names.EnemyNames().All(e => e.Value.Count == 2), "Desktop lost a language");
+Check(names.UpgradeNames().Count == upgrades.Count, "Desktop upgrade export count");
+foreach (var entry in upgrades)
+    foreach (string language in new[] { "ru", "en" })
+        Check(names.UpgradeNames()[entry.Value["key"]][language] == names.UpgradeName(entry.Key, language),
+            "Desktop and Native upgrade labels differ: " + entry.Key);
+names.UpgradeNames()["STATS.UPGRADE.LAUNCH"]["ru"] = "mutated snapshot";
+Check(names.UpgradeName("tumbleLaunch", "ru") == "Рывок при кувырке", "Upgrade export exposed mutable cache");
 names.EnemyNames()["ENEMY.BANG"]["ru"] = "mutated snapshot";
 Check(names.MonsterName("Banger", "ru", true, false) == "Взрывник", "Export must not expose mutable cache");
 
@@ -167,7 +174,12 @@ Check(delays.SequenceEqual(new[] { 5f, 5f, 5f, 60f, 60f }), "Desktop startup/res
 Check(desktop.Posts.Count == 5, "Desktop did not republish names");
 var payload = JObject.Parse(desktop.Posts[0]);
 Check(payload["names"].Children().Count() == monsters.Count && (string)payload["names"]["ENEMY.BANG"]["ru"] == "Взрывник",
-    "Desktop payload changed or contains upgrades");
+    "Desktop names payload changed or contains upgrades");
+Check(payload["upgradeNames"].Children().Count() == upgrades.Count, "Desktop omitted upgrade names");
+foreach (var entry in upgrades)
+    foreach (string language in new[] { "ru", "en" })
+        Check((string)payload["upgradeNames"][entry.Value["key"]][language]
+            == Plugin.LocalizedHudNames.UpgradeName(entry.Key, language), "Plugin payload differs from Native: " + entry.Key);
 
 ResetRuntime();
 LocalizationSettings.AvailableLocales.Missing.Add("ru-RU");
@@ -176,6 +188,19 @@ sync = desktop.Sync();
 for (int step = 0; step < 30 && desktop.Posts.Count == 0 && sync.MoveNext(); step++) { }
 Check(desktop.Posts.Count == 1 && JObject.Parse(desktop.Posts[0])["names"]["ENEMY.BANG"]["ru"] == null,
     "Missing Russian prevented partial desktop sync");
+Check((string)JObject.Parse(desktop.Posts[0])["upgradeNames"]["STATS.UPGRADE.LAUNCH"]["en"] == "Tumble Launch"
+    && JObject.Parse(desktop.Posts[0])["upgradeNames"]["STATS.UPGRADE.LAUNCH"]["ru"] == null,
+    "Partial upgrade tables not exported");
+ResetRuntime();
+foreach (string locale in new[] { "en-US", "ru-RU" })
+    LocalizationSettings.StringDatabase.Tables[locale].Values = new Dictionary<string, string>
+    { ["STATS.UPGRADE.LAUNCH"] = "Updated official stat label" };
+desktop = new Plugin(false);
+sync = desktop.Sync();
+for (int step = 0; step < 10 && desktop.Posts.Count == 0 && sync.MoveNext(); step++) { }
+Check(desktop.Posts.Count == 1 && !JObject.Parse(desktop.Posts[0])["names"].HasValues
+    && (string)JObject.Parse(desktop.Posts[0])["upgradeNames"]["STATS.UPGRADE.LAUNCH"]["ru"] == "Updated official stat label",
+    "Upgrade-only game tables must publish even without enemy names");
 ResetRuntime();
 LocalizationSettings.AvailableLocales.Missing.UnionWith(new[] { "en-US", "ru-RU" });
 desktop = new Plugin(false);

@@ -396,17 +396,17 @@
                 cooldownShort: "💀",
                 upgradesNames: {
                     strength: "Сила",
-                    tumbleLaunch: "Кувырок: запуск",
+                    tumbleLaunch: "Рывок при кувырке",
                     range: "Дальность",
                     sprintSpeed: "Скорость бега",
-                    tumbleWings: "Кувырок: крылья",
+                    tumbleWings: "Крылья при кувырке",
                     crouchRest: "Отдых в приседе",
-                    extraJump: "Доп. прыжок",
-                    tumbleClimb: "Кувырок: подъём",
+                    extraJump: "Ещё один прыжок",
+                    tumbleClimb: "Карабкание при кувырке",
                     health: "Здоровье",
                     stamina: "Выносливость",
-                    mapPlayerCount: "Счётчик игроков",
-                    deathHeadBattery: "Батарея головы"
+                    mapPlayerCount: "Счётчик игроков на карте",
+                    deathHeadBattery: "Батарея мёртвой головы"
                 }
             },
             en: {
@@ -483,8 +483,23 @@
             return interfaceText[currentLanguage][key] || interfaceText.ru[key] || key;
         }
 
+        function getLocalizedHudName(group, key, fallback) {
+            const names = latestState?.hudNames?.[group]?.[key];
+            for (const language of [currentLanguage, "en"]) {
+                const value = names?.[language];
+                if (typeof value === "string" && value.trim()) return value;
+            }
+            return fallback;
+        }
+
         function getUpgradeName(upgrade) {
-            return interfaceText[currentLanguage].upgradesNames[upgrade.key] || upgrade.name;
+            return getLocalizedHudName("upgrades", upgrade.key,
+                interfaceText[currentLanguage].upgradesNames[upgrade.key] || upgrade.name);
+        }
+
+        function getMonsterName(monster) {
+            if (monster.unknown) return monster.name;
+            return getLocalizedHudName("monsters", monster.name, monster.name);
         }
 
         function formatCurrency(value) {
@@ -1009,7 +1024,7 @@
                 square.appendChild(tooltip);
             }
 
-            tooltip.querySelector(".monster-tooltip-name").textContent = monster.name;
+            tooltip.querySelector(".monster-tooltip-name").textContent = getMonsterName(monster);
             tooltip.querySelector(".monster-tooltip-health").textContent = getMonsterHealthText(status);
             tooltip.querySelector(".monster-tooltip-strength").textContent = getMonsterStrengthText(monster);
         }

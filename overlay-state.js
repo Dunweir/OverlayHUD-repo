@@ -80,7 +80,7 @@ const OverlayApp = (() => {
         respawnIndicatorVisible: true,
         onlyAliveMonstersVisible: false,
         onlyAliveIncludeUndetected: false,
-        itemDestroyedAlertsVisible: true,
+        itemDestroyedAlertsVisible: false,
         squareSize: 70,
         upgradeSize: 38,
         overlayScaleVersion: 3,

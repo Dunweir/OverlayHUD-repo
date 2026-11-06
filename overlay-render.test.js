@@ -149,7 +149,7 @@ test("value updates only refresh counters and position", () => {
     }
 });
 test("zero crossings, gameplay activation and layout changes retain full rendering", () => {
-    for (const changes of [{ mapValue: 0 }, { lostValue: 0 }, { gameplayVisible: false }, { level: 2 }, { squareSize: 90 }, { roster: [{ id: 1 }] }, { interfaceLanguage: "en" }]) {
+    for (const changes of [{ mapValue: 0 }, { lostValue: 0 }, { gameplayVisible: false }, { level: 2 }, { squareSize: 90 }, { roster: [{ id: 1 }] }, { interfaceLanguage: "en" }, { hudNames: { monsters: { Banger: { ru: "Взрывник" } } } }]) {
         assert.deepEqual(render(base, changes).calls, ["full"]);
     }
     assert.deepEqual(render({ ...base, lostValue: 0 }, { lostValue: 1 }).calls, ["full"]);
