@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../../overlay-hud/HudNameLocalization.cs" Link="HudNameLocalization.cs" />
+    <Compile Include="../../overlay-hud/MonsterLocalization.cs" Link="MonsterLocalization.cs" />
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+    <None Include="../../assets/monster-localization.json" Link="monster-localization.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Update="upgrade-names.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="../../overlay-hud/NativeHud.Tooltips.cs" Link="NativeHud.Tooltips.source" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="../../overlay-hud/Plugin.cs" Link="Plugin.source" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>

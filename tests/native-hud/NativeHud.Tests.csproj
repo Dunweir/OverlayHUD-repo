@@ -7,6 +7,8 @@
   <ItemGroup>
     <Compile Include="../../overlay-hud/NativeHudState.cs" Link="NativeHudState.cs" />
     <Compile Include="../../overlay-hud/NativeHudLayout.cs" Link="NativeHudLayout.cs" />
+    <Compile Include="../../overlay-hud/NativeAlertLayout.cs" Link="NativeAlertLayout.cs" />
+    <EmbeddedResource Include="../../overlay-hud/NativeAssets/teko-atlas.json" LogicalName="AlertTekoAtlas.json" />
     <Compile Include="../../overlay-hud/NativeHudOptions.cs" Link="NativeHudOptions.cs" />
     <Compile Include="../../overlay-hud/NativeTimestampWriter.cs" Link="NativeTimestampWriter.cs" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />

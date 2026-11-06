@@ -10,12 +10,12 @@ namespace OverlayHUD
         internal bool HorizontalLayout = true, Enabled = true;
         internal bool ShowLevel = true, ShowTimer = true, ShowMapValue = true, ShowLostValue = true;
         internal bool ShowMonsters = true, ShowProximityWaves = true, ShowRespawnIndicator = true;
-        internal bool ShowDestroyedItemAlerts = true, ShowHealth = true, ShowRespawnTimer = true;
+        internal bool ShowDestroyedItemAlerts = false, ShowHealth = true, ShowRespawnTimer = true;
         internal bool ShowStrength = true, ShowUpgrades = true, ShowMonsterCounts = true;
         internal bool ShowDamageNumbers = true, Animations = true;
         internal bool OnlyAliveMonsters = false, FilterUndetectedMonsters = false;
         internal bool WrapValueLabels = true, ShowTooltips = false;
-        internal bool UseGameUIEffects = false;
+        internal bool UseGameUIEffects = true;
         internal string Language = "ru", Alignment = "Center";
         internal HashSet<string> HiddenUpgrades = new HashSet<string>(StringComparer.Ordinal);
 

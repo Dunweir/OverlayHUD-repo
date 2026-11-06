@@ -86,7 +86,8 @@ namespace OverlayHUD
                     // Use the displayed snapshot (including grouped HP), never look up a hidden roster entry.
                     if (!tile.Seen || monster == null || !monster.Seen || monster.Unknown
                         || !TooltipContainsMouse(tile.Root, mouse)) continue;
-                    tooltipLines[0] = monster.Name ?? "";
+                    tooltipLines[0] = Plugin.LocalizedHudNames.MonsterName(monster.Name, options.Language,
+                        tile.Seen && monster.Seen, monster.Unknown);
                     tooltipLines[1] = TooltipHealth(monster);
                     tooltipLines[2] = TooltipStrength(monster);
                     ShowTooltip(tile.Root, canvasRect, 3);
@@ -124,25 +125,8 @@ namespace OverlayHUD
 
         private static bool TooltipFinite(double value) => !double.IsNaN(value) && !double.IsInfinity(value);
 
-        private string TooltipUpgradeName(string key)
-        {
-            switch (key)
-            {
-                case "strength": return options.Translate("Сила", "Strength");
-                case "tumbleLaunch": return options.Translate("Кувырок: запуск", "Tumble Launch");
-                case "range": return options.Translate("Дальность", "Range");
-                case "sprintSpeed": return options.Translate("Скорость бега", "Sprint Speed");
-                case "tumbleWings": return options.Translate("Кувырок: крылья", "Tumble Wings");
-                case "crouchRest": return options.Translate("Отдых в приседе", "Crouch Rest");
-                case "extraJump": return options.Translate("Доп. прыжок", "Extra Jump");
-                case "tumbleClimb": return options.Translate("Кувырок: подъём", "Tumble Climb");
-                case "health": return options.Translate("Здоровье", "Health");
-                case "stamina": return options.Translate("Выносливость", "Stamina");
-                case "mapPlayerCount": return options.Translate("Счётчик игроков", "Map Player Count");
-                case "deathHeadBattery": return options.Translate("Батарея головы", "Death Head Battery");
-                default: return key;
-            }
-        }
+        private string TooltipUpgradeName(string key) =>
+            Plugin.LocalizedHudNames.UpgradeName(key, options.Language);
 
         private void ShowTooltip(RectTransform target, RectTransform canvasRect, int lineCount)
         {

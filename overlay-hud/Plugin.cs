@@ -310,7 +310,7 @@ namespace OverlayHUD
             InitializeNativeHud();
             if (!nativeMode) StartOverlayAppIfNeeded();
             PatchGameUpdates();
-            if (!nativeMode) StartCoroutine(SyncMonsterLocalization());
+            StartCoroutine(SyncMonsterLocalization());
         }
 
         private void StartOverlayAppIfNeeded()

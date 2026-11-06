@@ -17,11 +17,11 @@ Check(defaults.Scale == 1 && defaults.OffsetX == 0 && defaults.OffsetY == 20
     "Native HUD layout/language defaults changed");
 Check(defaults.HorizontalLayout && defaults.Enabled && defaults.ShowLevel && defaults.ShowTimer
     && defaults.ShowMapValue && defaults.ShowLostValue && defaults.ShowMonsters && defaults.ShowProximityWaves
-    && defaults.ShowRespawnIndicator && defaults.ShowDestroyedItemAlerts && defaults.ShowHealth
+    && defaults.ShowRespawnIndicator && !defaults.ShowDestroyedItemAlerts && defaults.ShowHealth
     && defaults.ShowRespawnTimer && defaults.ShowStrength && defaults.ShowUpgrades && defaults.ShowMonsterCounts
     && defaults.ShowDamageNumbers && defaults.Animations && defaults.WrapValueLabels
     && !defaults.OnlyAliveMonsters && !defaults.FilterUndetectedMonsters && !defaults.ShowTooltips
-    && !defaults.UseGameUIEffects,
+    && defaults.UseGameUIEffects,
     "Native HUD toggle defaults changed");
 Check(defaults.Translate("Уровень", "Level") == "Уровень", "Russian translation failed");
 defaults.Language = "en";
@@ -319,6 +319,7 @@ alerts.Apply("level", "{\"level\":3}", 82);
 alertClock.Update(alerts.LastDestroyedItem, true, 82);
 Check(alertClock.Current == null && alerts.LastDestroyedItem == null, "Level transition retained a pending alert");
 Console.WriteLine("Native HUD destroyed-item alert checks passed.");
+AlertLayoutTests.Run();
 
 // Native artwork must contain-fit, never stretch portrait upgrades into squares.
 float portraitScale = NativeHudLayout.ContainScale(128, 256, 26);

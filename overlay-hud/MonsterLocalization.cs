@@ -1,80 +1,65 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
-using System.Text;
 using System.Threading.Tasks;
+using Newtonsoft.Json;
 using UnityEngine;
 using UnityEngine.Localization.Settings;
+using UnityEngine.Localization.Tables;
 using UnityEngine.ResourceManagement.AsyncOperations;
 
 namespace OverlayHUD
 {
     public sealed partial class Plugin
     {
+        internal static readonly HudNameLocalization LocalizedHudNames = new HudNameLocalization();
+
         private IEnumerator SyncMonsterLocalization()
         {
-            // Explicit locales: never change the game's selected language.
-            var initialization = LocalizationSettings.InitializationOperation;
+            LocalizedHudNames.Clear();
+            // Explicit locales: never change the game's selected language or mutate a
+            // LocalizedAsset's shared LocaleOverride. No synchronous Addressables waits.
+            AsyncOperationHandle<LocalizationSettings> initialization;
+            try { initialization = LocalizationSettings.InitializationOperation; }
+            catch (Exception ex)
+            {
+                Logger.LogWarning("Game localization unavailable; using fallback HUD names. " + ex.Message);
+                yield break;
+            }
             yield return initialization;
             if (initialization.Status != AsyncOperationStatus.Succeeded)
             {
-                Logger.LogWarning("Game localization initialization failed; using bundled enemy names.");
+                Logger.LogWarning("Game localization initialization failed; using fallback HUD names.");
                 yield break;
             }
 
-            string json = null;
-            while (json == null)
+            var loaded = new HashSet<string>();
+            // Missing tables/locales must not block the other language or retry forever.
+            for (int attempt = 0; attempt < 6 && loaded.Count < 2; attempt++)
             {
-                var names = new Dictionary<string, Dictionary<string, string>>();
-                bool complete = true;
                 foreach (string code in new[] { "en-US", "ru-RU" })
                 {
-                    var locale = LocalizationSettings.AvailableLocales.GetLocale(code);
-                    if (locale == null) { complete = false; continue; }
-                    var operation = LocalizationSettings.StringDatabase.GetTableAsync("HUD", locale);
+                    if (loaded.Contains(code) || !TryRequestHudTable(code, out var operation)) continue;
                     yield return operation;
-                    if (operation.Status != AsyncOperationStatus.Succeeded || operation.Result == null)
-                    {
-                        complete = false;
-                        continue;
-                    }
-                    // The database owns and caches these table handles.
+                    if (operation.Status != AsyncOperationStatus.Succeeded || operation.Result == null) continue;
+                    // The database owns and caches these table handles; do not release them.
+                    var entries = new List<KeyValuePair<string, string>>();
                     foreach (var entry in operation.Result.Values)
-                    {
-                        if (entry.Key == null || !entry.Key.StartsWith("ENEMY.", StringComparison.Ordinal)
-                            || string.IsNullOrWhiteSpace(entry.Value)) continue;
-                        if (!names.TryGetValue(entry.Key, out var translations))
-                        {
-                            translations = new Dictionary<string, string>();
-                            names.Add(entry.Key, translations);
-                        }
-                        translations[code.Substring(0, 2)] = entry.Value;
-                    }
+                        entries.Add(new KeyValuePair<string, string>(entry.Key, entry.Value));
+                    if (LocalizedHudNames.SetTable(code.Substring(0, 2), entries)) loaded.Add(code);
                 }
-                if (complete && names.Count > 0)
-                {
-                    var builder = new StringBuilder("{\"names\":{");
-                    bool first = true;
-                    foreach (var entry in names)
-                    {
-                        if (!first) builder.Append(',');
-                        first = false;
-                        builder.Append('"').Append(EscapeJson(entry.Key)).Append("\":{");
-                        bool firstLanguage = true;
-                        foreach (var translation in entry.Value)
-                        {
-                            if (!firstLanguage) builder.Append(',');
-                            firstLanguage = false;
-                            builder.Append('"').Append(translation.Key).Append("\":\"")
-                                .Append(EscapeJson(translation.Value)).Append('"');
-                        }
-                        builder.Append('}');
-                    }
-                    json = builder.Append("}}").ToString();
-                    Logger.LogInfo("Loaded " + names.Count + " official enemy names from the game's ru/en HUD tables.");
-                }
-                else yield return new WaitForSecondsRealtime(10f);
+                if (loaded.Count < 2 && attempt < 5) yield return new WaitForSecondsRealtime(10f);
             }
+            Logger.LogInfo("Loaded official HUD names (ENEMY.* / STATS.UPGRADE.*) for "
+                + loaded.Count + "/2 ru/en locales.");
+            if (loaded.Count < 2)
+                Logger.LogWarning("Some HUD localization tables are unavailable; missing names use English/original fallbacks.");
+
+            // Native uses the cache directly. It must never start a desktop HTTP loop.
+            if (nativeMode) yield break;
+            var names = LocalizedHudNames.EnemyNames();
+            if (names.Count == 0) yield break;
+            string json = JsonConvert.SerializeObject(new { names });
 
             // Retry startup races and republish after a desktop-server restart.
             while (true)
@@ -84,6 +69,23 @@ namespace OverlayHUD
                 while (!request.IsCompleted) yield return null;
                 bool success = !request.IsFaulted && !request.IsCanceled && IsHttpSuccess(request.Result);
                 yield return new WaitForSecondsRealtime(success ? 60f : 5f);
+            }
+        }
+
+        private bool TryRequestHudTable(string code, out AsyncOperationHandle<StringTable> operation)
+        {
+            operation = default;
+            try
+            {
+                var locale = LocalizationSettings.AvailableLocales.GetLocale(code);
+                if (locale == null) return false;
+                operation = LocalizationSettings.StringDatabase.GetTableAsync("HUD", locale);
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Logger.LogWarning("Cannot load HUD localization for " + code + ": " + ex.Message);
+                return false;
             }
         }
     }

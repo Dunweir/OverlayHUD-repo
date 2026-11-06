@@ -7,7 +7,12 @@ namespace OverlayHUD
 {
     public sealed partial class Plugin
     {
-        public enum RendererMode { Electron, Native }
+        public enum RendererMode
+        {
+            [System.ComponentModel.Description("Electron (old)")]
+            Electron,
+            Native
+        }
         private bool nativeMode;
         private NativeHud nativeHud;
         private NativeTimestampWriter nativeTimestamps;
@@ -28,8 +33,8 @@ namespace OverlayHUD
 
         private void InitializeNativeHud()
         {
-            nativeMode = Config.Bind("Overlay", "Renderer", RendererMode.Electron,
-                "Electron or experimental Native Unity HUD. Restart the game after changing.").Value == RendererMode.Native;
+            nativeMode = Config.Bind("Overlay", "Renderer", RendererMode.Native,
+                "Native Unity HUD (default) or Electron (old) desktop HUD. Electron keeps its config value for compatibility. Restart the game after changing.").Value == RendererMode.Native;
             nativeEnabled = BindNativeToggle("Enabled", true, "Show the native HUD without stopping game-state tracking.");
             nativeSaveTimestamps = Config.Bind("NativeHUD", "SaveTimestamps", true,
                 "Save level start times, map names and seen monster names/counts in BepInEx/plugins/OverlayHUD/timestamps. Disabling finalizes the current line; enabling starts at the next level.");
@@ -62,7 +67,7 @@ namespace OverlayHUD
             nativeMonsters = BindNativeToggle("ShowMonsters", true, "Show the monster tiles; does not hide the level, timer, values or upgrades.");
             nativeProximityWaves = BindNativeToggle("ShowProximityWaves", true, "Show proximity waves around nearby monster tiles.");
             nativeRespawnIndicator = BindNativeToggle("ShowRespawnIndicator", true, "Show the circular monster respawn indicator, independently of ShowRespawnTimer.");
-            nativeDestroyedItemAlerts = BindNativeToggle("ShowDestroyedItemAlerts", true, "Show notifications about destroyed valuables and their last holder.");
+            nativeDestroyedItemAlerts = BindNativeToggle("ShowDestroyedItemAlerts", false, "Show notifications about destroyed valuables and their last holder.");
             nativeHealth = BindNativeToggle("ShowHealth", true, "Show monster health bars. Numeric HP is available in hover tooltips when ShowTooltips is enabled.");
             nativeRespawn = BindNativeToggle("ShowRespawnTimer", true, "Show seen monsters' numeric respawn timers, independently of ShowRespawnIndicator.");
             nativeStrength = BindNativeToggle("ShowStrength", true, "Show required strength on seen monsters, including during respawn. Green means sufficient strength, red insufficient; amber X means impossible and ? unknown.");
@@ -74,7 +79,7 @@ namespace OverlayHUD
             nativeFilterUndetectedMonsters = BindNativeToggle("FilterUndetectedMonsters", false, "When OnlyAliveMonsters is true, also remove dead undetected placeholders. False keeps all undetected placeholders. Ignored when OnlyAliveMonsters is false.");
             nativeWrapValueLabels = BindNativeToggle("WrapValueLabels", true, "Place map/loss labels above their amounts; false keeps labels and amounts on one line.");
             nativeTooltips = BindNativeToggle("ShowTooltips", false, "Show monster and upgrade tooltips on hover while the game cursor is unlocked. Does not unlock or capture the cursor. Tooltips are disabled while UseGameUIEffects is active.");
-            nativeGameUIEffects = BindNativeToggle("UseGameUIEffects", false,
+            nativeGameUIEffects = BindNativeToggle("UseGameUIEffects", true,
                 "Experimental: render the native HUD through the game's UI camera and compositor to inherit real game HUD effects. The game's lower-resolution render texture reduces HUD sharpness; hover tooltips are disabled while active. Falls back to the normal HUD while the game UI is unavailable.");
 
             BindNativeUpgrade("strength", "Strength");

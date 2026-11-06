@@ -1,0 +1,14 @@
+{
+  "strength": { "key": "STATS.UPGRADE.STRENGTH", "en": "Strength", "ru": "Сила" },
+  "tumbleLaunch": { "key": "STATS.UPGRADE.LAUNCH", "en": "Tumble Launch", "ru": "Рывок при кувырке" },
+  "range": { "key": "STATS.UPGRADE.RANGE", "en": "Range", "ru": "Дальность" },
+  "sprintSpeed": { "key": "STATS.UPGRADE.SPEED", "en": "Sprint Speed", "ru": "Скорость бега" },
+  "tumbleWings": { "key": "STATS.UPGRADE.TUMBLE_WINGS", "en": "Tumble Wings", "ru": "Крылья при кувырке" },
+  "crouchRest": { "key": "STATS.UPGRADE.CROUCH_REST", "en": "Crouch Rest", "ru": "Отдых в приседе" },
+  "extraJump": { "key": "STATS.UPGRADE.EXTRA_JUMP", "en": "Extra Jump", "ru": "Ещё один прыжок" },
+  "tumbleClimb": { "key": "STATS.UPGRADE.TUMBLE_CLIMB", "en": "Tumble Climb", "ru": "Карабкание при кувырке" },
+  "health": { "key": "STATS.UPGRADE.HEALTH", "en": "Health", "ru": "Здоровье" },
+  "stamina": { "key": "STATS.UPGRADE.STAMINA", "en": "Stamina", "ru": "Выносливость" },
+  "mapPlayerCount": { "key": "STATS.UPGRADE.MAP_PLAYER_COUNT", "en": "Map Player Count", "ru": "Счётчик игроков на карте" },
+  "deathHeadBattery": { "key": "STATS.UPGRADE.DEATH_HEAD_BATTERY", "en": "Death Head Battery", "ru": "Батарея мёртвой головы" }
+}

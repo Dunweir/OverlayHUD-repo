@@ -1,4 +1,3 @@
-using System;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -6,28 +5,27 @@ namespace OverlayHUD
 {
     internal sealed partial class NativeHud
     {
-        private const float AlertHeight = 64, AlertGap = 14;
         private readonly NativeAlertLifetime alertLifetime = new NativeAlertLifetime();
         private RectTransform alertPanel;
         private CanvasGroup alertGroup;
-        private NativeBitmapText alertPlayer, alertItem;
+        private NativeBitmapText alertPlayer, alertAction, alertItem;
 
         private void CreateAlerts()
         {
-            alertPanel = Fill("DestroyedItemAlert", panel, 0, 0, 0, AlertHeight,
-                new Color32(45, 18, 20, 244), 9).rectTransform;
+            alertPanel = Fill("DestroyedItemAlert", panel, 0, 0, 0, NativeAlertLayout.Height,
+                HeaderColor(225, 70, 70, .17f), NativeAlertLayout.Radius).rectTransform;
             // Clip glyph overhangs as well as text in exceptionally narrow viewports.
             alertPanel.gameObject.AddComponent<RectMask2D>();
             alertGroup = alertPanel.gameObject.AddComponent<CanvasGroup>();
             alertGroup.blocksRaycasts = false;
             alertGroup.interactable = false;
-            var burst = Rect("Burst", alertPanel, 12, 16, 32, 32).gameObject.AddComponent<NativeAlertBurst>();
+            var burst = Rect("Burst", alertPanel, NativeAlertLayout.PaddingX, NativeAlertLayout.PaddingTop,
+                NativeAlertLayout.FontSize, NativeAlertLayout.FontSize).gameObject.AddComponent<NativeAlertBurst>();
             burst.color = new Color32(255, 157, 91, 255);
             burst.raycastTarget = false;
-            alertPlayer = Text(alertPanel, robotoBold, 22, 56, 7, 0, 25);
-            alertPlayer.color = new Color32(255, 192, 182, 255);
-            alertItem = Text(alertPanel, robotoBold, 20, 56, 33, 0, 24);
-            alertItem.color = new Color32(255, 241, 235, 255);
+            alertPlayer = CreateAlertText(HeaderColor(255, 154, 154));
+            alertAction = CreateAlertText(HeaderColor(247, 251, 255, .72f));
+            alertItem = CreateAlertText(HeaderColor(255, 154, 154));
             alertPanel.gameObject.SetActive(false);
         }
 
@@ -37,10 +35,7 @@ namespace OverlayHUD
             bool visible = alertLifetime.Current != null;
             alertPanel.gameObject.SetActive(visible);
             if (!visible) return;
-            double elapsed = now - alertLifetime.ShownAt;
-            alertGroup.alpha = options.Animations
-                ? Mathf.Clamp01((float)Math.Min(elapsed / .18, (NativeAlertLifetime.ShowDuration - elapsed) / .3))
-                : 1;
+            alertGroup.alpha = NativeAlertLayout.Opacity(now - alertLifetime.ShownAt, options.Animations);
         }
 
         private void PositionAlerts()
@@ -50,42 +45,34 @@ namespace OverlayHUD
             // FitToScreen uses height matching; all positions here are canvas units.
             float viewportHeight = scaler.referenceResolution.y;
             float viewportWidth = viewportHeight * HudViewportAspect;
-            const float margin = 2;
-            float width = Mathf.Max(0, Mathf.Min(640, Mathf.Min(Mathf.Max(360, layoutWidth), viewportWidth - margin * 2)));
-            float height = Mathf.Max(0, Mathf.Min(AlertHeight, viewportHeight - margin * 2));
+            var current = alertLifetime.Current;
+            var line = NativeAlertLayout.BuildLine(current.Player, options.Translate("разрушил", "destroyed"), current.Item,
+                NativeAlertLayout.AvailableWidth(viewportWidth), alertPlayer.Measure);
             float panelLeft = viewportWidth * panel.anchorMin.x + panel.anchoredPosition.x - panel.pivot.x * panel.rect.width;
             float panelTop = viewportHeight * (1 - panel.anchorMin.y) - panel.anchoredPosition.y
                 - (1 - panel.pivot.y) * panel.rect.height;
-            float x = Mathf.Clamp(panelLeft + (panel.rect.width - width) / 2, margin,
-                Mathf.Max(margin, viewportWidth - width - margin));
-            float y = panelTop - height - AlertGap;
-            if (y < margin) y = panelTop + panel.rect.height + AlertGap;
-            // If neither side fits, keeping the alert on-screen takes precedence over the gap.
-            y = Mathf.Clamp(y, margin, Mathf.Max(margin, viewportHeight - height - margin));
-            alertPanel.anchoredPosition = new Vector2(x - panelLeft, panelTop - y);
-            alertPanel.sizeDelta = new Vector2(width, height);
-            float textWidth = Mathf.Max(0, width - 68);
-            alertPlayer.rectTransform.sizeDelta = new Vector2(textWidth, 25);
-            alertItem.rectTransform.sizeDelta = new Vector2(textWidth, 24);
-            var current = alertLifetime.Current;
-            alertPlayer.Value = FitAlertText(alertPlayer, current.Player + options.Translate(" разрушил", " destroyed"), textWidth);
-            alertItem.Value = FitAlertText(alertItem, current.Item, textWidth);
+            var placement = NativeAlertLayout.Place(line.Width, viewportWidth, viewportHeight,
+                panelLeft, panelTop, panel.rect.width, panel.rect.height, alertGroup.alpha);
+            alertPanel.anchoredPosition = new Vector2(placement.X - panelLeft, panelTop - placement.Y);
+            alertPanel.sizeDelta = new Vector2(placement.Width, placement.Height);
+            SetAlertText(alertPlayer, line.Player, line.PlayerX, line.PlayerWidth);
+            SetAlertText(alertAction, line.Action, line.ActionX, line.ActionWidth);
+            SetAlertText(alertItem, line.Item, line.ItemX, line.ItemWidth);
         }
 
-        private static string FitAlertText(NativeBitmapText label, string value, float width)
+        private NativeBitmapText CreateAlertText(Color color)
         {
-            if (label.Measure(value) <= width) return value;
-            const string suffix = "...";
-            if (label.Measure(suffix) > width) return "";
-            int length = value.Length;
-            while (length > 0)
-            {
-                length--;
-                if (length > 0 && char.IsHighSurrogate(value[length - 1])) length--;
-                string shortened = value.Substring(0, length).TrimEnd() + suffix;
-                if (label.Measure(shortened) <= width) return shortened;
-            }
-            return suffix;
+            var label = Text(alertPanel, teko, NativeAlertLayout.FontSize, 0, NativeAlertLayout.PaddingTop,
+                0, NativeAlertLayout.FontSize);
+            label.color = color;
+            return label;
+        }
+
+        private static void SetAlertText(NativeBitmapText label, string value, float x, float width)
+        {
+            label.rectTransform.anchoredPosition = new Vector2(x, -NativeAlertLayout.PaddingTop);
+            label.rectTransform.sizeDelta = new Vector2(width, NativeAlertLayout.FontSize);
+            label.Value = value;
         }
     }
 
