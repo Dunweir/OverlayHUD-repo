@@ -32,9 +32,27 @@ BepInEx creates `local.overlay.overlay_hud.cfg` after first launch. Current sett
 - `Detection.StatusIntervalSeconds` for periodic safety sync; event-driven health and respawn changes remain immediate, and values below 10 seconds are raised to 10.
 - `Detection.PreferPlayerVisionDetection` for player-visible encounter detection, with legacy fallback for enemies that need it.
 - `Debug.Logging` for extra diagnostic logs.
-- `OverlayApp.AutoStart`, `OverlayApp.AutoClose`, `OverlayApp.ExecutableRelativePath`, and `OverlayApp.ArchiveName` for the bundled `OverlayHUD_app`.
+- `OverlayApp.AutoStart`, `OverlayApp.AutoClose`, `OverlayApp.ExecutableRelativePath`, and `OverlayApp.ArchiveName` for the bundled desktop app.
 
-Older LAN endpoints and earlier app folder names are migrated to the current local defaults on launch.
+`OverlayApp.ExecutableRelativePath` defaults to empty, selecting the external per-profile install below. Known legacy default path strings are normalized to empty. Custom paths retain their previous behavior: relative to the plugin DLL or absolute, without this external migration. Older LAN endpoints are migrated to the current local defaults on launch.
+
+## Desktop App Storage
+
+`OverlayHUD_app.zip` stays beside the plugin DLL. The default executable is:
+
+```text
+%LOCALAPPDATA%\OverlayHUD\profiles\<profile-key>\app\OverlayHUD.exe
+```
+
+`<profile-key>` is the SHA-256 of the normalized `BepInExRootPath`. App files, root `overlay-config.json`, and `timestamps/` are isolated per BepInEx profile. Settings UI `localStorage` remains in Electron's existing storage; browser-profile isolation is unchanged.
+
+Close **both the game and desktop app** before updating or preparing migration. Only desktop AutoStart invokes migration; Native HUD timestamps are unchanged. A recognized legacy `OverlayHUD_app` beside the DLL is copied in full, including config, timestamps, and unknown files. Archive updates preserve the root config and timestamps. The legacy folder is deleted only after successful migration; do not delete it beforehand. If both legacy and external installs exist, the legacy folder is left untouched with a warning for manual review. Locked cleanup also produces a warning.
+
+An archive SHA-256 change triggers a staged upgrade without manual deletion. Failed updates preserve the original app and abort launch. Relocation only needs the updated plugin DLL with the existing bundle, not an Electron rebuild.
+
+Look for `Bundled OverlayHUD desktop app ready at:` in `BepInEx/LogOutput.log` for the actual executable path. `Extracted bundled OverlayHUD desktop app` now applies only to custom installs.
+
+External files survive mod uninstall or profile deletion. With the app closed, back up needed timestamps and root config, then manually delete the corresponding `%LOCALAPPDATA%\OverlayHUD\profiles\<profile-key>` folder if no longer needed.
 
 ## Build Notes
 

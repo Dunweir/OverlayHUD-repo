@@ -120,9 +120,19 @@ R.E.P.O. (Unity)
 - **Flat-пакет для Gale** должен содержать ровно: `icon.png`,
   `manifest.json`, `OverlayHUD.dll`, `OverlayHUD_app.zip`, `README.md`,
   `LICENSE`, `THIRD_PARTY_NOTICES.md` — ничего лишнего.
-- **`OverlayHUD_app.zip`** — архив Electron-приложения, который плагин
-  распаковывает рядом с DLL в `OverlayHUD_app/` при первом запуске. При
-  архивации перечисляй верхнеуровневые файлы явно (не `tar -C <dir> .`,
+- **`OverlayHUD_app.zip`** остаётся рядом с DLL; при пустом (по умолчанию)
+  `OverlayApp.ExecutableRelativePath` desktop AutoStart устанавливает приложение в
+  `%LOCALAPPDATA%\OverlayHUD\profiles\<SHA256 нормализованного BepInExRootPath>\app\OverlayHUD.exe`.
+  Старые default-пути нормализуются в пустой; custom-пути остаются относительными к DLL
+  либо абсолютными. Только desktop AutoStart переносит распознанный `OverlayHUD_app/`
+  целиком, удаляя старую папку лишь после успеха; конфликты/блокировки требуют проверки
+  предупреждений. Изменение SHA-256 архива вызывает staged-обновление с сохранением
+  корневого конфига/timestamps; ошибка сохраняет исходное приложение и отменяет запуск.
+  Закрывают игру и desktop; старую папку заранее не удаляют. Хватает новой DLL со старым
+  бандлом, пересборка Electron не нужна. Изолированы файлы приложения, корневой конфиг
+  и timestamps, но не Electron localStorage; Native timestamps не меняются. Внешние
+  файлы переживают удаление мода/профиля; перенос и ручная очистка описаны в README.
+  При архивации перечисляй верхнеуровневые файлы явно (не `tar -C <dir> .`,
   это добавляет лишнюю запись `./`).
 - **Детекция монстров** событийная (Harmony-патчи), периодические проходы
   — только страховка (`Detection.StatusIntervalSeconds`, минимум 10 сек).
@@ -154,7 +164,8 @@ R.E.P.O. (Unity)
 ## Диагностика
 
 Основной источник — `BepInEx/LogOutput.log` игрового профиля. Ключевые строки
-для grep: `Loading [OverlayHUD`, `Extracted bundled OverlayHUD desktop app`,
+для grep: `Loading [OverlayHUD`, `Bundled OverlayHUD desktop app ready at:` (путь к EXE),
 `Started bundled OverlayHUD desktop app`, `Registered spawned enemy parent`,
 `Marked monster for web overlay`, `HTTP/1.1 200 OK`. Подробный чек-лист — в
-README, раздел «Диагностика».
+README, раздел «Диагностика». `Extracted bundled OverlayHUD desktop app` теперь
+относится только к пользовательскому пути установки.

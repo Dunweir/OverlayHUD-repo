@@ -274,7 +274,7 @@ namespace OverlayHUD
             debugLogging = Config.Bind("Debug", "Logging", false, "Write periodic bridge debug logs.");
             autoStartOverlayApp = Config.Bind("OverlayApp", "AutoStart", true, "Start the bundled OverlayHUD desktop app when the game starts.");
             autoCloseOverlayApp = Config.Bind("OverlayApp", "AutoClose", true, "Close the bundled OverlayHUD desktop app when the game exits.");
-            overlayAppRelativePath = Config.Bind("OverlayApp", "ExecutableRelativePath", Path.Combine("OverlayHUD_app", "OverlayHUD.exe"), "Path to the bundled OverlayHUD executable relative to this plugin DLL.");
+            overlayAppRelativePath = Config.Bind("OverlayApp", "ExecutableRelativePath", string.Empty, "Leave empty to install the bundled desktop app in LocalAppData/OverlayHUD, separately for each BepInEx profile. Legacy default paths also use this location. Custom paths are relative to this plugin DLL, or absolute.");
             overlayAppArchiveName = Config.Bind("OverlayApp", "ArchiveName", "OverlayHUD_app.zip", "Bundled OverlayHUD desktop app archive next to this plugin DLL.");
             bool configChanged = false;
             if (endpoint.Value == "http://192.168.1.198:8787/api/monster-seen")
@@ -292,12 +292,10 @@ namespace OverlayHUD
                 statusInterval.Value = 10f;
                 configChanged = true;
             }
-            if (overlayAppRelativePath.Value == "OverlayHUD.exe"
-                || overlayAppRelativePath.Value == Path.Combine("OverlayHUD-win32-x64", "OverlayHUD.exe")
-                || overlayAppRelativePath.Value == Path.Combine("OverlayHUDApp", "OverlayHUD.exe")
-                || overlayAppRelativePath.Value == Path.Combine("OverlayHUD_app", "OverlayHUD-win32-x64", "OverlayHUD.exe"))
+            if (BundledAppStorage.IsBundledExecutablePath(overlayAppRelativePath.Value)
+                && overlayAppRelativePath.Value != string.Empty)
             {
-                overlayAppRelativePath.Value = Path.Combine("OverlayHUD_app", "OverlayHUD.exe");
+                overlayAppRelativePath.Value = string.Empty;
                 configChanged = true;
             }
             if (overlayAppArchiveName.Value == "OverlayHUDApp.zip")
@@ -355,17 +353,46 @@ namespace OverlayHUD
 
         private string ResolveOverlayAppPath()
         {
-            string pluginPath = Assembly.GetExecutingAssembly().Location;
-            string pluginDirectory = string.IsNullOrWhiteSpace(pluginPath)
-                ? Paths.PluginPath
-                : Path.GetDirectoryName(pluginPath);
-            string relativePath = overlayAppRelativePath.Value;
-            return Path.GetFullPath(Path.Combine(pluginDirectory, relativePath));
+            if (BundledAppStorage.IsBundledExecutablePath(overlayAppRelativePath.Value))
+            {
+                string appDirectory = BundledAppStorage.GetAppDirectory(
+                    Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), Paths.BepInExRootPath);
+                return Path.Combine(appDirectory, "OverlayHUD.exe");
+            }
+            return Path.GetFullPath(Path.Combine(GetPluginDirectory(), overlayAppRelativePath.Value));
         }
 
         private void EnsureOverlayAppExtracted(string exePath)
         {
             if (string.IsNullOrWhiteSpace(exePath)) return;
+            if (BundledAppStorage.IsBundledExecutablePath(overlayAppRelativePath.Value))
+            {
+                string appDirectory = Path.GetDirectoryName(exePath);
+                string profileId = Path.GetFileName(Path.GetDirectoryName(appDirectory));
+                // Two game processes must not promote competing staged installs for the same profile.
+                using (var installMutex = new Mutex(false, @"Local\OverlayHUD-install-" + profileId))
+                {
+                    bool acquired = false;
+                    try
+                    {
+                        try { acquired = installMutex.WaitOne(TimeSpan.FromSeconds(30)); }
+                        catch (AbandonedMutexException) { acquired = true; }
+                        if (!acquired) throw new IOException("Another OverlayHUD installation is still in progress. Try starting the game again later.");
+                        BundledAppStorage.EnsureInstalled(appDirectory,
+                            Path.Combine(GetPluginDirectory(), overlayAppArchiveName.Value),
+                            Path.Combine(GetPluginDirectory(), "OverlayHUD_app"),
+                            message => Logger.LogWarning(message));
+                        Logger.LogInfo("Bundled OverlayHUD desktop app ready at: " + exePath);
+                    }
+                    finally
+                    {
+                        if (acquired) installMutex.ReleaseMutex();
+                    }
+                }
+                return;
+            }
+
+            // Preserve explicit custom-path installations; only the default uses managed external storage.
             string resourcesDirectory = Path.Combine(Path.GetDirectoryName(exePath), "resources");
             // New bundles use a regular app directory; retain support for existing ASAR installs.
             bool hasApp = File.Exists(Path.Combine(resourcesDirectory, "app.asar"))
