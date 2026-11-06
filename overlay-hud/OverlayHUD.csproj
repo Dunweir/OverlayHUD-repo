@@ -4,12 +4,21 @@
     <LangVersion>latest</LangVersion>
     <Nullable>disable</Nullable>
     <AssemblyName>OverlayHUD</AssemblyName>
-    <Version>26.11.2</Version>
+    <Version>26.11.3</Version>
     <RootNamespace>OverlayHUD</RootNamespace>
+    <NativeOnly Condition="'$(NativeOnly)' == ''">false</NativeOnly>
+    <DefaultItemExcludes>$(DefaultItemExcludes);bin\**;obj\**;dist\**</DefaultItemExcludes>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(NativeOnly)' == 'true'">
+    <DefineConstants>$(DefineConstants);NATIVE_ONLY</DefineConstants>
+    <OutputPath>bin\NativeOnly\$(Configuration)\</OutputPath>
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies.net472" Version="1.0.3" PrivateAssets="all" />
     <Compile Remove="stubs\**\*.cs" />
+    <Compile Remove="BundledAppStorage.cs" Condition="'$(NativeOnly)' == 'true'" />
     <EmbeddedResource Include="NativeAssets\*" LogicalName="OverlayHUD.NativeAssets.%(Filename)%(Extension)" />
     <EmbeddedResource Include="..\assets\fonts\*-OFL.txt" />
   </ItemGroup>
@@ -58,8 +67,8 @@
       <HintPath>lib\0Harmony.dll</HintPath>
       <Private>false</Private>
     </Reference>
-    <Reference Include="System.IO.Compression" />
-    <Reference Include="System.IO.Compression.FileSystem" />
+    <Reference Include="System.IO.Compression" Condition="'$(NativeOnly)' != 'true'" />
+    <Reference Include="System.IO.Compression.FileSystem" Condition="'$(NativeOnly)' != 'true'" />
     <Reference Include="UnityEngine">
       <HintPath>C:\Program Files (x86)\Steam\steamapps\common\REPO\REPO_Data\Managed\UnityEngine.dll</HintPath>
       <Private>false</Private>

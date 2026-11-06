@@ -50,9 +50,20 @@ test('all official monster names render without changing their gameplay identity
     }
     ui.currentLanguage = 'ru';
     assert.equal(ui.getMonsterName({ name: 'Modded Enemy' }), 'Modded Enemy');
-    assert.equal(ui.getMonsterName({ name: 'Banger', unknown: true }), 'Banger');
+    assert.equal(ui.getMonsterName({ name: 'Banger', unknown: true }), 'Взрывник');
+    for (const language of ['ru', 'en']) {
+        ui.currentLanguage = language;
+        for (const name of ['Snatcher', 'Pony']) {
+            const monster = { id: 'unknown-icon', name, unknown: true };
+            assert.equal(ui.getMonsterName(monster), monsters['ENEMY.SNATCHER'][language]);
+            assert.deepEqual(monster, { id: 'unknown-icon', name, unknown: true });
+        }
+        assert.equal(ui.getMonsterName({ name: 'Modded Enemy', unknown: true }), 'Modded Enemy');
+    }
+    ui.currentLanguage = 'ru';
     ui.latestState = null;
     assert.equal(ui.getMonsterName({ name: 'Banger' }), 'Banger');
+    assert.equal(ui.getMonsterName({ name: 'Snatcher', unknown: true }), 'Snatcher');
 });
 
 test('live translations update existing tooltip and upgrade labels without changing language', () => {

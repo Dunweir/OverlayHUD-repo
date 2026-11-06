@@ -1,13 +1,19 @@
-# OverlayHUD 26.11.2
+# OverlayHUD 26.11.3
 
-Локальный HUD-оверлей для **R.E.P.O.**, который показывает информацию о текущем забеге в отдельном прозрачном окне поверх игры.
+Локальный HUD-оверлей для **R.E.P.O.**, который показывает информацию о текущем забеге внутри игры или в отдельном прозрачном окне.
 
 **Автор: EgorSalad**  
 **OverlayHUD целиком создан с использованием Codex AI.**
 **Ныне поддерживается с помощью Claude Sonnet 5.**
-**Сборка 26.11.2: автоматические проверки пройдены; синхронизация ХП ещё не проверена в игровом лобби.**
+**Версия 26.11.3: синхронизацию ХП необходимо проверить в игровом лобби перед публикацией.**
 
 > OverlayHUD — неофициальный фанатский проект. Он не связан с semiwork, издателем R.E.P.O. или Thunderstore.
+
+## Что нового в 26.11.3
+
+Full включает обновлённое Electron-приложение с официальными русскими и английскими названиями в подсказках, в том числе для монстров без собственной иконки. Native обновлён до той же версии 26.11.3.
+
+Перед обновлением закройте игру и уже запущенный OverlayHUD (Electron). Изменение SHA-256 комплектного `OverlayHUD_app.zip` запускает управляемое обновление приложения при следующем desktop-автозапуске с сохранением корневого конфига и таймкодов.
 
 ## Как выглядит OverlayHUD
 
@@ -21,7 +27,14 @@
 
 ## Что делает мод
 
-OverlayHUD состоит из BepInEx-плагина и комплектного desktop-приложения. После запуска modded-версии игры плагин автоматически распаковывает и запускает приложение, синхронизирует с ним состояние текущего забега, а при выходе из игры закрывает его.
+Доступны две альтернативные сборки одной версии и с одной идентичностью плагина:
+
+| Архив | Состав и режим по умолчанию |
+| --- | --- |
+| `EgorSalad-OverlayHUD-26.11.3-Full.zip` | Native + Electron; по умолчанию **Electron**. Плагин распаковывает и запускает комплектное приложение, синхронизирует состояние забега и закрывает приложение после игры. Native выбирается в конфиге. |
+| `EgorSalad-OverlayHUD-26.11.3-Native.zip` | Только Unity HUD внутри игры. Отдельная DLL без кода запуска приложения и HTTP-моста, без архива приложения и его настроек. |
+
+**Устанавливайте только один вариант в профиль.** При смене сборки удалите прежний пакет, не оставляйте вторую DLL или остатки приложения в каталоге мода. Сохраните нужные timestamps. При переходе со старых версий или между сборками закройте игру, сохраните резервную копию и удалите `BepInEx/config/local.overlay.overlay_hud.cfg`: новый конфиг создаётся при следующем запуске. Старые секции и значения не мигрируют; нужные настройки задайте заново в новых секциях.
 
 HUD умеет показывать:
 
@@ -41,21 +54,19 @@ HUD умеет показывать:
 
 ### Экспериментальный HUD внутри игры
 
-Режим `Native` рисует HUD через Unity Canvas вместо Electron: не запускает
-desktop-приложение и не отправляет HTTP-запросы. После сборки замените
-`OverlayHUD.dll` в профиле мода и настройте `BepInEx/config/local.overlay.overlay_hud.cfg`.
-Ниже полный пример Native-настроек со значениями по умолчанию.
-Новые конфиги используют `Native`; обновление не сбрасывает уже сохранённые настройки.
+Режим `Native` рисует HUD через Unity Canvas: не запускает desktop-приложение
+и не отправляет HTTP-запросы. В Full для его включения установите
+`Renderer = Native` в `[01 General]` и перезапустите игру; значение по умолчанию — `Electron`.
+В Native-only этот режим единственный, секции `[01 General]` и выбора Renderer нет.
+Ниже Native-настройки со значениями по умолчанию; они одинаковы в обеих сборках.
 
 ```ini
-[Overlay]
-Renderer = Native
-
-[NativeHUD]
+[03 Native - General]
 Enabled = true
 Language = ru
 SaveTimestamps = true
-UseGameUIEffects = true
+
+[04 Native - Layout]
 Scale = 1
 Alignment = Center
 OffsetX = 0
@@ -67,26 +78,33 @@ MonsterSize = 70
 UpgradeSize = 38
 UpgradeRows = 2
 WrapValueLabels = true
+
+[05 Native - Information]
 ShowLevel = true
 ShowTimer = true
 ShowMapValue = true
 ShowLostValue = true
+ShowUpgrades = true
+
+[06 Native - Monsters]
 ShowMonsters = true
 ShowHealth = true
 ShowRespawnTimer = true
 ShowRespawnIndicator = true
 ShowStrength = true
 ShowMonsterCounts = true
-ShowUpgrades = true
+OnlyAliveMonsters = false
+FilterUndetectedMonsters = false
+
+[07 Native - Effects]
+UseGameUIEffects = true
 ShowProximityWaves = true
 ShowDamageNumbers = true
 Animations = true
 ShowDestroyedItemAlerts = false
 ShowTooltips = false
-OnlyAliveMonsters = false
-FilterUndetectedMonsters = false
 
-[NativeHUD.Upgrades]
+[08 Native - Upgrades]
 strength = true
 tumbleLaunch = true
 range = true
@@ -101,15 +119,14 @@ mapPlayerCount = true
 deathHeadBattery = true
 ```
 
-**Только `Renderer` требует перезапуска игры.** Все параметры `[NativeHUD]` и
-`[NativeHUD.Upgrades]`, включая компоновку и колонки, применяются на лету через
-BepInEx Configuration Manager или перезагрузку конфига средствами BepInEx.
-Автоматического наблюдения за cfg-файлом нет: ручное редактирование требует
-перезагрузки конфига либо игры. `Renderer = Electron` возвращает desktop-интерфейс
-(в BepInEx Configuration Manager вариант подписан **Electron (old)**; значение cfg
-остаётся `Electron` для совместимости);
-при ошибке создания Canvas/загрузки ресурсов плагин пишет причину в лог и
-возвращается к Electron на текущую сессию.
+**Смена `Renderer` в Full требует перезапуска игры.** Все параметры секций
+`03 Native - General` — `08 Native - Upgrades`, включая компоновку и колонки,
+применяются на лету через BepInEx Configuration Manager или перезагрузку конфига
+средствами BepInEx. Автоматического наблюдения за cfg-файлом нет: ручное
+редактирование требует перезагрузки конфига либо игры.
+В Full `Renderer = Electron` возвращает desktop-интерфейс; при ошибке создания
+Canvas/загрузки ресурсов Full также возвращается к Electron на текущую сессию.
+Native-only при такой ошибке пишет причину в лог, другого рендерера в нём нет.
 
 **Компоновка и размеры**
 
@@ -134,7 +151,7 @@ BepInEx Configuration Manager или перезагрузку конфига с�
 | Здоровье | `ShowHealth` управляет **полосками** ХП. Числа текущего/максимального ХП доступны в подсказках независимо от этого переключателя. |
 | Респавн | `ShowRespawnTimer` — числовой отсчёт `м:сс`; `ShowRespawnIndicator` — круговой сектор оставшегося времени. Независимы друг от друга; неизвестный/истёкший отсчёт не висит как `00:00`. |
 | Сила | `ShowStrength` — требуемое число улучшений у обнаруженных монстров, **включая респавн**. Зелёный — силы хватает, красный — нет; янтарные `X` — поднять нельзя, `?` — данных нет. |
-| Улучшения | `ShowUpgrades` — полученные улучшения с количеством; каждый из 12 ключей `[NativeHUD.Upgrades]` отдельно включает/скрывает свой тип. Нулевые количества скрыты. |
+| Улучшения | `ShowUpgrades` — полученные улучшения с количеством; каждый из 12 ключей `[08 Native - Upgrades]` отдельно включает/скрывает свой тип. Нулевые количества скрыты. |
 | Эффекты | `ShowProximityWaves` — волны близости; `ShowDamageNumbers` — всплывающий урон. `Animations = false` отключает переходы, волны, вспышки и числа урона; числовые таймеры продолжают обновляться. |
 | Уведомления | `ShowDestroyedItemAlerts = false` — при включении показывает уничтоженный предмет и последнего державшего его игрока. |
 
@@ -256,9 +273,10 @@ Roboto остаётся у бейджей, подсказок и уведомл�
 ## Как это работает
 
 ```mermaid
-flowchart LR
-    Game["R.E.P.O."] --> Plugin["OverlayHUD.dll<br/>BepInEx + Harmony"]
-    Plugin -->|"HTTP JSON<br/>127.0.0.1:8787"| Server["Локальный Node.js server"]
+flowchart TD
+    Game["R.E.P.O."] --> Plugin["OverlayHUD.dll: BepInEx + Harmony"]
+    Plugin --> Native["Native: Unity Canvas внутри игры"]
+    Plugin -->|"Только Full, режим Electron: HTTP JSON 127.0.0.1:8787"| Server["Локальный Node.js server"]
     Server -->|"State + Server-Sent Events"| Web["HTML / CSS / JavaScript HUD"]
     Web --> Electron["Прозрачное Electron-окно"]
 ```
@@ -301,16 +319,18 @@ flowchart LR
 ## Установка через r2modman
 
 1. Откройте r2modman, выберите R.E.P.O. и создайте или выберите профиль.
-2. В настройках профиля (`Settings`) найдите `Import local mod` и выберите архив `EgorSalad-OverlayHUD-<version>.zip`. Предварительно распаковывать ZIP не нужно.
+2. В настройках профиля (`Settings`) найдите `Import local mod` и выберите **один** архив: `EgorSalad-OverlayHUD-26.11.3-Full.zip` или `EgorSalad-OverlayHUD-26.11.3-Native.zip`. Предварительно распаковывать ZIP не нужно.
 3. Убедитесь, что в профиле установлен BepInExPack.
 4. Запустите игру через кнопку `Start modded` в r2modman.
-5. При первом запуске дождитесь распаковки и автоматического старта `OverlayHUD.exe`.
+5. Full по умолчанию распакует и запустит `OverlayHUD.exe`; Native-only покажет HUD прямо в игре после загрузки уровня.
 
-Node.js и Electron отдельно устанавливать не требуется: desktop-приложение уже находится внутри пакета.
+Для ручной установки поместите файлы выбранного архива в `BepInEx/plugins/OverlayHUD/`. Не смешивайте файлы разных вариантов.
+
+Node.js и Electron отдельно устанавливать не требуется: Full включает приложение, а Native-only его не использует. Следующие подразделы о desktop-приложении относятся только к Full в режиме Electron.
 
 ### Перенос и обновление desktop-приложения
 
-Перед обновлением или подготовкой к переносу закройте **игру и OverlayHUD**. Не удаляйте старую папку `OverlayHUD_app` рядом с DLL: при следующем desktop-автозапуске (`OverlayApp.AutoStart=true`) плагин скопирует распознанную старую установку во внешнюю папку целиком, включая `overlay-config.json`, `timestamps/` и неизвестные файлы. Обновление из архива применяется с сохранением корневого конфига и timestamps; старая папка удаляется только после успешного переноса. Native HUD не запускает перенос, его timestamps остаются на прежнем месте.
+Перед обновлением или подготовкой к переносу закройте **игру и OverlayHUD**. Не удаляйте старую папку `OverlayHUD_app` рядом с DLL: при следующем desktop-автозапуске (`AutoStart=true` в `[09 Electron - App]`) плагин скопирует распознанную старую установку во внешнюю папку целиком, включая `overlay-config.json`, `timestamps/` и неизвестные файлы. Обновление из архива применяется с сохранением корневого конфига и timestamps; старая папка удаляется только после успешного переноса. Native HUD не запускает перенос, его timestamps остаются на прежнем месте.
 
 Если старая и внешняя установки уже существуют одновременно, старая остаётся нетронутой, а лог предупреждает о необходимости ручной проверки. Если удалению после переноса мешают заблокированные файлы, плагин также пишет предупреждение.
 
@@ -332,27 +352,27 @@ Node.js и Electron отдельно устанавливать не требу�
 BepInEx/config/local.overlay.overlay_hud.cfg
 ```
 
-Основные параметры:
+Используются только новые нумерованные секции. Старые `[Overlay]`, `[Detection]`, `[NativeHUD]`, `[NativeHUD.Upgrades]`, `[OverlayApp]` и `[Debug]` не поддерживаются. При смене сборки или переходе со старой схемы создайте чистый конфиг, как описано выше; автоматического переноса значений нет.
 
-| Секция и параметр | По умолчанию | Назначение |
-| --- | ---: | --- |
-| `Overlay.Renderer` | `Native` | Unity HUD; `Electron` — прежний desktop HUD, в Configuration Manager подписан Electron (old) |
-| `Overlay.Endpoint` | `http://127.0.0.1:8787/api/monster-seen` | Endpoint встреченных монстров |
-| `Overlay.LevelEndpoint` | `http://127.0.0.1:8787/api/level` | Endpoint смены уровня |
-| `Detection.ScanIntervalSeconds` | `3` | Повторная попытка собрать roster при старте уровня |
-| `Detection.StatusIntervalSeconds` | `10` | Страховочная полная синхронизация статусов |
-| `Detection.RequireLineOfSight` | `true` | Показывать монстров только после встречи; `false` сразу раскрывает весь состав уровня |
-| `Detection.RevealUnknownMonsters` | `false` | Сразу показывать монстров без собственной иконки — с заглушкой в виде четырёхконечной звезды; монстры со своими иконками появляются по обычным правилам |
-| `Detection.PreferPlayerVisionDetection` | `true` | Использовать обнаружение через PlayerVision, когда оно доступно |
-| `Debug.Logging` | `false` | Дополнительные диагностические строки в BepInEx-логе |
-| `OverlayApp.AutoStart` | `true` | Автоматически запускать desktop-приложение |
-| `OverlayApp.AutoClose` | `true` | Закрывать приложение при выходе из игры |
-| `OverlayApp.ExecutableRelativePath` | пусто | Автоматический внешний путь для профиля BepInEx; либо пользовательский путь к EXE |
-| `OverlayApp.ArchiveName` | `OverlayHUD_app.zip` | Имя комплектного архива приложения |
+| Секция | Параметры и значения по умолчанию |
+| --- | --- |
+| `01 General` — только Full | `Renderer = Electron`; альтернатива `Native`. Смена требует перезапуска игры. |
+| `02 Detection` | `ScanIntervalSeconds = 3`, `StatusIntervalSeconds = 10`, `RequireLineOfSight = true`, `RevealUnknownMonsters = false`, `PreferPlayerVisionDetection = true`. |
+| `03 Native - General` | `Enabled = true`, `Language = ru` (или `en`), `SaveTimestamps = true`. |
+| `04 Native - Layout` | `Alignment = Center`, `Scale = 1`, `OffsetX = 0`, `OffsetY = 20`, `HorizontalLayout = true`, `HorizontalColumns = 11`, `Columns = 4`, `MonsterSize = 70`, `UpgradeSize = 38`, `UpgradeRows = 2`, `WrapValueLabels = true`. |
+| `05 Native - Information` | `ShowLevel`, `ShowTimer`, `ShowMapValue`, `ShowLostValue`, `ShowUpgrades` — все `true`. |
+| `06 Native - Monsters` | `ShowMonsters`, `ShowHealth`, `ShowRespawnTimer`, `ShowRespawnIndicator`, `ShowStrength`, `ShowMonsterCounts` — `true`; `OnlyAliveMonsters`, `FilterUndetectedMonsters` — `false`. |
+| `07 Native - Effects` | `Animations`, `ShowProximityWaves`, `ShowDamageNumbers`, `UseGameUIEffects` — `true`; `ShowDestroyedItemAlerts`, `ShowTooltips` — `false`. |
+| `08 Native - Upgrades` | 12 переключателей улучшений, все `true`; полный список в примере Native выше. |
+| `09 Electron - App` — только Full | `AutoStart = true`, `AutoClose = true`, `ExecutableRelativePath` — пусто, `ArchiveName = OverlayHUD_app.zip`. |
+| `10 Electron - Connection` — только Full | `Endpoint = http://127.0.0.1:8787/api/monster-seen`, `LevelEndpoint = http://127.0.0.1:8787/api/level`. |
+| `99 Diagnostics` | `Logging = false`; `true` включает подробный BepInEx-лог. |
 
-Известные старые значения пути по умолчанию автоматически заменяются пустым значением. Пользовательские пути сохраняют прежнее поведение: относительный путь считается от DLL, абсолютный используется напрямую; описанный внешний перенос к ним не применяется.
+Native-only не создаёт секции `01 General`, `09 Electron - App`, `10 Electron - Connection`: это отдельная сборка DLL, а не Full с изменённым значением Renderer.
 
-Значения `StatusIntervalSeconds` меньше `10` автоматически поднимаются до безопасного значения `10`. Обновление мода не сбрасывает сохранённые настройки: если ранее выставлено `RequireLineOfSight=false`, для обнаружения только после встречи измените его на `true`.
+Пустой `ExecutableRelativePath` выбирает внешнюю установку для профиля. Пользовательский относительный путь считается от DLL, абсолютный используется напрямую; внешний перенос к пользовательским путям не применяется. Перенос **файлов** приложения, описанный выше, не означает миграцию старых секций конфига.
+
+Значения `StatusIntervalSeconds` меньше `10` поднимаются до `10`. `RequireLineOfSight=false` раскрывает весь состав уровня сразу; `RevealUnknownMonsters=true` раскрывает новые виды с иконкой-заглушкой, не меняя правил для известных видов. По умолчанию монстры появляются только после встречи.
 
 Цвет обводки обнаруженных монстров берётся из игровой категории `EnemyParent.difficulty`: 1 — зелёный, 2 — синий, 3 — красный. Если категория недоступна или некорректна, обводка золотая. Это действует и для известных, и для новых монстров. Если мод оставил игровую категорию по умолчанию, она считается первым уровнем.
 
@@ -371,7 +391,7 @@ BepInEx/config/local.overlay.overlay_hud.cfg
 
 Аппаратное ускорение Electron включено по умолчанию. Через пункт **Аппаратное ускорение (перезапуск)…** в трее его можно отключать и включать. После подтверждения настройка сохраняется в `overlay-config.json`, и только приложение оверлея перезапускается; игра продолжает работать. Отмена не меняет настройку. Программный рендеринг может увеличить нагрузку на CPU.
 
-При `OverlayApp.AutoClose=true` автоматически запущенный оверлей отслеживает процесс игры и закрывается после её выхода, в том числе после перезапуска при смене аппаратного ускорения. Для этого нужны обновлённые DLL плагина и desktop-приложение. На оверлей, запущенный вручную, это правило не распространяется.
+При `AutoClose=true` в `[09 Electron - App]` автоматически запущенный оверлей отслеживает процесс игры и закрывается после её выхода, в том числе после перезапуска при смене аппаратного ускорения. Для этого нужны обновлённые DLL плагина и desktop-приложение. На оверлей, запущенный вручную, это правило не распространяется.
 
 Проверка процесса игры выполняется раз в секунду и работает также после краша игры. При начале закрытия оверлей даёт Electron 5 секунд на штатный выход, затем принудительно завершает собственное приложение. Отсутствие игровых данных не вызывает закрытие: пауза и загрузка не считаются выходом из игры.
 
@@ -419,12 +439,14 @@ Desktop HUD создаёт текстовые файлы в `timestamps/` ряд
 
 Пустой список монстров не скрывает HUD: таймер, ценности и улучшения показываются и на уровнях без врагов. Повреждения и разрушение ценностей в комнате сдачи учитываются в потерях; штатная сдача предметов — нет.
 
-Если HUD не появляется:
+Для Native проверьте `Enabled` в `[03 Native - General]`, наличие строки `Native HUD initialized` и ошибок создания HUD в логе. В Full также проверьте выбранный `Renderer`.
+
+Если не появляется Electron HUD (только Full):
 
 1. Проверьте, что игра запущена в windowed/borderless-режиме.
-2. Проверьте путь к EXE из строки `Bundled OverlayHUD desktop app ready at:` и предупреждения о переносе/обновлении; для пользовательской установки — `OverlayApp.ExecutableRelativePath`. Архив `OverlayHUD_app.zip` должен оставаться рядом с DLL.
+2. Проверьте путь к EXE из строки `Bundled OverlayHUD desktop app ready at:` и предупреждения о переносе/обновлении; для пользовательской установки — `ExecutableRelativePath` в `[09 Electron - App]`. Архив `OverlayHUD_app.zip` должен оставаться рядом с DLL.
 3. Убедитесь, что порт `8787` не занят другим процессом.
-4. Временно включите `Debug.Logging = true`.
+4. Временно включите `Logging = true` в `[99 Diagnostics]`.
 5. Приложите свежий `LogOutput.log` к отчёту об ошибке.
 
 ## КД монстров в мультиплеере
@@ -464,7 +486,7 @@ start-server.bat        Ручной запуск web-сервера для ра
 - Windows;
 - .NET SDK с поддержкой `net472`;
 - установленная R.E.P.O. для Unity reference assemblies;
-- Node.js и npm;
+- Node.js, npm и установленные зависимости `game-overlay/` — для рекомендуемой релизной сборки с `-RebuildDesktop`; повторное использование проверенного актуального архива не требует пересборки Electron;
 - BepInEx/Harmony reference assemblies.
 
 Пути к Unity DLL сейчас заданы в `overlay-hud/OverlayHUD.csproj` через стандартный Steam-каталог. При другой установке игры измените `HintPath`.
@@ -481,12 +503,7 @@ dotnet build overlay-hud/OverlayHUD.csproj -c Release
 overlay-hud/bin/Release/net472/OverlayHUD.dll
 ```
 
-После сборки DLL нужно скопировать в:
-
-```text
-overlay-hud/package-flat/OverlayHUD.dll
-overlay-hud/package/plugins/OverlayHUD/OverlayHUD.dll
-```
+Это обычная сборка Full. Для выпуска двух вариантов используйте скрипт ниже: он сам собирает разные DLL и не изменяет существующие package-копии. Не подменяйте Native DLL результатом Full-сборки.
 
 ### Electron-приложение
 
@@ -506,9 +523,29 @@ game-overlay/dist/OverlayHUD-win32-x64/
 
 При создании `OverlayHUD_app.zip` перечисляйте верхнеуровневые файлы и каталоги явно. Архивация через `tar -C <dir> .` добавляет нежелательную запись `./`.
 
-### Flat-пакет для локального импорта и Thunderstore
+### Два flat-пакета для локального импорта и Thunderstore
 
-Flat-архив должен содержать ровно:
+Из корня репозитория (Windows PowerShell 5.1 или PowerShell 7). Для релиза рекомендуется пересобрать Electron:
+
+```powershell
+powershell -NoProfile -File tools/Build-Packages.ps1 -RebuildDesktop
+# Повторная релизная сборка с заменой двух результатов предыдущего запуска:
+powershell -NoProfile -File tools/Build-Packages.ps1 -RebuildDesktop -Force
+# Без пересборки: только если существующий комплектный архив полностью актуален:
+powershell -NoProfile -File tools/Build-Packages.ps1
+# Альтернатива: другой уже собранный актуальный архив приложения:
+powershell -NoProfile -File tools/Build-Packages.ps1 -BundlePath "C:\build\OverlayHUD_app.zip"
+```
+
+`-RebuildDesktop` запускает `npm.cmd run package` в `game-overlay/` и создаёт свежий `OverlayHUD_app.zip` в staging; существующий входной архив не перезаписывается. Зависимости приложения должны быть установлены заранее (см. выше). `-BundlePath` нельзя совмещать с `-RebuildDesktop`; относительный путь считается от рабочего каталога вызывающего процесса.
+
+Скрипт собирает Release дважды с `NativeOnly=false` и `NativeOnly=true`, раздельными `obj/Full/` и `obj/NativeOnly/` и раздельными выходными папками. Временная сборка, staging и проверенные архивы остаются в `overlay-hud/dist/packages/<run-id>/`; в ZIP попадают только явно перечисленные файлы, не PDB/obj/конфиги. Версия берётся из manifest и сверяется с проектом; версия не повышается.
+
+Без `-RebuildDesktop` используется существующий `overlay-hud/package-flat/OverlayHUD_app.zip` либо архив из `-BundlePath`. Он допускается только при совпадении версии приложения с релизом и SHA-256 веб-файлов, файлов приложения и всех файлов `assets/` с текущими исходниками. Устаревшее или неполное содержимое отклоняется с указанием пересобрать desktop; одной новой DLL для исправления старого Electron-бандла недостаточно. Свежий архив проходит те же проверки. Скрипт собирает оба варианта и проверяет точный состав обоих ZIP до копирования в корень. Без `-Force` любой уже существующий выходной ZIP останавливает работу до сборки. Даже с `-Force` архив `EgorSalad-OverlayHUD-26.11.2.zip` **никогда не затрагивается**.
+
+Результаты в корне: `EgorSalad-OverlayHUD-26.11.3-Full.zip` и `EgorSalad-OverlayHUD-26.11.3-Native.zip`.
+
+Full содержит ровно 7 записей без каталогов:
 
 ```text
 icon.png
@@ -520,7 +557,9 @@ LICENSE
 THIRD_PARTY_NOTICES.md
 ```
 
-Перед публикацией проверяйте версию manifest, структуру обоих архивов и SHA-256 DLL во всех package-копиях.
+Native содержит ровно 6 записей: тот же список **без `OverlayHUD_app.zip`**, с отдельной Native DLL, собственными README, описанием manifest и notices без компонентов desktop-приложения. Шаблоны Full находятся в `overlay-hud/package-flat/`, Native — в `overlay-hud/package-native/`; icon и MIT LICENSE общие. `name`, `author`, `version_number` и зависимости manifest совпадают: это взаимоисключающие варианты, не два одновременно устанавливаемых мода.
+
+Скрипт печатает SHA-256 DLL и итоговых ZIP. Проверка содержимого ZIP не заменяет тесты DLL и запуск обеих сборок в игре.
 
 
 **Обновление существующей установки:** закройте игру и OverlayHUD перед импортом. Сохраните старую папку `OverlayHUD_app` для автоматического переноса; изменение SHA-256 `OverlayHUD_app.zip` вызовет staged-обновление при desktop-автозапуске (см. «Перенос и обновление desktop-приложения»).
@@ -532,8 +571,8 @@ THIRD_PARTY_NOTICES.md
 
 - [BepInExPack for R.E.P.O.](https://thunderstore.io/c/repo/p/BepInEx/BepInExPack/) — загрузка плагина.
 - [Harmony](https://github.com/pardeike/Harmony) — безопасные runtime-патчи игровых методов; поставляется через BepInEx.
-- [Electron](https://www.electronjs.org/) — прозрачное desktop-окно.
-- [Node.js](https://nodejs.org/) — локальный сервер внутри packaged Electron-приложения.
+- Только Full: [Electron](https://www.electronjs.org/) — прозрачное desktop-окно.
+- Только Full: [Node.js](https://nodejs.org/) — локальный сервер внутри packaged Electron-приложения.
 
 Для конечного пользователя отдельная установка Harmony, Electron или Node.js не требуется.
 

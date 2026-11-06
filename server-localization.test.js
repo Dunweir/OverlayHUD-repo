@@ -67,6 +67,64 @@ test('API exposes official bundled ru/en names before plugin sync, with stable i
     assert.equal(current.itemDestroyedAlertsVisible, false);
 });
 
+test('server-generated entries localize all 30 monsters and 12 upgrades in tooltips, including unknown icons', async () => {
+    const { post, state } = boot();
+    await post('/api/settings', { settings: { saveTimestampsEnabled: false } });
+    const html = fs.readFileSync(`${__dirname}/overlay.html`, 'utf8');
+    const extract = (name) => {
+        const start = html.indexOf(`        function ${name}(`);
+        const end = html.indexOf('\n        }', start) + '\n        }'.length;
+        assert(start >= 0 && end > start, name);
+        return html.slice(start, end);
+    };
+    const fields = new Map(['.monster-tooltip-name', '.monster-tooltip-health', '.monster-tooltip-strength']
+        .map(key => [key, { textContent: '' }]));
+    const square = { querySelector: () => ({ querySelector: key => fields.get(key) }) };
+    const ui = vm.createContext({
+        currentLanguage: 'ru', latestState: null,
+        // Deliberately distinct fallback: upgrades must resolve the server's names.
+        interfaceText: { ru: { upgradesNames: {} }, en: { upgradesNames: {} } },
+        getMonsterHealthText: () => '', getMonsterStrengthText: () => ''
+    });
+    vm.runInContext(['getLocalizedHudName', 'getMonsterName', 'getUpgradeName', 'updateMonsterTooltip']
+        .map(extract).join('\n'), ui);
+    assert.equal(Object.keys(monsterNames).length, 30);
+    const cases = Object.entries(monsterNames).map(([key, labels]) => ({
+        name: key === 'ENEMY.SNATCHER' ? 'Snatcher' : labels.en, labels
+    }));
+    cases.push({ name: 'Pony', labels: monsterNames['ENEMY.SNATCHER'] },
+        { name: 'Modded Enemy', labels: { ru: 'Modded Enemy', en: 'Modded Enemy' } });
+    for (const { name, labels } of cases) {
+        // Reset slot limits so every identity goes through the actual seen-event path.
+        assert.equal((await post('/api/level', { level: 9 })).status, 200);
+        const result = await post('/api/monster-seen', { id: 'tooltip-monster', name });
+        assert.equal(result.body.added, true, name);
+        ui.latestState = await state();
+        assert.equal(ui.latestState.monsters.length, 1, name);
+        const monster = ui.latestState.monsters[0];
+        if (['Snatcher', 'Pony', 'Modded Enemy'].includes(name)) assert.equal(monster.unknown, true, name);
+        const before = JSON.stringify(ui.latestState);
+        for (const language of ['ru', 'en']) {
+            ui.currentLanguage = language;
+            ui.updateMonsterTooltip(square, monster, {});
+            assert.equal(fields.get('.monster-tooltip-name').textContent, labels[language], `${name}/${language}`);
+        }
+        assert.equal(JSON.stringify(ui.latestState), before, 'Tooltip must not mutate gameplay state');
+    }
+    assert.equal(Object.keys(upgradeNames).length, 12);
+    assert.equal((await post('/api/upgrades', {
+        upgrades: Object.fromEntries(Object.keys(upgradeNames).map(key => [key, 1]))
+    })).status, 200);
+    ui.latestState = await state();
+    for (const language of ['ru', 'en']) {
+        ui.currentLanguage = language;
+        for (const [key, labels] of Object.entries(upgradeNames)) {
+            assert.equal(ui.latestState[key], 1, key);
+            assert.equal(ui.getUpgradeName({ key, name: 'Missing server translation' }), labels[language], `${key}/${language}`);
+        }
+    }
+});
+
 for (const language of ['ru', 'en']) {
     test(`localization changes reach API and SSE with ${language} already selected, without gameplay/timestamp changes`, async () => {
         const { post, state, broadcasts, writes } = boot();

@@ -6,21 +6,25 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
+#if !NATIVE_ONLY
 using System.IO;
 using System.IO.Compression;
 using System.Net.Sockets;
+#endif
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Text;
+#if !NATIVE_ONLY
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
+#endif
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
 namespace OverlayHUD
 {
-    [BepInPlugin("local.overlay.overlay_hud", "OverlayHUD", "26.11.2")]
+    [BepInPlugin("local.overlay.overlay_hud", "OverlayHUD", "26.11.3")]
     public sealed partial class Plugin : BaseUnityPlugin
     {
         private static Plugin instance;
@@ -32,14 +36,18 @@ namespace OverlayHUD
         private static readonly object seenLock = new object();
         private static readonly object enemyLock = new object();
         private static readonly object reflectionCacheLock = new object();
+#if !NATIVE_ONLY
         private static readonly object networkQueueLock = new object();
+#endif
         private static readonly Dictionary<string, MemberInfo> memberCache = new Dictionary<string, MemberInfo>();
         private static readonly HashSet<string> missingMemberCache = new HashSet<string>();
         private static readonly Dictionary<string, MethodInfo> noArgMethodCache = new Dictionary<string, MethodInfo>();
         private static readonly HashSet<string> missingNoArgMethodCache = new HashSet<string>();
+#if !NATIVE_ONLY
         private static Task networkQueueTail = Task.CompletedTask;
         private static int latestMonsterStatusRequestVersion;
         private static int latestMapValueRequestVersion;
+#endif
         private static float mapValue;
         private static float mapValueInitial;
         private static float lostValue;
@@ -243,20 +251,24 @@ namespace OverlayHUD
             }
         }
 
+#if !NATIVE_ONLY
         private ConfigEntry<string> endpoint;
         private ConfigEntry<string> levelEndpoint;
+#endif
         private ConfigEntry<float> scanInterval;
         private ConfigEntry<float> statusInterval;
         private ConfigEntry<bool> requireLineOfSight;
         private ConfigEntry<bool> revealUnknownMonsters;
         private ConfigEntry<bool> preferPlayerVisionDetection;
         private ConfigEntry<bool> debugLogging;
+#if !NATIVE_ONLY
         private ConfigEntry<bool> autoStartOverlayApp;
         private ConfigEntry<bool> autoCloseOverlayApp;
         private ConfigEntry<string> overlayAppRelativePath;
         private ConfigEntry<string> overlayAppArchiveName;
-        private Harmony harmony;
         private Process launchedOverlayProcess;
+#endif
+        private Harmony harmony;
 
         private void Awake()
         {
@@ -264,55 +276,32 @@ namespace OverlayHUD
             foreach (string typeName in new[] { "StatsManager", "PlayerController", "MapToolController", "CurrencyUI", "SemiUI", "GameDirector", "LoadingUI", "RunManager", "LevelGenerator", "SemiFunc", "ValuableObject", "RoundDirector", "PlayerAvatar" })
                 ResolveGameType(typeName);
             KeepPluginObjectAlive();
-            endpoint = Config.Bind("Overlay", "Endpoint", "http://127.0.0.1:8787/api/monster-seen", "Monster endpoint on this PC.");
-            levelEndpoint = Config.Bind("Overlay", "LevelEndpoint", "http://127.0.0.1:8787/api/level", "Level sync endpoint on this PC.");
-            scanInterval = Config.Bind("Detection", "ScanIntervalSeconds", 3f, "How often pending enemy roster sync is retried.");
-            statusInterval = Config.Bind("Detection", "StatusIntervalSeconds", 10f, "How often monster health and respawn status are synced after the roster is known. Event-driven changes remain immediate; values below 10 are raised to 10.");
-            requireLineOfSight = Config.Bind("Detection", "RequireLineOfSight", true, "Reveal monsters only after an encounter. Disable to reveal the complete level roster as soon as it is known.");
-            revealUnknownMonsters = Config.Bind("Detection", "RevealUnknownMonsters", false, "Reveal monsters using the four-pointed star placeholder icon as soon as they are discovered, regardless of RequireLineOfSight. Monsters with their own icons keep their usual detection rules.");
-            preferPlayerVisionDetection = Config.Bind("Detection", "PreferPlayerVisionDetection", true, "When enabled, show monsters when the player sees them. When disabled, use the older enemy-vision plus player-very-close detection.");
-            debugLogging = Config.Bind("Debug", "Logging", false, "Write periodic bridge debug logs.");
-            autoStartOverlayApp = Config.Bind("OverlayApp", "AutoStart", true, "Start the bundled OverlayHUD desktop app when the game starts.");
-            autoCloseOverlayApp = Config.Bind("OverlayApp", "AutoClose", true, "Close the bundled OverlayHUD desktop app when the game exits.");
-            overlayAppRelativePath = Config.Bind("OverlayApp", "ExecutableRelativePath", string.Empty, "Leave empty to install the bundled desktop app in LocalAppData/OverlayHUD, separately for each BepInEx profile. Legacy default paths also use this location. Custom paths are relative to this plugin DLL, or absolute.");
-            overlayAppArchiveName = Config.Bind("OverlayApp", "ArchiveName", "OverlayHUD_app.zip", "Bundled OverlayHUD desktop app archive next to this plugin DLL.");
-            bool configChanged = false;
-            if (endpoint.Value == "http://192.168.1.198:8787/api/monster-seen")
-            {
-                endpoint.Value = "http://127.0.0.1:8787/api/monster-seen";
-                configChanged = true;
-            }
-            if (levelEndpoint.Value == "http://192.168.1.198:8787/api/level")
-            {
-                levelEndpoint.Value = "http://127.0.0.1:8787/api/level";
-                configChanged = true;
-            }
-            if (statusInterval.Value < 10f)
-            {
-                statusInterval.Value = 10f;
-                configChanged = true;
-            }
-            if (BundledAppStorage.IsBundledExecutablePath(overlayAppRelativePath.Value)
-                && overlayAppRelativePath.Value != string.Empty)
-            {
-                overlayAppRelativePath.Value = string.Empty;
-                configChanged = true;
-            }
-            if (overlayAppArchiveName.Value == "OverlayHUDApp.zip")
-            {
-                overlayAppArchiveName.Value = "OverlayHUD_app.zip";
-                configChanged = true;
-            }
-            if (configChanged) Config.Save();
-
-            Logger.LogInfo("OverlayHUD is running. MonsterEndpoint=" + endpoint.Value + ", LevelEndpoint=" + levelEndpoint.Value + ", Logging=" + debugLogging.Value);
+            requireLineOfSight = BindNativeSetting("02 Detection", "RequireLineOfSight", true, "Reveal monsters only after an encounter. Disable to reveal the complete level roster as soon as it is known.", 100);
+            revealUnknownMonsters = BindNativeSetting("02 Detection", "RevealUnknownMonsters", false, "Reveal monsters using the four-pointed star placeholder icon as soon as they are discovered, regardless of RequireLineOfSight. Monsters with their own icons keep their usual detection rules.", 90);
+            preferPlayerVisionDetection = BindNativeSetting("02 Detection", "PreferPlayerVisionDetection", true, "When enabled, show monsters when the player sees them. When disabled, use enemy-vision plus player-very-close detection.", 80);
+            scanInterval = BindNativeSetting("02 Detection", "ScanIntervalSeconds", 3f, "How often pending enemy roster sync is retried.", 70);
+            statusInterval = BindNativeSetting("02 Detection", "StatusIntervalSeconds", 10f, "How often monster health and respawn status are synced after the roster is known. Event-driven changes remain immediate; values below 10 are raised to 10.", 60);
+            debugLogging = BindNativeSetting("99 Diagnostics", "Logging", false, "Write additional diagnostic logs.", 100);
+            if (statusInterval.Value < 10f) statusInterval.Value = 10f;
+#if !NATIVE_ONLY
+            autoStartOverlayApp = BindNativeSetting("09 Electron - App", "AutoStart", true, "Start the bundled OverlayHUD desktop app when the game starts.", 100);
+            autoCloseOverlayApp = BindNativeSetting("09 Electron - App", "AutoClose", true, "Close the bundled OverlayHUD desktop app when the game exits.", 90);
+            overlayAppRelativePath = BindNativeSetting("09 Electron - App", "ExecutableRelativePath", string.Empty, "Leave empty to install the bundled desktop app in LocalAppData/OverlayHUD, separately for each BepInEx profile. Custom paths are relative to this plugin DLL, or absolute.", 80);
+            overlayAppArchiveName = BindNativeSetting("09 Electron - App", "ArchiveName", "OverlayHUD_app.zip", "Bundled OverlayHUD desktop app archive next to this plugin DLL.", 70);
+            endpoint = BindNativeSetting("10 Electron - Connection", "Endpoint", "http://127.0.0.1:8787/api/monster-seen", "Monster endpoint on this PC.", 100);
+            levelEndpoint = BindNativeSetting("10 Electron - Connection", "LevelEndpoint", "http://127.0.0.1:8787/api/level", "Level sync endpoint on this PC.", 90);
+#endif
+            Logger.LogInfo("OverlayHUD is running. Logging=" + debugLogging.Value);
 
             InitializeNativeHud();
+#if !NATIVE_ONLY
             if (!nativeMode) StartOverlayAppIfNeeded();
+#endif
             PatchGameUpdates();
             StartCoroutine(SyncMonsterLocalization());
         }
 
+#if !NATIVE_ONLY
         private void StartOverlayAppIfNeeded()
         {
             if (!autoStartOverlayApp.Value) return;
@@ -353,7 +342,7 @@ namespace OverlayHUD
 
         private string ResolveOverlayAppPath()
         {
-            if (BundledAppStorage.IsBundledExecutablePath(overlayAppRelativePath.Value))
+            if (string.IsNullOrWhiteSpace(overlayAppRelativePath.Value))
             {
                 string appDirectory = BundledAppStorage.GetAppDirectory(
                     Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), Paths.BepInExRootPath);
@@ -365,7 +354,7 @@ namespace OverlayHUD
         private void EnsureOverlayAppExtracted(string exePath)
         {
             if (string.IsNullOrWhiteSpace(exePath)) return;
-            if (BundledAppStorage.IsBundledExecutablePath(overlayAppRelativePath.Value))
+            if (string.IsNullOrWhiteSpace(overlayAppRelativePath.Value))
             {
                 string appDirectory = Path.GetDirectoryName(exePath);
                 string profileId = Path.GetFileName(Path.GetDirectoryName(appDirectory));
@@ -470,6 +459,8 @@ namespace OverlayHUD
                 launchedOverlayProcess = null;
             }
         }
+
+#endif
 
         private void PatchGameUpdates()
         {
@@ -966,7 +957,9 @@ namespace OverlayHUD
             SceneManager.sceneLoaded -= OnSceneLoaded;
             harmony?.UnpatchSelf();
             if (gameplayActive) HandleLevelChanging();
+#if !NATIVE_ONLY
             StopOverlayAppIfNeeded();
+#endif
             if (instance == this) instance = null;
         }
 
@@ -3218,6 +3211,7 @@ namespace OverlayHUD
             }
         }
 
+#if !NATIVE_ONLY
         private static Task<string> QueueNetworkRequest(Func<string> request)
         {
             lock (networkQueueLock)
@@ -3232,10 +3226,13 @@ namespace OverlayHUD
             }
         }
 
+#endif
+
         private IEnumerator PostSeenMonster(string monsterName, int instanceId, string metadata)
         {
             string json = "{\"name\":\"" + EscapeJson(monsterName) + "\",\"id\":" + instanceId + metadata + "}";
             if (DispatchNative("monster-seen", json)) yield break;
+#if !NATIVE_ONLY
             string endpointUrl = endpoint.Value;
             Task<string> request = QueueNetworkRequest(() => SendHttpPost(endpointUrl, json));
             while (!request.IsCompleted) yield return null;
@@ -3249,12 +3246,14 @@ namespace OverlayHUD
                 Logger.LogInfo("Sent seen monster " + monsterName + ": " + result);
             }
 
+#endif
             yield break;
         }
 
         private IEnumerator PostMonsterRoster(string json)
         {
             if (DispatchNative("roster", json)) yield break;
+#if !NATIVE_ONLY
             string rosterEndpoint = BuildSiblingEndpoint(levelEndpoint.Value, "/api/roster");
             Task<string> request = QueueNetworkRequest(() => SendHttpPost(rosterEndpoint, json));
             while (!request.IsCompleted) yield return null;
@@ -3268,12 +3267,14 @@ namespace OverlayHUD
                 Logger.LogInfo("Synced monster roster.");
             }
 
+#endif
             yield break;
         }
 
         private IEnumerator PostMonsterStatuses(string json, bool coalesce = false)
         {
             if (DispatchNative("monster-status", json)) yield break;
+#if !NATIVE_ONLY
             string statusEndpoint = BuildSiblingEndpoint(levelEndpoint.Value, "/api/monster-status");
             int requestVersion = coalesce ? Interlocked.Increment(ref latestMonsterStatusRequestVersion) : 0;
             Task<string> request = QueueNetworkRequest(() => !coalesce || requestVersion == Volatile.Read(ref latestMonsterStatusRequestVersion)
@@ -3287,6 +3288,7 @@ namespace OverlayHUD
                 Logger.LogWarning("Failed to sync monster respawn status: " + TrimHttpResult(result));
             }
 
+#endif
             yield break;
         }
 
@@ -3294,6 +3296,7 @@ namespace OverlayHUD
         {
             string json = "{\"level\":" + level + ",\"levelName\":\"" + EscapeJson(levelName ?? "") + "\"}";
             if (DispatchNative("level", json)) yield break;
+#if !NATIVE_ONLY
             string endpointUrl = levelEndpoint.Value;
             Task<string> request = QueueNetworkRequest(() => SendHttpPost(endpointUrl, json));
             while (!request.IsCompleted) yield return null;
@@ -3321,12 +3324,14 @@ namespace OverlayHUD
                 }
             }
 
+#endif
             yield break;
         }
 
         private IEnumerator PostVisibility(bool visible)
         {
             if (nativeMode) { nativeState.Visible = visible; yield break; }
+#if !NATIVE_ONLY
             string visibilityEndpoint = BuildSiblingEndpoint(levelEndpoint.Value, "/api/visibility");
             string json = "{\"visible\":" + (visible ? "true" : "false") + "}";
             Task<string> request = QueueNetworkRequest(() => SendHttpPost(visibilityEndpoint, json));
@@ -3341,12 +3346,14 @@ namespace OverlayHUD
                 Logger.LogInfo("Synced overlay visibility " + (visible ? "on" : "off") + ": " + result);
             }
 
+#endif
             yield break;
         }
 
         private IEnumerator PostGameUiVisibility(string json)
         {
             if (DispatchNative("tab-hidden", json)) yield break;
+#if !NATIVE_ONLY
             string tabEndpoint = BuildSiblingEndpoint(levelEndpoint.Value, "/api/tab-hidden");
             Task<string> request = QueueNetworkRequest(() => SendHttpPost(tabEndpoint, json));
             while (!request.IsCompleted) yield return null;
@@ -3356,12 +3363,14 @@ namespace OverlayHUD
                 Logger.LogWarning("Failed to sync game UI visibility: " + TrimHttpResult(result));
             }
 
+#endif
             yield break;
         }
 
         private IEnumerator PostPlayerUpgrades(string json, int changedCount)
         {
             if (DispatchNative("upgrades", json)) yield break;
+#if !NATIVE_ONLY
             string upgradesEndpoint = BuildSiblingEndpoint(levelEndpoint.Value, "/api/upgrades");
             Task<string> request = QueueNetworkRequest(() => SendHttpPost(upgradesEndpoint, json));
             while (!request.IsCompleted) yield return null;
@@ -3375,12 +3384,12 @@ namespace OverlayHUD
                 Logger.LogInfo("Synced " + changedCount + " player upgrade value(s): " + result);
             }
 
+#endif
             yield break;
         }
 
         private IEnumerator PostMapValue(int value, int initial, int lost, int? goal)
         {
-            string mapValueEndpoint = BuildSiblingEndpoint(levelEndpoint.Value, "/api/map-value");
             string json = "{\"value\":" + value.ToString(CultureInfo.InvariantCulture)
                 + ",\"initial\":" + initial.ToString(CultureInfo.InvariantCulture)
                 + ",\"lost\":" + lost.ToString(CultureInfo.InvariantCulture);
@@ -3388,7 +3397,8 @@ namespace OverlayHUD
             json += "}";
 
             if (DispatchNative("map-value", json)) yield break;
-
+#if !NATIVE_ONLY
+            string mapValueEndpoint = BuildSiblingEndpoint(levelEndpoint.Value, "/api/map-value");
             int requestVersion = Interlocked.Increment(ref latestMapValueRequestVersion);
             Task<string> request = QueueNetworkRequest(() => requestVersion == Volatile.Read(ref latestMapValueRequestVersion)
                 ? SendHttpPost(mapValueEndpoint, json)
@@ -3405,6 +3415,7 @@ namespace OverlayHUD
                 Logger.LogInfo("Synced map value " + value + ": " + result);
             }
 
+#endif
             yield break;
         }
 
@@ -3412,6 +3423,7 @@ namespace OverlayHUD
         {
             string json = "{\"player\":\"" + EscapeJson(playerName) + "\",\"item\":\"" + EscapeJson(itemName) + "\"}";
             if (DispatchNative("item-destroyed", json)) yield break;
+#if !NATIVE_ONLY
             string itemDestroyedEndpoint = BuildSiblingEndpoint(levelEndpoint.Value, "/api/item-destroyed");
             Task<string> request = QueueNetworkRequest(() => SendHttpPost(itemDestroyedEndpoint, json));
             while (!request.IsCompleted) yield return null;
@@ -3425,9 +3437,11 @@ namespace OverlayHUD
                 Logger.LogInfo(playerName + " destroyed " + itemName + ": " + result);
             }
 
+#endif
             yield break;
         }
 
+#if !NATIVE_ONLY
         private static string SendStateLevelFallback(int level, string levelName, string levelEndpointUrl)
         {
             string stateEndpoint = BuildSiblingEndpoint(levelEndpointUrl, "/api/state");
@@ -3682,6 +3696,8 @@ namespace OverlayHUD
             split = response.IndexOf("\n\n", StringComparison.Ordinal);
             return split >= 0 ? response.Substring(split + 2) : "";
         }
+
+#endif
 
         private static string FindKnownMonster(string raw)
         {

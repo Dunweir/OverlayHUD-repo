@@ -1,8 +1,10 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+#if !NATIVE_ONLY
 using System.Threading.Tasks;
 using Newtonsoft.Json;
+#endif
 using UnityEngine;
 using UnityEngine.Localization.Settings;
 using UnityEngine.Localization.Tables;
@@ -55,6 +57,7 @@ namespace OverlayHUD
             if (loaded.Count < 2)
                 Logger.LogWarning("Some HUD localization tables are unavailable; missing names use English/original fallbacks.");
 
+#if !NATIVE_ONLY
             // Native uses the cache directly. It must never start a desktop HTTP loop.
             if (nativeMode) yield break;
             var names = LocalizedHudNames.EnemyNames();
@@ -71,6 +74,7 @@ namespace OverlayHUD
                 bool success = !request.IsFaulted && !request.IsCanceled && IsHttpSuccess(request.Result);
                 yield return new WaitForSecondsRealtime(success ? 60f : 5f);
             }
+#endif
         }
 
         private bool TryRequestHudTable(string code, out AsyncOperationHandle<StringTable> operation)

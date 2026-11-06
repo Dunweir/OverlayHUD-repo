@@ -2,11 +2,18 @@
 
 **Author: EgorSalad**
 
-Small BepInEx plugin source for syncing R.E.P.O. runtime state with the bundled OverlayHUD desktop app.
+BepInEx plugin for displaying R.E.P.O. runtime state in a Unity HUD or a bundled desktop app.
+
+Two alternative distributions share the same plugin GUID, manifest identity and version 26.11.3:
+
+- **Full**: Native + Electron; `Renderer = Electron` by default.
+- **Native-only**: a separately compiled Unity HUD DLL, without desktop startup/storage or HTTP bridge code, an app archive, a renderer selector, or desktop config entries.
+
+Install only one distribution per profile. Remove the previous package before switching; do not leave duplicate DLLs or package remnants. Close the game, back up and remove `BepInEx/config/local.overlay.overlay_hud.cfg` when switching builds or upgrading from the old config schema. Old config sections/values are not migrated. Reapply desired settings using the new sections.
 
 The plugin does not reveal the whole level roster to the HUD as seen. It builds the roster for status tracking, then sends a monster as encountered only after the game reports a player-visible or legacy close/vision encounter. Tick and Upscream use the legacy fallback while PlayerVision detection is enabled because their `EnemyOnScreen` path is not reliable in current testing.
 
-## Overlay Endpoints
+## Overlay Endpoints (Full, Electron mode only)
 
 The bundled desktop app starts a local server on `127.0.0.1:8787`. The plugin posts:
 
@@ -25,18 +32,27 @@ The fallback in `assets/monster-localization.json` is extracted from the install
 
 ## Config
 
-BepInEx creates `local.overlay.overlay_hud.cfg` after first launch. Current settings are:
+BepInEx creates `BepInEx/config/local.overlay.overlay_hud.cfg` after first launch.
 
-- `Overlay.Endpoint` and `Overlay.LevelEndpoint` for the local HUD server.
-- `Detection.ScanIntervalSeconds` for pending roster retries.
-- `Detection.StatusIntervalSeconds` for periodic safety sync; event-driven health and respawn changes remain immediate, and values below 10 seconds are raised to 10.
-- `Detection.PreferPlayerVisionDetection` for player-visible encounter detection, with legacy fallback for enemies that need it.
-- `Debug.Logging` for extra diagnostic logs.
-- `OverlayApp.AutoStart`, `OverlayApp.AutoClose`, `OverlayApp.ExecutableRelativePath`, and `OverlayApp.ArchiveName` for the bundled desktop app.
+| Section | Settings |
+| --- | --- |
+| `01 General` (Full only) | `Renderer = Electron`; alternative `Native`, restart required |
+| `02 Detection` | `ScanIntervalSeconds = 3`, `StatusIntervalSeconds = 10` (minimum 10), `RequireLineOfSight = true`, `RevealUnknownMonsters = false`, `PreferPlayerVisionDetection = true` |
+| `03 Native - General` | `Enabled = true`, `Language = ru`, `SaveTimestamps = true` |
+| `04 Native - Layout` | `Alignment = Center`, `Scale = 1`, `OffsetX = 0`, `OffsetY = 20`, `HorizontalLayout = true`, `HorizontalColumns = 11`, `Columns = 4`, `MonsterSize = 70`, `UpgradeSize = 38`, `UpgradeRows = 2`, `WrapValueLabels = true` |
+| `05 Native - Information` | `ShowLevel`, `ShowTimer`, `ShowMapValue`, `ShowLostValue`, `ShowUpgrades` (all true) |
+| `06 Native - Monsters` | `ShowMonsters`, `ShowHealth`, `ShowRespawnTimer`, `ShowRespawnIndicator`, `ShowStrength`, `ShowMonsterCounts` (true); `OnlyAliveMonsters`, `FilterUndetectedMonsters` (false) |
+| `07 Native - Effects` | `Animations`, `ShowProximityWaves`, `ShowDamageNumbers`, `UseGameUIEffects` (true); `ShowDestroyedItemAlerts`, `ShowTooltips` (false) |
+| `08 Native - Upgrades` | Per-upgrade visibility, all true |
+| `09 Electron - App` (Full only) | `AutoStart = true`, `AutoClose = true`, `ExecutableRelativePath` empty, `ArchiveName = OverlayHUD_app.zip` |
+| `10 Electron - Connection` (Full only) | `Endpoint = http://127.0.0.1:8787/api/monster-seen`, `LevelEndpoint = http://127.0.0.1:8787/api/level` |
+| `99 Diagnostics` | `Logging = false` |
 
-`OverlayApp.ExecutableRelativePath` defaults to empty, selecting the external per-profile install below. Known legacy default path strings are normalized to empty. Custom paths retain their previous behavior: relative to the plugin DLL or absolute, without this external migration. Older LAN endpoints are migrated to the current local defaults on launch.
+Sections `03`–`08` apply live through Configuration Manager or a BepInEx config reload; the cfg file is not watched automatically. Native-only does not bind sections `01`, `09`, or `10`. It does not fall back to another renderer if HUD initialization fails.
 
-## Desktop App Storage
+`ExecutableRelativePath` in `09 Electron - App` defaults to empty, selecting the external per-profile install below. Custom paths are relative to the plugin DLL or absolute, without external relocation. App-file relocation is independent of config migration: old sections and values have no compatibility layer.
+
+## Desktop App Storage (Full only)
 
 `OverlayHUD_app.zip` stays beside the plugin DLL. The default executable is:
 
@@ -54,10 +70,53 @@ Look for `Bundled OverlayHUD desktop app ready at:` in `BepInEx/LogOutput.log` f
 
 External files survive mod uninstall or profile deletion. With the app closed, back up needed timestamps and root config, then manually delete the corresponding `%LOCALAPPDATA%\OverlayHUD\profiles\<profile-key>` folder if no longer needed.
 
-## Build Notes
+## Build and Package Both Variants
 
-1. Install BepInEx for R.E.P.O. through r2modman/Thunderstore or manually.
-2. Copy the needed DLL references into `../lib/` or change `OverlayHUD.csproj` `HintPath` values to point at your game install.
-3. Build with `dotnet build overlay-hud/OverlayHUD.csproj -c Release`.
-4. Copy `bin/Release/net472/OverlayHUD.dll` into the package folders before building a flat package.
-5. Build the flat package from `package-flat` so it includes `OverlayHUD.dll`, `OverlayHUD_app.zip`, `manifest.json`, `README.md`, and `icon.png`.
+Requirements: Windows PowerShell 5.1 or PowerShell 7, .NET SDK targeting `net472`, installed R.E.P.O. Unity/game assemblies at the project's `HintPath` locations, and reference assemblies in `overlay-hud/lib/`. The recommended release build also requires Node.js, npm, and dependencies installed in `game-overlay/` (`npm install`). Reusing a verified current desktop bundle requires no Electron rebuild.
+
+Run from the repository root. Rebuilding Electron is recommended for releases:
+
+```powershell
+powershell -NoProfile -File tools/Build-Packages.ps1 -RebuildDesktop
+# Release rerun: explicitly replace previously generated outputs:
+powershell -NoProfile -File tools/Build-Packages.ps1 -RebuildDesktop -Force
+# Reuse the default bundle only when it fully matches the current release and sources:
+powershell -NoProfile -File tools/Build-Packages.ps1
+# Alternative current bundle (relative paths use the caller's working directory):
+powershell -NoProfile -File tools/Build-Packages.ps1 -BundlePath "C:\build\OverlayHUD_app.zip"
+```
+
+`-RebuildDesktop` runs `npm.cmd run package` in `game-overlay/` and creates a fresh `OverlayHUD_app.zip` in staging. It does not overwrite the existing input ZIP. Install app dependencies beforehand; `-BundlePath` cannot be combined with `-RebuildDesktop`.
+
+Without `-RebuildDesktop`, the input defaults to `overlay-hud/package-flat/OverlayHUD_app.zip`, or the custom `-BundlePath`. It must contain `OverlayHUD.exe` at its root. Both reused and freshly built bundles are validated: the app version must match the release, and SHA-256 hashes of web files, app files, and every file in `assets/` must match the current sources. Stale or missing content is rejected with rebuild guidance; updating only the DLL cannot fix an old Electron bundle. Existing input ZIPs and DLL copies in `package-flat/` and `package/plugins/` remain untouched.
+
+Before installing the update, close the game and any running OverlayHUD Electron app. The changed bundle SHA-256 triggers the managed app update on the next desktop AutoStart, preserving the root config and timestamps.
+
+### Build contract
+
+- Builds Release twice, explicitly passing `-p:NativeOnly=false` and `-p:NativeOnly=true`.
+- The project implements `NativeOnly=true` by defining `NATIVE_ONLY` and excluding `BundledAppStorage.cs`; it must exclude all `obj/`, `bin/`, and `dist/` trees from default compile globs, not just the active intermediate path.
+- Both `BaseIntermediateOutputPath` and `MSBuildProjectExtensionsPath` are isolated under `obj/Full/<run-id>/` or `obj/NativeOnly/<run-id>/`. Restore state and generated assembly attributes cannot cross between variants or runs.
+- Explicit `OutputPath` values point to separate `overlay-hud/dist/packages/<run-id>/build/` subdirectories. The script disables target-framework/runtime suffixes and reads the DLL directly from that variant's output.
+- Staging files and checked archives are retained under `overlay-hud/dist/packages/<run-id>/`. Only explicitly named files enter the ZIP; build outputs, generated cfg files, PDBs and reference DLLs are excluded.
+- Versions are read from the Full manifest and checked against the project and Native manifest. The script does not bump versions. Both manifest identities and dependencies must match.
+- Both ZIPs are constructed and their exact entry names/counts checked before either is copied to the repository root. This is structural validation, not a substitute for DLL regression tests or a game session.
+- Existing suffixed output archives cause a preflight failure unless `-Force` is passed. Even with `-Force`, `EgorSalad-OverlayHUD-26.11.2.zip` is never touched. SHA-256 hashes of each DLL and final archive are printed.
+
+### Package contract
+
+`EgorSalad-OverlayHUD-26.11.3-Full.zip` has exactly seven root entries:
+
+```text
+icon.png
+manifest.json
+OverlayHUD.dll
+OverlayHUD_app.zip
+README.md
+LICENSE
+THIRD_PARTY_NOTICES.md
+```
+
+`EgorSalad-OverlayHUD-26.11.3-Native.zip` has exactly six root entries: the same list without `OverlayHUD_app.zip`, using the separately compiled Native DLL and `package-native/` README, manifest and notices. Native notices include the complete font license without desktop runtime references. Full templates come from `package-flat/`; the icon and repository MIT license are shared. No directory entries or leading `./` records are added.
+
+A normal development build remains `dotnet build overlay-hud/OverlayHUD.csproj -c Release` (Full). For releases use the packaging script rather than manually copying a potentially stale DLL between layouts.

@@ -169,7 +169,7 @@ test('timestamp locations omit the game Level prefix in both languages', async (
 
 test('line-of-sight detection remains enabled by default', () => {
     const plugin = fs.readFileSync(`${__dirname}/overlay-hud/Plugin.cs`, 'utf8');
-    assert.match(plugin, /Config\.Bind\("Detection", "RequireLineOfSight", true,/);
+    assert.match(plugin, /BindNativeSetting\("02 Detection", "RequireLineOfSight", true,/);
 });
 
 test('disabled from startup creates no files, including on shutdown', async () => {
