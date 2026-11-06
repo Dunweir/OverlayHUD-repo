@@ -1,7 +1,7 @@
 {
   "name": "OverlayHUD",
   "author": "EgorSalad",
-  "version_number": "26.11.3",
+  "version_number": "26.11.4",
   "website_url": "https://github.com/Dunweir/overlay_repo",
   "description": "Native + Electron HUD for R.E.P.O. Electron by default; optional in-game Unity HUD. Monsters, health, respawn timers, upgrades, level time and values.",
   "dependencies": [

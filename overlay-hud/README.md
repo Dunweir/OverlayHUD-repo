@@ -4,7 +4,7 @@
 
 BepInEx plugin for displaying R.E.P.O. runtime state in a Unity HUD or a bundled desktop app.
 
-Two alternative distributions share the same plugin GUID, manifest identity and version 26.11.3:
+Two alternative distributions share the same plugin GUID, manifest identity and version 26.11.4:
 
 - **Full**: Native + Electron; `Renderer = Electron` by default.
 - **Native-only**: a separately compiled Unity HUD DLL, without desktop startup/storage or HTTP bridge code, an app archive, a renderer selector, or desktop config entries.
@@ -105,7 +105,7 @@ Before installing the update, close the game and any running OverlayHUD Electron
 
 ### Package contract
 
-`EgorSalad-OverlayHUD-26.11.3-Full.zip` has exactly seven root entries:
+`EgorSalad-OverlayHUD-26.11.4-Full.zip` has exactly seven root entries:
 
 ```text
 icon.png
@@ -117,6 +117,6 @@ LICENSE
 THIRD_PARTY_NOTICES.md
 ```
 
-`EgorSalad-OverlayHUD-26.11.3-Native.zip` has exactly six root entries: the same list without `OverlayHUD_app.zip`, using the separately compiled Native DLL and `package-native/` README, manifest and notices. Native notices include the complete font license without desktop runtime references. Full templates come from `package-flat/`; the icon and repository MIT license are shared. No directory entries or leading `./` records are added.
+`EgorSalad-OverlayHUD-26.11.4-Native.zip` has exactly six root entries: the same list without `OverlayHUD_app.zip`, using the separately compiled Native DLL and `package-native/` README, manifest and notices. Native notices include the complete font license without desktop runtime references. Full templates come from `package-flat/`; the icon and repository MIT license are shared. No directory entries or leading `./` records are added.
 
 A normal development build remains `dotnet build overlay-hud/OverlayHUD.csproj -c Release` (Full). For releases use the packaging script rather than manually copying a potentially stale DLL between layouts.
