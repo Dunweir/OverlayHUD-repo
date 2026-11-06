@@ -1,153 +1,105 @@
-# OverlayHUD 26.11.3 — Native
+# OverlayHUD — Native
 
-HUD для **R.E.P.O.**, который рисуется прямо в игре через Unity Canvas.
-**Автор: EgorSalad.** Неофициальный фанатский проект, не связанный с semiwork,
-издателем R.E.P.O. или Thunderstore.
+**An in-game HUD for R.E.P.O. / Информационный HUD внутри R.E.P.O.**
 
-## Возможности
+[English](#english) · [Русский](#русский)
 
-- Встреченные монстры, их здоровье, требуемая сила и количество в группе.
-- Числовой таймер и круговой индикатор респавна, фильтрация погибших монстров.
-- Номер уровня, время прохождения, стоимость ценностей и потери.
-- Улучшения игрока с индивидуальными переключателями видимости.
-- Русский и английский языки, официальные игровые названия в подсказках.
-- Настройка размеров, масштаба, положения, рядов и колонок.
-- Анимации, волны близости, числа урона, уведомления об уничтоженных предметах.
-- Локальные текстовые таймкоды уровней.
+## English
 
-По умолчанию вид монстра раскрывается только после встречи; до этого он остаётся
-заглушкой. HUD появляется после загрузки уровня и скрывается при просмотре карты
-и показе счётчика квоты. Шрифты и изображения встроены в DLL.
+Keep track of your run without leaving the game. OverlayHUD displays encountered monsters, player upgrades and valuable statistics directly inside R.E.P.O., with a customizable layout and optional visual effects.
 
-## Установка и обновление
+This is the **Native edition**: the HUD is rendered through Unity, with its fonts and icons bundled into the plugin. No separate application or window is required.
 
-1. Установите BepInExPack для R.E.P.O. в профиль r2modman/Gale.
-2. Импортируйте `EgorSalad-OverlayHUD-26.11.3-Native.zip` как локальный мод.
-   Предварительная распаковка не нужна.
-3. Запустите игру с модами. HUD появится на игровом уровне.
+### Features
 
-Для ручной установки распакуйте файлы пакета в `BepInEx/plugins/OverlayHUD/`.
+- **Monster information** — health bars, required grab strength, grouped counts, respawn timers and circular respawn indicators.
+- **Run overview** — current level, elapsed time, remaining valuable value and losses.
+- **Player upgrades** — icons for owned upgrades, with individual visibility controls.
+- **Visual feedback** — proximity waves, floating damage numbers, animations and optional destroyed-item notifications showing the last holder.
+- **Flexible layout** — horizontal or grid layouts, alignment, offsets, scale, icon sizes, rows and columns.
+- **Russian and English** — localized interface and official game names in tooltips.
+- **Session timestamps** — local text logs of level starts, maps and encountered monsters.
 
-Это альтернативная сборка **того же плагина**, а не дополнительный мод.
-Не устанавливайте её вместе с другим вариантом OverlayHUD. При смене варианта
-закройте игру, сохраните нужные таймкоды и удалите прежний пакет целиком,
-не оставляя вторую DLL или другие файлы старого пакета.
+By default, monsters are revealed **only after an encounter**. Undetected monsters remain placeholders, and receiving multiplayer data does not reveal their identities. The HUD hides while the map or quota counter is shown.
 
-При переходе со старой версии или другой сборки сохраните резервную копию
-и удалите `BepInEx/config/local.overlay.overlay_hud.cfg`. При следующем запуске
-создаётся чистый конфиг. Старые секции и значения не мигрируют; настройте мод заново.
+### Customization
 
-## Конфигурация
+Settings are grouped by purpose in `BepInEx/config/local.overlay.overlay_hud.cfg`: detection, general HUD options, layout, information, monsters, effects and individual upgrades.
 
-Файл: `BepInEx/config/local.overlay.overlay_hud.cfg`.
-Используются только перечисленные ниже секции; выбора рендерера нет.
+Native HUD appearance settings can be changed live through **BepInEx Configuration Manager**, if available. Manual file edits require a config reload or game restart.
 
-### `02 Detection`
+- Choose `Language = en` or `ru` in **03 Native - General**; Russian is the default.
+- Show or hide individual HUD elements without stopping game-state tracking.
+- For hover tooltips, enable `ShowTooltips` and disable `UseGameUIEffects` in **07 Native - Effects**. Tooltips work when the game cursor is unlocked; the HUD does not unlock or capture it.
+- Timestamps are saved to `BepInEx/plugins/OverlayHUD/timestamps/` and can be disabled with `SaveTimestamps`.
 
-| Параметр | По умолчанию | Назначение |
-| --- | --- | --- |
-| `ScanIntervalSeconds` | `3` | Повтор сбора состава уровня |
-| `StatusIntervalSeconds` | `10` | Страховочная синхронизация; минимум 10 секунд, события урона обрабатываются сразу |
-| `RequireLineOfSight` | `true` | Раскрывать вид только после встречи; `false` раскрывает весь состав |
-| `RevealUnknownMonsters` | `false` | Сразу раскрывать виды без собственной иконки |
-| `PreferPlayerVisionDetection` | `true` | Использовать игровое обнаружение через PlayerVision, где доступно |
+### Multiplayer and limitations
 
-### `03 Native - General`
+- Accurate client-side respawn timers and health synchronization require compatible, current OverlayHUD versions on the host and clients. Health synchronization is experimental.
+- Damage numbers show a monster's health loss from all sources, not an individual player's damage score.
+- Game UI effects are experimental and may reduce text sharpness. Disable `UseGameUIEffects` for independent, sharper rendering.
+- Monsters without a dedicated icon use a placeholder. Unsupported font characters appear as `?`.
+- This is an alternative edition of the same plugin, not an add-on for another OverlayHUD edition. Use only one copy per profile.
 
-- `Enabled = true` — показывать HUD; скрытие не останавливает отслеживание и таймкоды.
-- `Language = ru` — русский; `en` — английский.
-- `SaveTimestamps = true` — сохранять таймкоды уровней.
+### Feedback
 
-### `04 Native - Layout`
+For bug reports, include `BepInEx/LogOutput.log`, your config and a short description of the issue. Optional detailed logging is available under **99 Diagnostics**.
 
-| Параметр | По умолчанию | Назначение |
-| --- | --- | --- |
-| `Alignment` | `Center` | `Left`, `Center`, `Right`: горизонтальная привязка |
-| `Scale` | `1` | Масштаб 0.5–2 относительно 1920×1080 |
-| `OffsetX` / `OffsetY` | `0` / `20` | Смещение от привязки / отступ сверху; диапазоны −1920…1920 / 0…1080 |
-| `HorizontalLayout` | `true` | Компактная верхняя строка; `false` — сетка |
-| `HorizontalColumns` / `Columns` | `11` / `4` | Плитки в строке / сетке (1–24); лишние переносятся, а не скрываются |
-| `MonsterSize` / `UpgradeSize` | `70` / `38` | Размер иконок до общего масштаба (32–128 / 20–64) |
-| `UpgradeRows` | `2` | Один или два ряда улучшений |
-| `WrapValueLabels` | `true` | Подписи стоимости над суммами; `false` — в одной строке |
+[Report an issue](https://github.com/Dunweir/OverlayHUD-repo/issues) · [Source code and detailed documentation](https://github.com/Dunweir/OverlayHUD-repo)
 
-### `05 Native - Information`
+---
 
-`ShowLevel`, `ShowTimer`, `ShowMapValue`, `ShowLostValue`, `ShowUpgrades` — все
-`true`. Независимо включают уровень, таймер, стоимость карты, потери и улучшения.
-Нулевые суммы и отсутствующие улучшения скрыты.
+## Русский
 
-### `06 Native - Monsters`
+Следите за забегом, не выходя из игры. OverlayHUD показывает встреченных монстров, улучшения игрока и статистику ценностей прямо внутри R.E.P.O. Расположение, состав HUD и визуальные эффекты можно настроить под себя.
 
-- `ShowMonsters`, `ShowHealth`, `ShowRespawnTimer`, `ShowRespawnIndicator`,
-  `ShowStrength`, `ShowMonsterCounts` — все `true`.
-- `ShowHealth` управляет полосками ХП, а не числами в подсказках.
-- Числовой таймер и круговой индикатор респавна независимы.
-- Сила берётся из игры: зелёный — хватает, красный — не хватает,
-  `X` — нельзя поднять, `?` — нет данных.
-- `OnlyAliveMonsters = false` — при включении скрывает погибших встреченных монстров.
-- `FilterUndetectedMonsters = false` — только вместе с `OnlyAliveMonsters=true`
-  дополнительно скрывает погибшие необнаруженные заглушки, не раскрывая их вид.
+Это **Native-версия**: HUD рисуется средствами Unity, а шрифты и иконки встроены в плагин. Отдельное приложение или окно не требуется.
 
-### `07 Native - Effects`
+### Возможности
 
-- `Animations = true` — анимации; отключение также убирает волны, вспышки и числа урона,
-  но не останавливает числовые таймеры.
-- `ShowProximityWaves = true`, `ShowDamageNumbers = true` — волны близости и урон.
-- `ShowDestroyedItemAlerts = false` — уведомления об уничтожении предмета и последнем
-  державшем его игроке; показываются 6 секунд, новое заменяет предыдущее.
-- `UseGameUIEffects = true` — экспериментальные эффекты игровой UI-камеры.
-  Могут уменьшать резкость; `false` выбирает независимый чёткий вывод.
-- `ShowTooltips = false` — подсказки при наведении. Для работы включите этот параметр,
-  отключите `UseGameUIEffects` и разблокируйте курсор средствами игры.
-  Сам HUD не разблокирует курсор и не перехватывает клики.
+- **Информация о монстрах** — полоски здоровья, требуемая сила захвата, количество в группе, таймеры и круговые индикаторы респавна.
+- **Состояние забега** — текущий уровень, время прохождения, оставшаяся стоимость ценностей и потери.
+- **Улучшения игрока** — иконки полученных улучшений с отдельными переключателями видимости.
+- **Визуальные подсказки** — волны близости, всплывающие числа урона, анимации и включаемые уведомления об уничтоженных предметах с именем последнего державшего их игрока.
+- **Гибкое расположение** — горизонтальный HUD или сетка, выравнивание, смещения, масштаб, размеры иконок, ряды и колонки.
+- **Русский и английский языки** — локализованный интерфейс и официальные игровые названия в подсказках.
+- **Таймкоды сессии** — локальные текстовые записи начала уровней, карт и встреченных монстров.
 
-### `08 Native - Upgrades`
+По умолчанию монстры раскрываются **только после встречи**. Необнаруженные виды остаются заглушками, а получение данных в мультиплеере не раскрывает их названия. HUD скрывается при просмотре карты и показе счётчика квоты.
 
-Все переключатели по умолчанию `true`: `strength`, `tumbleLaunch`, `range`,
-`sprintSpeed`, `tumbleWings`, `crouchRest`, `extraJump`, `tumbleClimb`, `health`,
-`stamina`, `mapPlayerCount`, `deathHeadBattery`.
-Отдельный тип показывается, если он получен и включён общий `ShowUpgrades`.
+### Настройка
 
-### `99 Diagnostics`
+Параметры находятся в `BepInEx/config/local.overlay.overlay_hud.cfg` и сгруппированы по назначению: обнаружение, общие настройки HUD, расположение, информация, монстры, эффекты и отдельные улучшения.
 
-`Logging = false` — подробные логи отключены. Включите для отчёта об ошибке.
+Внешний вид Native HUD можно менять на лету через **BepInEx Configuration Manager**, если он доступен. После ручного редактирования файла требуется перезагрузить конфиг или игру.
 
-Параметры секций `03`–`08` применяются на лету через BepInEx Configuration Manager
-или перезагрузку конфига средствами BepInEx. Автоматического наблюдения за файлом
-нет: после ручного редактирования перезагрузите конфиг либо игру.
+- Язык выбирается параметром `Language = ru` или `en` в **03 Native - General**; по умолчанию — русский.
+- Отдельные элементы HUD можно скрывать, не останавливая отслеживание состояния игры.
+- Для подсказок при наведении включите `ShowTooltips` и отключите `UseGameUIEffects` в **07 Native - Effects**. Подсказки работают при разблокированном игровом курсоре; сам HUD не разблокирует и не перехватывает его.
+- Таймкоды сохраняются в `BepInEx/plugins/OverlayHUD/timestamps/`; запись отключается параметром `SaveTimestamps`.
 
-## Таймкоды и мультиплеер
+### Мультиплеер и ограничения
 
-Таймкоды сохраняются в `BepInEx/plugins/OverlayHUD/timestamps/` отдельным UTF-8
-файлом на сессию: локальное время начала уровня, номер, карта, встреченные монстры
-и их количество. Имена игроков в таймкоды не записываются.
-Отключение `SaveTimestamps` завершает текущую строку; после включения запись
-возобновляется со следующего уровня. Старые файлы не удаляются.
+- Для точных таймеров респавна у клиента и синхронизации ХП нужны совместимые актуальные версии OverlayHUD у хоста и клиентов. Синхронизация ХП экспериментальная.
+- Числа урона показывают потерю здоровья монстра от всех источников, а не личный урон игрока.
+- Эффекты игрового интерфейса экспериментальные и могут снижать чёткость текста. Отключите `UseGameUIEffects` для независимого, более чёткого вывода.
+- Монстры без собственной иконки отображаются с заглушкой. Неподдерживаемые шрифтом символы заменяются на `?`.
+- Это альтернативная версия того же плагина, а не дополнение к другой сборке OverlayHUD. В профиле должна быть только одна копия.
 
-Для точного респавна и синхронизации ХП у хоста и клиентов должны быть совместимые
-актуальные версии OverlayHUD. Получение данных не раскрывает невстреченных монстров.
-Без поддержки хоста точный КД у клиента недоступен. Числа урона показывают потерю ХП
-от любых источников, а не персональный урон игрока. Синхронизацию ХП версии 26.11.3
-необходимо проверить в игровом лобби перед публикацией.
+### Обратная связь
 
-## Диагностика и ограничения
+К сообщению об ошибке приложите `BepInEx/LogOutput.log`, конфиг и краткое описание проблемы. Подробные логи можно включить в секции **99 Diagnostics**.
 
-- Лог: `BepInEx/LogOutput.log` активного профиля. Ищите `Loading [OverlayHUD`,
-  `Native HUD initialized` и ошибки `Native HUD initialization failed`.
-- Если HUD не виден, проверьте `Enabled`, загрузку игрового уровня и отсутствие
-  второй копии плагина. При ошибке инициализации другой рендерер не запускается.
-- Эффекты игровой UI-камеры экспериментальные. Для проверки чёткости и положения
-  отключите `UseGameUIEffects`.
-- Атласы шрифтов содержат ASCII и часть кириллицы; неподдерживаемые символы
-  отображаются как `?`. Масштабирование может снижать резкость текста.
-- Обновления игры и другие моды могут менять детекцию, игровые UI и здоровье врагов.
-  Приложите свежий лог и конфиг к отчёту об ошибке.
+[Сообщить об ошибке](https://github.com/Dunweir/OverlayHUD-repo/issues) · [Исходники и подробная документация](https://github.com/Dunweir/OverlayHUD-repo)
 
-Исходники и подробности: https://github.com/Dunweir/overlay_repo
+---
 
-## Лицензия
+**Author / Автор: EgorSalad**
 
-Код OverlayHUD — MIT, см. `LICENSE`. Шрифты, игровые изображения и сторонние
-компоненты сохраняют собственные условия; см. `THIRD_PARTY_NOTICES.md`.
-Copyright © 2025–2026 EgorSalad.
+Unofficial fan project; not affiliated with semiwork, the publisher of R.E.P.O. or Thunderstore.
+
+Неофициальный фанатский проект; не связан с semiwork, издателем R.E.P.O. или Thunderstore.
+
+Code / Код: **MIT**. Fonts and game artwork retain their respective licenses and rights; see `LICENSE` and `THIRD_PARTY_NOTICES.md`.
+
+Шрифты и игровые изображения сохраняют собственные лицензии и права; см. `LICENSE` и `THIRD_PARTY_NOTICES.md`.
