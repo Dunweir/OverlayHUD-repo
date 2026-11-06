@@ -2,6 +2,10 @@
 
 **An in-game HUD for R.E.P.O. / Информационный HUD внутри R.E.P.O.**
 
+**AI disclosure:** OverlayHUD was created entirely using Codex AI. Development and maintenance are AI-assisted.
+
+**Использование ИИ:** OverlayHUD целиком создан с использованием Codex AI. Разработка и поддержка ведутся с помощью ИИ.
+
 [English](#english) · [Русский](#русский)
 
 ## English
