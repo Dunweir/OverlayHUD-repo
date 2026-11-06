@@ -114,16 +114,16 @@ assert shadow_alpha.crop((0, PADDED_SIZE - 1, PADDED_SIZE, PADDED_SIZE)).getextr
 assert shadow_alpha.crop((PADDED_SIZE - 1, 0, PADDED_SIZE, PADDED_SIZE)).getextrema()[1] <= 2
 save_checked(tinted_mask(shadow_alpha), "card-shadow.png", (PADDED_SIZE, PADDED_SIZE))
 
-# Rasterize the installed Windows color glyph; ship only the resulting PNG.
-emoji = "\U0001f4aa"
-left, top, right, bottom = emoji_font.getbbox(emoji)
-emoji_image = Image.new("RGBA", (right - left, bottom - top))
-ImageDraw.Draw(emoji_image).text((-left, -top), emoji, font=emoji_font, embedded_color=True)
-emoji_image = emoji_image.crop(emoji_image.getbbox())
-emoji_image.thumbnail((256, 256), Image.Resampling.LANCZOS)
-emoji_square = Image.new("RGBA", (256, 256))
-emoji_square.paste(emoji_image, ((256 - emoji_image.width) // 2, (256 - emoji_image.height) // 2))
-save_checked(emoji_square, "strength-emoji.png", (256, 256))
+# Rasterize the installed Windows color glyphs; ship only the resulting PNGs.
+for name, emoji in [("strength", "\U0001f4aa"), ("destruction", "\U0001f4a5")]:
+    left, top, right, bottom = emoji_font.getbbox(emoji)
+    emoji_image = Image.new("RGBA", (right - left, bottom - top))
+    ImageDraw.Draw(emoji_image).text((-left, -top), emoji, font=emoji_font, embedded_color=True)
+    emoji_image = emoji_image.crop(emoji_image.getbbox())
+    emoji_image.thumbnail((256, 256), Image.Resampling.LANCZOS)
+    emoji_square = Image.new("RGBA", (256, 256))
+    emoji_square.paste(emoji_image, ((256 - emoji_image.width) // 2, (256 - emoji_image.height) // 2))
+    save_checked(emoji_square, name + "-emoji.png", (256, 256))
 
 # Rasterize at 3x the usual text size. Keep original typefaces, including
 # Roboto for Cyrillic and health labels. Atlas coordinates use a top-left origin.

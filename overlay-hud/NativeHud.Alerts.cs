@@ -19,10 +19,9 @@ namespace OverlayHUD
             alertGroup = alertPanel.gameObject.AddComponent<CanvasGroup>();
             alertGroup.blocksRaycasts = false;
             alertGroup.interactable = false;
-            var burst = Rect("Burst", alertPanel, NativeAlertLayout.PaddingX, NativeAlertLayout.PaddingTop,
-                NativeAlertLayout.FontSize, NativeAlertLayout.FontSize).gameObject.AddComponent<NativeAlertBurst>();
-            burst.color = new Color32(255, 157, 91, 255);
-            burst.raycastTarget = false;
+            var burst = Image("Burst", alertPanel, NativeAlertLayout.PaddingX, NativeAlertLayout.PaddingTop,
+                NativeAlertLayout.FontSize, NativeAlertLayout.FontSize);
+            burst.texture = Texture("destruction-emoji.png");
             alertPlayer = CreateAlertText(HeaderColor(255, 154, 154));
             alertAction = CreateAlertText(HeaderColor(247, 251, 255, .72f));
             alertItem = CreateAlertText(HeaderColor(255, 154, 154));
@@ -76,24 +75,4 @@ namespace OverlayHUD
         }
     }
 
-    // Embedded atlases have no explosion emoji; draw the burst without a font dependency.
-    public sealed class NativeAlertBurst : MaskableGraphic
-    {
-        protected override void OnPopulateMesh(VertexHelper mesh)
-        {
-            mesh.Clear();
-            var bounds = rectTransform.rect;
-            float radius = Mathf.Min(bounds.width, bounds.height) / 2;
-            if (radius <= 0) return;
-            mesh.AddVert(bounds.center, color, Vector2.zero);
-            const int points = 16;
-            for (int i = 0; i < points; i++)
-            {
-                float angle = (90 + i * 360f / points) * Mathf.Deg2Rad;
-                float r = radius * (i % 2 == 0 ? 1 : .45f);
-                mesh.AddVert(bounds.center + new Vector2(Mathf.Cos(angle), Mathf.Sin(angle)) * r, color, Vector2.zero);
-            }
-            for (int i = 0; i < points; i++) mesh.AddTriangle(0, i + 1, (i + 1) % points + 1);
-        }
-    }
 }
