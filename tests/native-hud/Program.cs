@@ -9,11 +9,13 @@ static void Destroyed(NativeHudState target, string player, string item, double 
     target.Apply("item-destroyed", Newtonsoft.Json.JsonConvert.SerializeObject(new { player, item }), now);
 }
 
+LanguageTests.Run();
+
 var defaults = new NativeHudOptions();
 Check(defaults.Scale == 1 && defaults.OffsetX == 0 && defaults.OffsetY == 20
     && defaults.MonsterSize == 70 && defaults.UpgradeSize == 38 && defaults.Columns == 4
     && defaults.HorizontalColumns == 11 && defaults.UpgradeRows == 2
-    && defaults.Language == "ru" && defaults.Alignment == "Center" && defaults.HiddenUpgrades.Count == 0,
+    && defaults.Language == NativeHudLanguage.DefaultLanguage && defaults.Alignment == "Center" && defaults.HiddenUpgrades.Count == 0,
     "Native HUD layout/language defaults changed");
 Check(defaults.HorizontalLayout && defaults.Enabled && defaults.ShowLevel && defaults.ShowTimer
     && defaults.ShowMapValue && defaults.ShowLostValue && defaults.ShowMonsters && defaults.ShowProximityWaves
@@ -23,6 +25,7 @@ Check(defaults.HorizontalLayout && defaults.Enabled && defaults.ShowLevel && def
     && !defaults.OnlyAliveMonsters && !defaults.FilterUndetectedMonsters && !defaults.ShowTooltips
     && defaults.UseGameUIEffects,
     "Native HUD toggle defaults changed");
+defaults.Language = "ru";
 Check(defaults.Translate("Уровень", "Level") == "Уровень", "Russian translation failed");
 defaults.Language = "en";
 Check(defaults.Translate("Уровень", "Level") == "Level", "English translation failed");

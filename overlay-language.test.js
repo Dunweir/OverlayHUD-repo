@@ -6,7 +6,8 @@ const vm = require('node:vm');
 const flush = () => new Promise((resolve) => setImmediate(resolve));
 const plain = (value) => JSON.parse(JSON.stringify(value));
 
-function loadClient({ stored = null, serverState = {}, postResult = async () => ({ ok: true }) } = {}) {
+function loadClient({ stored = null, serverState = {}, postResult = async () => ({ ok: true }),
+    navigator = { language: 'ru-RU' }, desktopLanguage } = {}) {
     let remote = plain(serverState);
     const posts = [];
     const streams = [];
@@ -25,7 +26,9 @@ function loadClient({ stored = null, serverState = {}, postResult = async () => 
         }
     }
     const context = vm.createContext({
-        window: { location: { protocol: 'http:' }, EventSource, addEventListener() {} },
+        window: { location: { protocol: 'http:' }, EventSource, addEventListener() {},
+            OverlayDesktop: desktopLanguage ? { systemLanguage: desktopLanguage } : undefined },
+        navigator,
         EventSource,
         localStorage: {
             getItem: () => stored,
@@ -101,23 +104,55 @@ test('settings POST does not block live gameplay SSE', async () => {
 });
 
 for (const stored of [null, '{}', '{invalid', 'null', '{"interfaceLanguage":"de"}']) {
-    test(`no valid saved language uses server language (${stored})`, async () => {
+    test(`no valid saved language uses system language over server default (${stored})`, async () => {
         const client = loadClient({ stored, serverState: { ...gameplay, interfaceLanguage: 'en' } });
         await flush();
-        assert.equal(client.api.getState().interfaceLanguage, 'en');
-        assert.equal(client.posts.length, 0);
+        assert.equal(client.api.getState().interfaceLanguage, 'ru');
+        assert.equal(client.posts[0].interfaceLanguage, 'ru');
         assertGameplay(client.api.getState());
     });
 }
 
-test('fresh Electron defaults match Native language, tooltips and alerts', async () => {
+test('fresh Russian-language defaults match Native language, tooltips and alerts', async () => {
     const client = loadClient();
     await flush();
     assert.equal(client.api.getState().interfaceLanguage, 'ru');
     assert.equal(client.api.getState().upgradeTooltipsVisible, false);
     assert.equal(client.api.getState().itemDestroyedAlertsVisible, false);
-    assert.equal(client.posts.length, 0);
+    assert.equal(client.posts[0].interfaceLanguage, 'ru');
 });
+
+for (const [navigator, expected] of [
+    [{ language: 'ru-RU' }, 'ru'], [{ language: 'RU' }, 'ru'],
+    [{ languages: ['ru-KZ', 'en'], language: 'en-US' }, 'ru'],
+    [{ languages: ['de-DE', 'ru'], language: 'ru-RU' }, 'en'],
+    [{ language: 'en-GB' }, 'en'], [{ language: 'uk-UA' }, 'en'],
+    [{}, 'en'], [null, 'en']
+]) {
+    test(`browser language initializes and persists preference: ${JSON.stringify(navigator)}`, async () => {
+        const client = loadClient({ navigator, serverState: { ...gameplay, interfaceLanguage: expected === 'ru' ? 'en' : 'ru' } });
+        assert.equal(client.api.getState().interfaceLanguage, expected);
+        await flush();
+        assert.equal(client.api.getState().interfaceLanguage, expected);
+        assert.equal(client.posts[0].interfaceLanguage, expected);
+        assert.equal(JSON.parse(client.stored()).interfaceLanguage, expected);
+        assertGameplay(client.api.getState());
+        client.api.setInterfaceLanguage(expected === 'ru' ? 'en' : 'ru');
+        await flush();
+        assert.equal(client.api.getState().interfaceLanguage, expected === 'ru' ? 'en' : 'ru');
+    });
+}
+
+for (const desktopLanguage of ['ru', 'en']) {
+    test(`Electron OS language overrides Chromium language: ${desktopLanguage}`, async () => {
+        const client = loadClient({ desktopLanguage, navigator: { language: desktopLanguage === 'ru' ? 'en-US' : 'ru-RU' } });
+        await flush();
+        assert.equal(client.api.getState().interfaceLanguage, desktopLanguage);
+        const restarted = loadClient({ stored: client.stored(), desktopLanguage: desktopLanguage === 'ru' ? 'en' : 'ru' });
+        await flush();
+        assert.equal(restarted.api.getState().interfaceLanguage, desktopLanguage);
+    });
+}
 
 for (const enabled of [false, true]) {
     test(`saved destroyed-item alert preference survives startup: ${enabled}`, async () => {
@@ -150,8 +185,9 @@ test('HUD names arrive through GET/SSE but never become saved preferences', asyn
     assert.equal('hudNames' in JSON.parse(client.stored()), false);
 });
 
-test('saved Russian also takes precedence over initial server English', async () => {
+test('saved Russian also takes precedence over system and server English', async () => {
     const client = loadClient({
+        desktopLanguage: 'en',
         stored: '{"interfaceLanguage":"ru"}', serverState: { interfaceLanguage: 'en' }
     });
     await flush();

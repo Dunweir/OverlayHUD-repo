@@ -47,8 +47,8 @@ namespace OverlayHUD
                 "Electron desktop HUD (default) or Native Unity HUD. Restart the game after changing.", 100).Value == RendererMode.Native;
 #endif
             nativeEnabled = BindNativeToggle(NativeGeneralSection, "Enabled", true, "Show the native HUD without stopping game-state tracking.", 100);
-            nativeLanguage = BindNativeSetting(NativeGeneralSection, "Language", "ru",
-                "Native HUD language: ru (Russian) or en (English). Applies immediately.", 90, new AcceptableValueList<string>("ru", "en"));
+            nativeLanguage = BindNativeSetting(NativeGeneralSection, "Language", NativeHudLanguage.DefaultLanguage,
+                "Native HUD language: ru (Russian) or en (English). Defaults to Russian for a Russian OS UI language, English otherwise. Saved choices are preserved. Applies immediately.", 90, new AcceptableValueList<string>("ru", "en"));
             nativeSaveTimestamps = BindNativeSetting(NativeGeneralSection, "SaveTimestamps", true,
                 "Save level start times, map names and seen monster names/counts in BepInEx/plugins/OverlayHUD/timestamps. Disabling finalizes the current line; enabling starts at the next level.", 80);
 

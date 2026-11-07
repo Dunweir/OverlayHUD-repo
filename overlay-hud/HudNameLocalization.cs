@@ -111,7 +111,7 @@ namespace OverlayHUD
 
         private string Name(string key, string language, string fallback)
         {
-            // Same ru/en default as NativeHudOptions; never use the game's selected locale.
+            // Use the configured HUD language, never the game's selected locale.
             if (tables.TryGetValue(language == "en" ? "en" : "ru", out var localized)
                 && localized.TryGetValue(key, out string value)) return value;
             if (tables.TryGetValue("en", out var english) && english.TryGetValue(key, out value)) return value;

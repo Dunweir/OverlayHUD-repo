@@ -39,7 +39,8 @@ let quitting = false;
 let localServerModule = null;
 let hoverBoundsGeneration = 0;
 let screenshotInProgress = false;
-let overlayPreferences = { interfaceLanguage: "ru", saveTimestampsEnabled: true };
+let systemLanguage = "en";
+let overlayPreferences = { interfaceLanguage: systemLanguage, saveTimestampsEnabled: true };
 let stopGameLifetimeWatcher = () => {};
 let lifetimeArgv = process.argv;
 let forceExitTimer = null;
@@ -698,6 +699,7 @@ function createOverlayWindow() {
         hasShadow: false,
         webPreferences: {
             preload: path.join(__dirname, "preload.js"),
+            additionalArguments: [`--overlay-system-language=${systemLanguage}`],
                         backgroundThrottling: true,
             contextIsolation: true,
             nodeIntegration: false,
@@ -801,6 +803,9 @@ if (!app.requestSingleInstanceLock()) {
     });
 
     app.whenReady().then(async () => {
+        const locale = app.getPreferredSystemLanguages()[0] || "en";
+        systemLanguage = /^ru(?:[-_]|$)/i.test(locale) ? "ru" : "en";
+        overlayPreferences.interfaceLanguage = systemLanguage;
         try {
             await startLocalServer();
         } catch (error) {

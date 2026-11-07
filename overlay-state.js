@@ -39,6 +39,14 @@ const OverlayApp = (() => {
         return accumulator;
     }, {});
 
+    function getDefaultLanguage() {
+        const desktopLanguage = window.OverlayDesktop?.systemLanguage;
+        if (["ru", "en"].includes(desktopLanguage)) return desktopLanguage;
+        const browser = typeof navigator === "undefined" ? null : navigator;
+        const locale = browser?.languages?.[0] || browser?.language || "en";
+        return /^ru(?:[-_]|$)/i.test(locale) ? "ru" : "en";
+    }
+
     const defaultState = {
         level: 1,
         gameplayVisible: false,
@@ -59,7 +67,7 @@ const OverlayApp = (() => {
         deathHeadBattery: 0,
         upgradeVisibility: { ...defaultUpgradeVisibility },
         style: 1,
-        interfaceLanguage: "ru",
+        interfaceLanguage: getDefaultLanguage(),
         saveTimestampsEnabled: true,
         bgEnabled: false,
         timerVisible: true,
@@ -134,9 +142,13 @@ const OverlayApp = (() => {
 
     function loadState() {
         try {
-            return pickPreferences(JSON.parse(localStorage.getItem(storageKey)));
+            // Seed the client language before GET/SSE can replace it with the server default.
+            return {
+                interfaceLanguage: defaultState.interfaceLanguage,
+                ...pickPreferences(JSON.parse(localStorage.getItem(storageKey)))
+            };
         } catch {
-            return {};
+            return { interfaceLanguage: defaultState.interfaceLanguage };
         }
     }
 
@@ -163,7 +175,8 @@ const OverlayApp = (() => {
         const hoverOpacity = Number.isFinite(Number(source.hoverOpacity))
             ? Math.min(100, Math.max(20, Number(source.hoverOpacity)))
             : defaultState.hoverOpacity;
-        const interfaceLanguage = source.interfaceLanguage === "en" ? "en" : defaultState.interfaceLanguage;
+        const interfaceLanguage = ["ru", "en"].includes(source.interfaceLanguage)
+            ? source.interfaceLanguage : defaultState.interfaceLanguage;
         const normalizedOverlayAlignment = ["left", "center", "right"].includes(source.overlayAlignment)
             ? source.overlayAlignment
             : defaultState.overlayAlignment;

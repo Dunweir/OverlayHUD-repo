@@ -94,13 +94,15 @@ test('restart restores preferences but never stored gameplay, including before G
 });
 
 for (const stored of [null, '{}', '{bad', 'null', '[]', '42']) {
-    test(`missing/corrupt storage uses server settings and current gameplay: ${stored}`, async () => {
+    test(`missing/corrupt storage uses server layout and syncs default language: ${stored}`, async () => {
         const client = boot({ stored, remote: { ...game, ...settings } });
         await flush();
         assertSubset(client.api.getState(), game);
         assert.equal(client.api.getState().interfaceLanguage, 'en');
         assert.equal(client.api.getState().squareSize, 88);
-        assert.equal(client.posts.length, 0);
+        assert.equal(client.posts.length, 1);
+        assert.equal(client.posts[0].interfaceLanguage, 'en');
+        assert.equal(client.posts[0].squareSize, 88);
     });
 }
 

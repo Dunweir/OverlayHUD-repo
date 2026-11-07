@@ -9,7 +9,7 @@ const source = fs.readFileSync(path.join(__dirname, "main.js"), "utf8");
 const display = (id, x = 0, y = 0) => ({ id, label: `Display ${id}`, bounds: { x, y, width: 1920, height: 1080 } });
 const flush = () => new Promise((resolve) => setImmediate(resolve));
 
-async function boot(config = {}, args = []) {
+async function boot(config = {}, args = [], systemLanguages = ['ru-RU']) {
     const state = {
         config: JSON.stringify(config), displays: [display(10), display(20, -1920)], primary: 10,
         errors: [], writes: [], captures: 0, dialogs: 0, calls: [],
@@ -19,6 +19,7 @@ async function boot(config = {}, args = []) {
     };
     const app = Object.assign(new EventEmitter(), {
         isPackaged: false,
+        getPreferredSystemLanguages: () => systemLanguages,
         disableHardwareAcceleration() { state.calls.push("disableGPU"); },
         requestSingleInstanceLock: () => true,
         whenReady() { state.calls.push("ready"); return Promise.resolve(); },
@@ -163,6 +164,21 @@ async function boot(config = {}, args = []) {
     return { state, api: context.api, screen, app, image, runTimers, ipcMain: electron.ipcMain };
 }
 
+for (const [locales, expected] of [[['ru-RU'], 'ru'], [['RU'], 'ru'], [['en-US', 'ru'], 'en'], [['de-DE', 'ru'], 'en'], [[], 'en']]) {
+    test(`system language initializes tray and preload argument: ${locales}`, async () => {
+        const { state } = await boot({}, [], locales);
+        assert.equal(state.window.options.webPreferences.additionalArguments[0], `--overlay-system-language=${expected}`);
+        const languageMenu = state.menu.find((item) => item.label === (expected === 'ru' ? 'Язык / Language' : 'Language'));
+        assert.equal(languageMenu.submenu[expected === 'ru' ? 0 : 1].checked, true);
+        let bridge;
+        vm.runInNewContext(fs.readFileSync(path.join(__dirname, 'preload.js'), 'utf8'), {
+            process: { argv: state.window.options.webPreferences.additionalArguments },
+            require: () => ({ contextBridge: { exposeInMainWorld(name, value) { bridge = value; } }, ipcRenderer: {} })
+        });
+        assert.equal(bridge.systemLanguage, expected);
+    });
+}
+
 test("hover ticks outside the HUD clear once without repeatedly waking the renderer", async () => {
     const { state } = await boot();
     let hoverCalls = 0;
@@ -227,6 +243,7 @@ test("preload reports only boolean visibility transitions", () => {
     let bridge;
     const messages = [];
     vm.runInNewContext(fs.readFileSync(path.join(__dirname, "preload.js"), "utf8"), {
+        process: { argv: [] },
         require: () => ({
             contextBridge: { exposeInMainWorld(name, value) {
                 assert.equal(name, "OverlayDesktop");
