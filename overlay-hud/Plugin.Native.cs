@@ -120,7 +120,7 @@ namespace OverlayHUD
                 nativeHud = new NativeHud(nativeState, options.Columns, options.HorizontalLayout,
                     message => Logger.LogInfo(message));
                 nativeHud.Configure(options);
-                nativeTimestamps = new NativeTimestampWriter(nativeState,
+                nativeTimestamps = new NativeTimestampWriter(nativeState, LocalizedHudNames,
                     System.IO.Path.Combine(BepInEx.Paths.PluginPath, "OverlayHUD", "timestamps"),
                     error => Logger.LogWarning("Native timestamp saving disabled for this session: " + error.Message));
                 Logger.LogInfo("Native HUD initialized with bundled Teko and Roboto font atlases.");

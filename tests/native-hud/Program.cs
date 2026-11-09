@@ -63,6 +63,13 @@ static void TimestampLevel(NativeTimestampWriter writer, NativeHudState target, 
     target.Apply("level", json, now);
 }
 
+var timestampNames = new HudNameLocalization();
+var bundledNames = Newtonsoft.Json.Linq.JObject.Parse(File.ReadAllText(
+    Path.Combine(AppContext.BaseDirectory, "monster-localization.json")));
+foreach (string language in new[] { "ru", "en" })
+    timestampNames.SetTable(language, bundledNames.Properties().Select(entry =>
+        new KeyValuePair<string, string>(entry.Name, (string)entry.Value[language])));
+
 string timestampRoot = Path.Combine(Path.GetTempPath(), "OverlayHUD-tests-" + Guid.NewGuid().ToString("N"));
 Directory.CreateDirectory(timestampRoot);
 try
@@ -71,7 +78,7 @@ try
     var timestampState = new NativeHudState();
     var errors = new List<Exception>();
     DateTime clock = new DateTime(2026, 11, 4, 9, 8, 7, 123, DateTimeKind.Local);
-    using var writer = new NativeTimestampWriter(timestampState, directory, errors.Add, () => clock);
+    using var writer = new NativeTimestampWriter(timestampState, timestampNames, directory, errors.Add, () => clock);
     writer.Tick(0, true);
     foreach (string invalid in new[] { "{}", "{\"level\":0}", "{\"level\":-1}", "{\"level\":null}",
         "{\"level\":\"NaN\"}", "{\"level\":\"Infinity\"}", "{\"level\":2147483648}", "{\"level\":true}", "{\"level\":{}}" })
@@ -88,7 +95,7 @@ try
     TimestampLevel(writer, timestampState, "{\"level\":1,\"levelName\":\"Level - Усадьба\"}", 10);
     await writer.FlushAsync();
     string file = Path.Combine(directory, "2026-11-04_09-08-07-123_1.txt");
-    string firstHeading = "09:08:07 Уровень 1 Level - Усадьба";
+    string firstHeading = "09:08:07 Уровень 1 Усадьба";
     Check(File.ReadAllText(file) == firstHeading + Environment.NewLine, "Initial localized timestamp/map incorrect");
     Roster(timestampState, "Trudge", new[] { 1, 2 });
     Roster(timestampState, "Secret Unseen", new[] { 3 });
@@ -109,7 +116,7 @@ try
     clock = clock.AddMinutes(2);
     TimestampLevel(writer, timestampState, "{\"level\":2.9,\"levelName\":\"Museum\"}", 130, language: "en");
     await writer.FlushAsync();
-    string finalizedFirst = firstHeading + " [Gnomes x4, Trudge x2, Модовый зверь]";
+    string finalizedFirst = firstHeading + " [Гном x4, Модовый зверь, Шагатель x2]";
     string secondHeading = "09:10:07 Level 2 Museum";
     Check(File.ReadAllLines(file).SequenceEqual(new[] { finalizedFirst, secondHeading }),
         "Transition lost old monsters, leaked an unseen group/species, or changed frozen language");
@@ -157,7 +164,7 @@ try
 
     clock = clock.AddMinutes(-2);
     var otherState = new NativeHudState();
-    using var other = new NativeTimestampWriter(otherState, directory, errors.Add, () => clock);
+    using var other = new NativeTimestampWriter(otherState, timestampNames, directory, errors.Add, () => clock);
     TimestampLevel(other, otherState, "{\"level\":1}", 0);
     other.Dispose();
     await other.FlushAsync();
@@ -166,10 +173,39 @@ try
         "A second session overwrote an existing file");
     Check(errors.Count == 0, "Successful timestamp sessions logged errors");
 
+    foreach (string language in new[] { "ru", "en" })
+    {
+        var localizedState = new NativeHudState();
+        string localizedDirectory = Path.Combine(timestampRoot, language);
+        using var localizedWriter = new NativeTimestampWriter(localizedState, timestampNames,
+            localizedDirectory, errors.Add, () => clock);
+        TimestampLevel(localizedWriter, localizedState, "{\"level\":1,\"levelName\":\"Level - Manor\"}", 0,
+            language: language);
+        localizedState.Apply("monster-seen", "{\"id\":1,\"name\":\"Gnome\"}", 1);
+        localizedState.Apply("monster-seen", "{\"id\":2,\"name\":\"Snatcher\"}", 1);
+        localizedState.Apply("monster-seen", "{\"id\":3,\"name\":\"Animal\",\"unknown\":true}", 1);
+        string nextLanguage = language == "ru" ? "en" : "ru";
+        TimestampLevel(localizedWriter, localizedState, "{\"level\":2,\"levelName\":\"Mod Level - Annex\"}", 2,
+            language: nextLanguage);
+        localizedState.Apply("monster-seen", "{\"id\":4,\"name\":\"Trudge\"}", 3);
+        localizedWriter.Dispose();
+        await localizedWriter.FlushAsync();
+        string[] saved = File.ReadAllLines(Directory.GetFiles(localizedDirectory).Single());
+        string heading = language == "ru" ? "Уровень" : "Level";
+        string nextHeading = nextLanguage == "ru" ? "Уровень" : "Level";
+        string names = language == "ru" ? "Animal, Гном, Пони" : "Animal, Gnome, Pony";
+        string nextName = nextLanguage == "ru" ? "Шагатель" : "Trudge";
+        Check(saved[0] == "09:08:07 " + heading + " 1 Manor [" + names + "]",
+            "Timestamp language, official names, unknown fallback or leading map prefix incorrect: " + saved[0]);
+        Check(saved[1] == "09:08:07 " + nextHeading + " 2 Mod Level - Annex [" + nextName + "]",
+            "Language switch changed an active line or stripped an embedded map prefix: " + language);
+    }
+    Check(errors.Count == 0, "Localized timestamp sessions logged errors");
+
     string blocked = Path.Combine(timestampRoot, "blocked");
     File.WriteAllText(blocked, "not a directory");
     var failedState = new NativeHudState();
-    using var failedWriter = new NativeTimestampWriter(failedState, blocked, errors.Add, () => clock);
+    using var failedWriter = new NativeTimestampWriter(failedState, timestampNames, blocked, errors.Add, () => clock);
     TimestampLevel(failedWriter, failedState, "{\"level\":1}", 0);
     await failedWriter.FlushAsync();
     Check(errors.Count == 1, "IO failure was not logged exactly once");
@@ -189,7 +225,7 @@ try
     string writeFailureDirectory = Path.Combine(timestampRoot, "write-failure");
     var writeFailureState = new NativeHudState();
     var writeErrors = new List<Exception>();
-    using var writeFailure = new NativeTimestampWriter(writeFailureState, writeFailureDirectory, writeErrors.Add, () => clock);
+    using var writeFailure = new NativeTimestampWriter(writeFailureState, timestampNames, writeFailureDirectory, writeErrors.Add, () => clock);
     TimestampLevel(writeFailure, writeFailureState, "{\"level\":1}", 0);
     await writeFailure.FlushAsync();
     string writeFailureFile = Directory.GetFiles(writeFailureDirectory).Single();
@@ -204,7 +240,7 @@ try
     Check(writeErrors.Count == 1 && Directory.GetFileSystemEntries(writeFailureDirectory).Length == 0,
         "A later write failure retried, logged repeatedly or allocated another filename");
 
-    using var unused = new NativeTimestampWriter(new NativeHudState(), Path.Combine(timestampRoot, "unused"), errors.Add);
+    using var unused = new NativeTimestampWriter(new NativeHudState(), timestampNames, Path.Combine(timestampRoot, "unused"), errors.Add);
     unused.Dispose();
     await unused.FlushAsync();
     Check(!Directory.Exists(Path.Combine(timestampRoot, "unused")) && errors.Count == 1,

@@ -12,11 +12,13 @@ namespace OverlayHUD
     internal sealed class NativeTimestampWriter : IDisposable
     {
         private readonly NativeHudState state;
+        private readonly HudNameLocalization localizedNames;
         private readonly string directory;
         private readonly Action<Exception> logError;
         private readonly Func<DateTime> localNow;
         private readonly List<string> lines = new List<string>();
         private int activeLine = -1;
+        private string activeLanguage;
         private bool disposed;
         private DateTime sessionStart;
         private Task pending = Task.CompletedTask;
@@ -24,10 +26,11 @@ namespace OverlayHUD
         private string filePath;
         private volatile bool failed;
 
-        internal NativeTimestampWriter(NativeHudState state, string directory, Action<Exception> logError,
+        internal NativeTimestampWriter(NativeHudState state, HudNameLocalization localizedNames, string directory, Action<Exception> logError,
             Func<DateTime> localNow = null)
         {
             this.state = state;
+            this.localizedNames = localizedNames;
             this.directory = directory;
             this.logError = logError;
             this.localNow = localNow ?? (() => DateTime.Now);
@@ -48,10 +51,14 @@ namespace OverlayHUD
             DateTime start = localNow();
             if (lines.Count == 0) sessionStart = start;
             string map = data["levelName"]?.Type == JTokenType.String ? (string)data["levelName"] : "";
-            string label = language == "en" ? "Level" : "Уровень";
+            map = map.Replace('\r', ' ').Replace('\n', ' ').Trim();
+            const string prefix = "Level - ";
+            if (map.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)) map = map.Substring(prefix.Length).Trim();
+            activeLanguage = language == "en" ? "en" : "ru";
+            string label = activeLanguage == "en" ? "Level" : "Уровень";
             lines.Add(start.ToString("HH:mm:ss", CultureInfo.InvariantCulture) + " " + label + " "
                 + Math.Floor(level).ToString(CultureInfo.InvariantCulture) + " "
-                + (string.IsNullOrWhiteSpace(map) ? "?" : map.Replace('\r', ' ').Replace('\n', ' ').Trim()));
+                + (string.IsNullOrWhiteSpace(map) ? "?" : map));
             activeLine = lines.Count - 1;
             QueueWrite();
         }
@@ -70,8 +77,10 @@ namespace OverlayHUD
             foreach (NativeHudState.Monster monster in state.GetDisplayMonsters(now))
             {
                 if (!monster.Seen || string.IsNullOrWhiteSpace(monster.Name)) continue;
-                totals.TryGetValue(monster.Name, out int count);
-                totals[monster.Name] = count + Math.Max(1, monster.Count);
+                string name = localizedNames.MonsterName(monster.Name, activeLanguage, monster.Seen, monster.Unknown)
+                    ?? monster.Name;
+                totals.TryGetValue(name, out int count);
+                totals[name] = count + Math.Max(1, monster.Count);
             }
             var names = new List<string>();
             foreach (var monster in totals)

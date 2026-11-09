@@ -13,6 +13,8 @@
     <Compile Include="../../overlay-hud/NativeHudLanguage.cs" Link="NativeHudLanguage.cs" />
     <None Include="../../overlay-hud/Plugin.Native.cs" Link="Plugin.Native.source" CopyToOutputDirectory="PreserveNewest" />
     <Compile Include="../../overlay-hud/NativeTimestampWriter.cs" Link="NativeTimestampWriter.cs" />
+        <Compile Include="../../overlay-hud/HudNameLocalization.cs" Link="HudNameLocalization.cs" />
+        <None Include="../../assets/monster-localization.json" Link="monster-localization.json" CopyToOutputDirectory="PreserveNewest" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
   </ItemGroup>
 </Project>
