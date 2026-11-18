@@ -60,7 +60,7 @@ const desktopSymbols = [
   'RendererMode', 'QueueNetworkRequest', 'networkQueueLock', 'networkQueueTail',
   'latestMonsterStatusRequestVersion', 'latestMapValueRequestVersion',
   'BuildSiblingEndpoint', 'SendStateLevelFallback', 'SendHttpPost', 'SendHttpGet',
-  'ReadHttpResponse', 'IsHttpSuccess', 'TrimHttpResult', 'TcpClient', 'NetworkStream',
+  'IsHttpSuccess', 'TrimHttpResult', 'HttpWebRequest', 'SendHttpRequest',
 ];
 
 const desktopStrings = [

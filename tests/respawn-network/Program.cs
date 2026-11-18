@@ -25,7 +25,7 @@ namespace ExitGames.Client.Photon
 }
 namespace Photon.Realtime
 {
-    public class Room { }
+    public class Room { public Player GetPlayer(int id) => Array.Find(PhotonNetwork.PlayerListOthers, p => p.ActorNumber == id); }
     public class Player
     {
         public int ActorNumber;
@@ -59,14 +59,23 @@ namespace Photon.Pun
         public static Player[] PlayerListOthers = Array.Empty<Player>();
         public static double Time = 100;
         public static List<(object[] Packet, int Target)> Sent = new List<(object[], int)>();
-        public static void RaiseEvent(byte code, object data, RaiseEventOptions options, SendOptions send)
-            => Sent.Add(((object[])data, options.TargetActors[0]));
+        public static bool RaiseEvent(byte code, object data, RaiseEventOptions options, SendOptions send)
+            { Sent.Add(((object[])data, options.TargetActors[0])); return true; }
     }
 }
 namespace OverlayHUD
 {
     public sealed partial class Plugin
     {
+        private sealed class Toggle { internal bool Value = true; }
+        private readonly Toggle teamMonsterDetection = new Toggle();
+        private int teamReveals;
+        private bool PublishEnemyParentEncounter(Component parent, ref int id, ref string name, bool shareEncounter)
+        {
+            Check(!shareEncounter, "Remote encounters must not be echoed");
+            teamReveals++;
+            return true;
+        }
         private bool gameplayActive = true;
         private int updated;
         private readonly List<float> publishedHealth = new List<float>();
@@ -148,6 +157,23 @@ namespace OverlayHUD
             UnityEngine.Time.realtimeSinceStartup = 12;
             plugin.TickRespawnNetwork();
             Check(PhotonNetwork.Sent.Count == 4, "Periodic health and cooldown snapshots recover state");
+            supported.CustomProperties[TeamEncounterProtocol] = new string('c', 32);
+            plugin.localTeamEncounters.Add(parent);
+            PhotonNetwork.IsMasterClient = false;
+            plugin.TickTeamEncounters();
+            plugin.TickTeamEncounters();
+            Check(PhotonNetwork.Sent.Count == 5 && PhotonNetwork.Sent[4].Target == 4, "Client shares encounter once with participating teammate");
+            object[] spot = { TeamEncounterProtocol, plugin.respawnSession, supported.CustomProperties[TeamEncounterProtocol], 8 };
+            Receive(spot, 4);
+            Check(plugin.pendingTeamViews.Contains(8), "Early encounter queued");
+            PhotonView.Views[8] = parent.View;
+            plugin.TickTeamEncounters();
+            Check(plugin.teamReveals == 1 && plugin.pendingTeamViews.Count == 0, "Queued encounter published");
+            Receive(spot, 5);
+            plugin.teamMonsterDetection.Value = false;
+            Receive(spot, 4);
+            plugin.TickTeamEncounters();
+            Check(plugin.teamReveals == 1 && PhotonNetwork.LocalPlayer.CustomProperties[TeamEncounterProtocol] == null, "Opt-out and foreign sender ignored");
             plugin.StopRespawnNetwork();
             Check(PhotonNetwork.LocalPlayer.CustomProperties[RespawnProtocol] == null, "Remove capability on unload");
             Console.WriteLine("Respawn network protocol tests passed.");

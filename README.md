@@ -366,7 +366,7 @@ BepInEx/config/local.overlay.overlay_hud.cfg
 | Секция | Параметры и значения по умолчанию |
 | --- | --- |
 | `01 General` — только Full | `Renderer = Electron`; альтернатива `Native`. Смена требует перезапуска игры. |
-| `02 Detection` | `ScanIntervalSeconds = 3`, `StatusIntervalSeconds = 10`, `RequireLineOfSight = true`, `RevealUnknownMonsters = false`, `PreferPlayerVisionDetection = true`. |
+| `02 Detection` | `ScanIntervalSeconds = 3`, `StatusIntervalSeconds = 10`, `RequireLineOfSight = true`, `TeamMonsterDetection = true`, `RevealUnknownMonsters = false`, `PreferPlayerVisionDetection = true`. |
 | `12 Appearance` — обе сборки | `LegacyIcons = false`: новые иконки; `true`: прежние иконки в активном рендерере. |
 | `03 Native - General` | `Enabled = true`, `Language = ru` (или `en`), `SaveTimestamps = true`. |
 | `04 Native - Layout` | `Alignment = Center`, `Scale = 1`, `OffsetX = 0`, `OffsetY = 20`, `HorizontalLayout = true`, `HorizontalColumns = 11`, `Columns = 4`, `MonsterSize = 70`, `UpgradeSize = 38`, `UpgradeRows = 2`, `WrapValueLabels = true`. |
@@ -460,6 +460,10 @@ Desktop HUD создаёт текстовые файлы в `timestamps/` ряд
 3. Убедитесь, что порт `8787` не занят другим процессом.
 4. Временно включите `Logging = true` в `[99 Diagnostics]`.
 5. Приложите свежий `LogOutput.log` к отчёту об ошибке.
+
+## Командное обнаружение монстров
+
+В секции `[02 Detection]` параметр `TeamMonsterDetection = true` включает обмен встречами между участниками с этой функцией в Native и Electron. Когда напарник обнаруживает монстра, тот появляется и в вашем HUD. Мод у хоста для этого не требуется. Автоматическое раскрытие состава уровня через настройки игрока не передаётся команде. Значение `false` отключает отправку и получение встреч. Уже открытые карточки сохраняются до конца уровня.
 
 ## КД монстров в мультиплеере
 
@@ -578,6 +582,10 @@ Native содержит ровно 6 записей: тот же список **
 
 
 ## Зависимости и acknowledgements
+
+### Благодарности
+
+Спасибо NeverFun21 за идеи командного обнаружения монстров и повторного использования HTTP-соединений в Electron-оверлее. Обе идеи пришли из форка [OverlayHUD Multiplayer Fix](https://github.com/NeverFun21/OverlayHUD-Multiplayer-Fix).
 
 ### Обязательные зависимости
 

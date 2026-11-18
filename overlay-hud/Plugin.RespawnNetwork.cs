@@ -28,6 +28,7 @@ namespace OverlayHUD
 
         private void ResetRespawnNetwork()
         {
+            ResetTeamEncounters();
             networkHealth.Clear();
             networkRespawns.Clear();
             respawnSession = Guid.NewGuid().ToString("N");
@@ -41,8 +42,9 @@ namespace OverlayHUD
             if (PhotonNetwork.InRoom)
             {
                 PhotonNetwork.LocalPlayer.SetCustomProperties(new Hashtable { { RespawnProtocol, null } });
-                PhotonNetwork.LocalPlayer.SetCustomProperties(new Hashtable { { HealthProtocol, null } });
+                PhotonNetwork.LocalPlayer.SetCustomProperties(new Hashtable { { HealthProtocol, null }, { TeamEncounterProtocol, null } });
             }
+            ResetTeamEncounters();
             networkHealth.Clear();
             networkRespawns.Clear();
         }
@@ -69,6 +71,7 @@ namespace OverlayHUD
                 PhotonNetwork.LocalPlayer.SetCustomProperties(new Hashtable { { RespawnProtocol, respawnSession } });
             if (!Equals(PhotonNetwork.LocalPlayer.CustomProperties[HealthProtocol], respawnSession))
                 PhotonNetwork.LocalPlayer.SetCustomProperties(new Hashtable { { HealthProtocol, respawnSession } });
+            TickTeamEncounters();
             if (!gameplayActive) return;
             if (!PhotonNetwork.IsMasterClient) return;
 
@@ -109,6 +112,7 @@ namespace OverlayHUD
 
         private void ReceiveRespawnEvent(EventData message)
         {
+            ReceiveTeamEncounter(message);
             ReceiveHealthEvent(message);
             if (message.Code != RespawnEventCode || !gameplayActive || !PhotonNetwork.InRoom
                 || PhotonNetwork.IsMasterClient || message.Sender != PhotonNetwork.MasterClient?.ActorNumber) return;

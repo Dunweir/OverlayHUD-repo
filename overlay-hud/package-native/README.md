@@ -46,6 +46,10 @@ Native HUD appearance settings can be changed live through **BepInEx Configurati
 - Monsters without a dedicated icon use a placeholder. Unsupported font characters appear as `?`.
 - This is an alternative edition of the same plugin, not an add-on for another OverlayHUD edition. Use only one copy per profile.
 
+### Credits
+
+Team monster detection was inspired by the fork by NeverFun21, [OverlayHUD Multiplayer Fix](https://github.com/NeverFun21/OverlayHUD-Multiplayer-Fix).
+
 ### Feedback
 
 For bug reports, include `BepInEx/LogOutput.log`, your config and a short description of the issue. Optional detailed logging is available under **99 Diagnostics**.
@@ -91,6 +95,10 @@ For bug reports, include `BepInEx/LogOutput.log`, your config and a short descri
 - Эффекты игрового интерфейса экспериментальные и могут снижать чёткость текста. Отключите `UseGameUIEffects` для независимого, более чёткого вывода.
 - Монстры без собственной иконки отображаются с заглушкой. Неподдерживаемые шрифтом символы заменяются на `?`.
 - Это альтернативная версия того же плагина, а не дополнение к другой сборке OverlayHUD. В профиле должна быть только одна копия.
+
+### Благодарности
+
+Спасибо NeverFun21 за идею командного обнаружения монстров в форке [OverlayHUD Multiplayer Fix](https://github.com/NeverFun21/OverlayHUD-Multiplayer-Fix).
 
 ### Обратная связь
 

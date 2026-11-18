@@ -9,7 +9,7 @@ using System.Globalization;
 #if !NATIVE_ONLY
 using System.IO;
 using System.IO.Compression;
-using System.Net.Sockets;
+using System.Net;
 #endif
 using System.Reflection;
 using System.Runtime.CompilerServices;
@@ -258,6 +258,7 @@ namespace OverlayHUD
         private ConfigEntry<float> scanInterval;
         private ConfigEntry<float> statusInterval;
         private ConfigEntry<bool> requireLineOfSight;
+        private ConfigEntry<bool> teamMonsterDetection;
         private ConfigEntry<bool> revealUnknownMonsters;
         private ConfigEntry<bool> preferPlayerVisionDetection;
         private ConfigEntry<bool> debugLogging;
@@ -277,6 +278,7 @@ namespace OverlayHUD
                 ResolveGameType(typeName);
             KeepPluginObjectAlive();
             requireLineOfSight = BindNativeSetting("02 Detection", "RequireLineOfSight", true, "Reveal monsters only after an encounter. Disable to reveal the complete level roster as soon as it is known.", 100);
+            teamMonsterDetection = BindNativeSetting("02 Detection", "TeamMonsterDetection", true, "Share monster encounters with teammates who also have team detection enabled.", 95);
             revealUnknownMonsters = BindNativeSetting("02 Detection", "RevealUnknownMonsters", false, "Reveal monsters using the four-pointed star placeholder icon as soon as they are discovered, regardless of RequireLineOfSight. Monsters with their own icons keep their usual detection rules.", 90);
             preferPlayerVisionDetection = BindNativeSetting("02 Detection", "PreferPlayerVisionDetection", true, "When enabled, show monsters when the player sees them. When disabled, use enemy-vision plus player-very-close detection.", 80);
             scanInterval = BindNativeSetting("02 Detection", "ScanIntervalSeconds", 3f, "How often pending enemy roster sync is retried.", 70);
@@ -1342,7 +1344,7 @@ namespace OverlayHUD
             if (!ShouldRevealUnknownMonster(candidate)) return;
             int instanceId = root.GetInstanceID();
             string monsterName = null;
-            PublishEnemyParentEncounter(enemyParent, ref instanceId, ref monsterName);
+            PublishEnemyParentEncounter(enemyParent, ref instanceId, ref monsterName, shareEncounter: false);
         }
 
         private void RevealAllKnownEnemies(List<ResolvedEnemyCandidate> enemies)
@@ -2851,7 +2853,7 @@ namespace OverlayHUD
             nextScanAt = 0f;
         }
 
-        private bool PublishEnemyParentEncounter(Component enemyParent, ref int instanceId, ref string monsterName)
+        private bool PublishEnemyParentEncounter(Component enemyParent, ref int instanceId, ref string monsterName, bool shareEncounter = true)
         {
             if (enemyParent == null) return false;
             // Opted-in unknowns need not wait for the initial roster's stabilization scans.
@@ -2877,6 +2879,8 @@ namespace OverlayHUD
                 Root = root,
                 Center = GetObjectCenter(root)
             };
+            if (shareEncounter && teamMonsterDetection.Value && Photon.Pun.PhotonNetwork.InRoom)
+                localTeamEncounters.Add(enemyParent);
             MarkMonsterSeen(monsterName, candidate);
             if (debugLogging.Value)
             {
@@ -3539,113 +3543,48 @@ namespace OverlayHUD
 
         private static string SendHttpPost(string endpointUrl, string json)
         {
-            try
-            {
-                var uri = new Uri(endpointUrl);
-                if (!string.Equals(uri.Scheme, "http", StringComparison.OrdinalIgnoreCase))
-                {
-                    return "ERROR:Only http:// endpoints are supported by the raw bridge client.";
-                }
-
-                int port = uri.IsDefaultPort ? 80 : uri.Port;
-                byte[] body = Encoding.UTF8.GetBytes(json);
-                string path = string.IsNullOrEmpty(uri.PathAndQuery) ? "/" : uri.PathAndQuery;
-
-                using (var client = new TcpClient())
-                {
-                    IAsyncResult connect = client.BeginConnect(uri.Host, port, null, null);
-                    if (!connect.AsyncWaitHandle.WaitOne(TimeSpan.FromSeconds(2)))
-                    {
-                        return "ERROR:Connection timed out.";
-                    }
-                    client.EndConnect(connect);
-                    client.ReceiveTimeout = 2000;
-                    client.SendTimeout = 2000;
-
-                    using (NetworkStream stream = client.GetStream())
-                    using (var writer = new StreamWriter(stream, new UTF8Encoding(false), 1024, true))
-                    using (var reader = new StreamReader(stream, Encoding.UTF8, false, 1024, true))
-                    {
-                        writer.NewLine = "\r\n";
-                        writer.WriteLine("POST " + path + " HTTP/1.1");
-                        writer.WriteLine("Host: " + uri.Host + ":" + port);
-                        writer.WriteLine("Content-Type: application/json");
-                        writer.WriteLine("Content-Length: " + body.Length);
-                        writer.WriteLine("Connection: close");
-                        writer.WriteLine();
-                        writer.Flush();
-                        stream.Write(body, 0, body.Length);
-                        stream.Flush();
-
-                        return ReadHttpResponse(reader);
-                    }
-                }
-            }
-            catch (Exception error)
-            {
-                return "ERROR:" + error.GetType().Name + ": " + error.Message;
-            }
+            return SendHttpRequest(endpointUrl, json);
         }
 
         private static string SendHttpGet(string endpointUrl)
         {
+            return SendHttpRequest(endpointUrl, null);
+        }
+
+        private static string SendHttpRequest(string endpointUrl, string json)
+        {
             try
             {
                 var uri = new Uri(endpointUrl);
-                if (!string.Equals(uri.Scheme, "http", StringComparison.OrdinalIgnoreCase))
+                if (uri.Scheme != Uri.UriSchemeHttp) return "ERROR:Only http:// endpoints are supported.";
+                var request = (HttpWebRequest)WebRequest.Create(uri);
+                request.Proxy = null;
+                request.AllowAutoRedirect = false;
+                request.KeepAlive = true;
+                request.Timeout = request.ReadWriteTimeout = 2000;
+                if (json != null)
                 {
-                    return "ERROR:Only http:// endpoints are supported by the raw bridge client.";
+                    request.Method = "POST";
+                    request.ContentType = "application/json";
+                    byte[] body = Encoding.UTF8.GetBytes(json);
+                    request.ContentLength = body.Length;
+                    using (Stream stream = request.GetRequestStream()) stream.Write(body, 0, body.Length);
                 }
-
-                int port = uri.IsDefaultPort ? 80 : uri.Port;
-                string path = string.IsNullOrEmpty(uri.PathAndQuery) ? "/" : uri.PathAndQuery;
-
-                using (var client = new TcpClient())
+                HttpWebResponse response;
+                try { response = (HttpWebResponse)request.GetResponse(); }
+                catch (WebException error) when (error.Response is HttpWebResponse)
                 {
-                    IAsyncResult connect = client.BeginConnect(uri.Host, port, null, null);
-                    if (!connect.AsyncWaitHandle.WaitOne(TimeSpan.FromSeconds(2)))
-                    {
-                        return "ERROR:Connection timed out.";
-                    }
-                    client.EndConnect(connect);
-                    client.ReceiveTimeout = 2000;
-                    client.SendTimeout = 2000;
-
-                    using (NetworkStream stream = client.GetStream())
-                    using (var writer = new StreamWriter(stream, new UTF8Encoding(false), 1024, true))
-                    using (var reader = new StreamReader(stream, Encoding.UTF8, false, 1024, true))
-                    {
-                        writer.NewLine = "\r\n";
-                        writer.WriteLine("GET " + path + " HTTP/1.1");
-                        writer.WriteLine("Host: " + uri.Host + ":" + port);
-                        writer.WriteLine("Connection: close");
-                        writer.WriteLine();
-                        writer.Flush();
-
-                        return ReadHttpResponse(reader);
-                    }
+                    response = (HttpWebResponse)error.Response;
                 }
+                using (response)
+                using (var reader = new StreamReader(response.GetResponseStream(), Encoding.UTF8))
+                    return "HTTP/" + response.ProtocolVersion + " " + (int)response.StatusCode + " " +
+                        response.StatusDescription + "\r\n\r\n" + reader.ReadToEnd();
             }
             catch (Exception error)
             {
                 return "ERROR:" + error.GetType().Name + ": " + error.Message;
             }
-        }
-
-        private static string ReadHttpResponse(StreamReader reader)
-        {
-            string status = reader.ReadLine();
-            if (string.IsNullOrEmpty(status)) return "ERROR:Empty HTTP response.";
-
-            var builder = new StringBuilder();
-            builder.AppendLine(status);
-            string line;
-            while ((line = reader.ReadLine()) != null)
-            {
-                builder.AppendLine(line);
-            }
-
-            return builder.ToString();
         }
 
         private static string ExtractHttpBody(string response)

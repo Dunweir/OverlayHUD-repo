@@ -5,6 +5,7 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="../../overlay-hud/Plugin.RespawnNetwork.cs" Link="Plugin.RespawnNetwork.cs" />
+    <Compile Include="../../overlay-hud/Plugin.TeamEncounters.cs" Link="Plugin.TeamEncounters.cs" />
     <Compile Include="../../overlay-hud/Plugin.HealthNetwork.cs" Link="Plugin.HealthNetwork.cs" />
   </ItemGroup>
 </Project>
