@@ -79,7 +79,7 @@ Native HUD Full пишет причину в лог и возвращается 
 | `01 General` | `Renderer = Electron`; альтернатива `Native`, смена требует перезапуска |
 | `02 Detection` | `ScanIntervalSeconds = 3`, `StatusIntervalSeconds = 10` (минимум 10), `RequireLineOfSight = true`, `RevealUnknownMonsters = false`, `PreferPlayerVisionDetection = true` |
 | `03 Native - General` | `Enabled = true`, `Language = ru` (или `en`), `SaveTimestamps = true` |
-| `04 Native - Layout` | `Alignment = Center`, `Scale = 1`, `OffsetX = 0`, `OffsetY = 20`, `HorizontalLayout = true`, `HorizontalColumns = 11`, `Columns = 4`, `MonsterSize = 70`, `UpgradeSize = 38`, `UpgradeRows = 2`, `WrapValueLabels = true` |
+| `04 Native - Layout` | `Alignment = Center`, `Scale = 1`, `OffsetX = 0`, `OffsetY = 30`, `HorizontalLayout = true`, `HorizontalColumns = 11`, `Columns = 4`, `MonsterSize = 70`, `UpgradeSize = 38`, `UpgradeRows = 2`, `WrapValueLabels = true` |
 | `05 Native - Information` | `ShowLevel`, `ShowTimer`, `ShowMapValue`, `ShowLostValue`, `ShowUpgrades` — все `true` |
 | `06 Native - Monsters` | `ShowMonsters`, `ShowHealth`, `ShowRespawnTimer`, `ShowRespawnIndicator`, `ShowStrength`, `ShowMonsterCounts` — `true`; `OnlyAliveMonsters`, `FilterUndetectedMonsters` — `false` |
 | `07 Native - Effects` | `Animations`, `ShowProximityWaves`, `ShowDamageNumbers`, `UseGameUIEffects` — `true`; `ShowDestroyedItemAlerts`, `ShowTooltips` — `false` |

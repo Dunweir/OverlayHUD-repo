@@ -59,7 +59,7 @@ namespace OverlayHUD
                 "Horizontal screen alignment of the HUD: Left, Center or Right. OffsetX shifts it from this anchor. Applies immediately.", 120, new AcceptableValueList<string>("Left", "Center", "Right"));
             nativeOffsetX = BindNativeSetting(NativeLayoutSection, "OffsetX", 0f,
                 "Horizontal offset from the selected Alignment in scaled HUD pixels; positive moves right. Applies immediately.", 110, new AcceptableValueRange<float>(-1920f, 1920f));
-            nativeOffsetY = BindNativeSetting(NativeLayoutSection, "OffsetY", 20f,
+            nativeOffsetY = BindNativeSetting(NativeLayoutSection, "OffsetY", 30f,
                 "Distance from screen top in scaled HUD pixels. Applies immediately.", 100, new AcceptableValueRange<float>(0f, 1080f));
             nativeScale = BindNativeSetting(NativeLayoutSection, "Scale", 1f,
                 "HUD scale relative to 1080p. Applies immediately.", 90, new AcceptableValueRange<float>(0.5f, 2f));

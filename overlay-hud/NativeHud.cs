@@ -17,7 +17,7 @@ namespace OverlayHUD
         private NativeHudOptions options = new NativeHudOptions();
         private float layoutWidth;
         private CanvasScaler scaler;
-        private float requestedScale = 1, offsetX, offsetY = 20;
+        private float requestedScale = 1, offsetX, offsetY = 30;
         private int stripColumns = 11;
         private bool showHealth = true, showRespawn = true, showUpgrades = true, showStrength = true;
         private GameObject root;

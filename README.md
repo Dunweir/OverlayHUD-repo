@@ -77,7 +77,7 @@ SaveTimestamps = true
 Scale = 1
 Alignment = Center
 OffsetX = 0
-OffsetY = 20
+OffsetY = 30
 HorizontalLayout = true
 HorizontalColumns = 11
 Columns = 4
@@ -373,7 +373,7 @@ BepInEx/config/local.overlay.overlay_hud.cfg
 | `02 Detection` | `ScanIntervalSeconds = 3`, `StatusIntervalSeconds = 10`, `RequireLineOfSight = true`, `TeamMonsterDetection = true`, `RevealUnknownMonsters = false`, `PreferPlayerVisionDetection = true`. |
 | `12 Appearance` — обе сборки | `LegacyIcons = false`: новые иконки; `true`: прежние иконки в активном рендерере. |
 | `03 Native - General` | `Enabled = true`, `Language = ru` (или `en`), `SaveTimestamps = true`. |
-| `04 Native - Layout` | `Alignment = Center`, `Scale = 1`, `OffsetX = 0`, `OffsetY = 20`, `HorizontalLayout = true`, `HorizontalColumns = 11`, `Columns = 4`, `MonsterSize = 70`, `UpgradeSize = 38`, `UpgradeRows = 2`, `WrapValueLabels = true`. |
+| `04 Native - Layout` | `Alignment = Center`, `Scale = 1`, `OffsetX = 0`, `OffsetY = 30`, `HorizontalLayout = true`, `HorizontalColumns = 11`, `Columns = 4`, `MonsterSize = 70`, `UpgradeSize = 38`, `UpgradeRows = 2`, `WrapValueLabels = true`. |
 | `05 Native - Information` | `ShowLevel`, `ShowTimer`, `ShowMapValue`, `ShowLostValue`, `ShowUpgrades` — все `true`. |
 | `06 Native - Monsters` | `ShowMonsters`, `ShowHealth`, `ShowRespawnTimer`, `ShowRespawnIndicator`, `ShowStrength`, `ShowMonsterCounts` — `true`; `OnlyAliveMonsters`, `FilterUndetectedMonsters` — `false`. |
 | `07 Native - Effects` | `Animations`, `ShowProximityWaves`, `ShowDamageNumbers`, `UseGameUIEffects` — `true`; `ShowDestroyedItemAlerts`, `ShowTooltips` — `false`. |

@@ -12,7 +12,7 @@ static void Destroyed(NativeHudState target, string player, string item, double 
 LanguageTests.Run();
 
 var defaults = new NativeHudOptions();
-Check(defaults.Scale == 1 && defaults.OffsetX == 0 && defaults.OffsetY == 20
+Check(defaults.Scale == 1 && defaults.OffsetX == 0 && defaults.OffsetY == 30
     && defaults.MonsterSize == 70 && defaults.UpgradeSize == 38 && defaults.Columns == 4
     && defaults.HorizontalColumns == 11 && defaults.UpgradeRows == 2
     && defaults.Language == NativeHudLanguage.DefaultLanguage && defaults.Alignment == "Center" && defaults.HiddenUpgrades.Count == 0,

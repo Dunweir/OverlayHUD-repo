@@ -5,7 +5,7 @@ namespace OverlayHUD
 {
     internal sealed class NativeHudOptions
     {
-        internal float Scale = 1, OffsetX = 0, OffsetY = 20, MonsterSize = 70, UpgradeSize = 38;
+        internal float Scale = 1, OffsetX = 0, OffsetY = 30, MonsterSize = 70, UpgradeSize = 38;
         internal int Columns = 4, HorizontalColumns = 11, UpgradeRows = 2;
         internal bool HorizontalLayout = true, Enabled = true;
         internal bool ShowLevel = true, ShowTimer = true, ShowMapValue = true, ShowLostValue = true;
