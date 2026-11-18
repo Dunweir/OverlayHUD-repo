@@ -481,6 +481,7 @@ namespace OverlayHUD
                 MethodInfo levelGeneratorStartRoomGeneration = AccessTools.Method("LevelGenerator:StartRoomGeneration");
                 MethodInfo runManagerChangeLevel = AccessTools.Method("RunManager:ChangeLevel");
                 MethodInfo roundDirectorExtractionCompleted = AccessTools.Method("RoundDirector:ExtractionCompleted");
+                MethodInfo valuableBoxAbsorb = AccessTools.Method("ItemValuableBox:StartAbsorbLocal");
                 MethodInfo valuableDollarValueSetRpc = AccessTools.Method("ValuableObject:DollarValueSetRPC");
                 MethodInfo valuableDollarValueSetLogic = AccessTools.Method("ValuableObject:DollarValueSetLogic");
                 MethodInfo valuableDollarHaulAdd = AccessTools.Method("ValuableObject:AddToDollarHaulList");
@@ -576,6 +577,14 @@ namespace OverlayHUD
                     harmony.Patch(roundDirectorExtractionCompleted, postfix: extractionCompletedPostfix);
                     Logger.LogInfo("Patched RoundDirector.ExtractionCompleted for map value refresh.");
                 }
+
+                if (valuableBoxAbsorb != null)
+                {
+                    harmony.Patch(valuableBoxAbsorb, prefix: new HarmonyMethod(typeof(Plugin).GetMethod(
+                        nameof(ValuableBoxAbsorbPrefix), BindingFlags.NonPublic | BindingFlags.Static)));
+                    Logger.LogInfo("Patched ItemValuableBox.StartAbsorbLocal for valuable transfers.");
+                }
+                PatchValuableBoxEvents(harmony);
 
                 if (valuableDollarValueSetRpc != null)
                 {
@@ -816,40 +825,6 @@ namespace OverlayHUD
             instance?.AddLostValue(valueLost, "valuable break");
         }
 
-        private static void PhysGrabObjectDestroyingPrefix(object __instance)
-        {
-            if (!IsRunLevel()) return;
-
-            Component valuable = GetValuableComponent(__instance);
-            bool wasSubmittedForExtraction = false;
-            if (valuable != null)
-            {
-                int valuableKey = GetValuableKey(valuable);
-                if (valuableKey != 0 && !destroyedValuablesAccounted.Add(valuableKey)) return;
-
-                float currentValue = ReadValuableCurrentValue(valuable);
-                float originalValue = ReadValuableOriginalValue(valuable);
-                bool alreadyAccountedFor = originalValue > 0f && currentValue < originalValue * 0.15f;
-                // Haul membership only means the object is in the extraction room.
-                // Damage destruction sets dead; normal extraction destroys it without doing so.
-                wasSubmittedForExtraction = !(ReadMember(__instance, "dead") is bool dead && dead)
-                    && IsValuableInDollarHaul(valuable);
-                if (!alreadyAccountedFor)
-                {
-                    instance?.AddMapValue(-currentValue, "valuable destroyed");
-                    if (!wasSubmittedForExtraction)
-                    {
-                        instance?.AddLostValue(currentValue, "valuable destroyed");
-                    }
-                }
-            }
-
-            if (valuable != null && !wasSubmittedForExtraction)
-            {
-                instance?.ReportDestroyedItem(__instance);
-            }
-        }
-
         private static void PhysGrabObjectGrabStartedPostfix(object __instance, object player)
         {
             RecordLastGrabber(__instance, ReadMember(player, "playerAvatar"));
@@ -1064,6 +1039,9 @@ namespace OverlayHUD
             lostValue = 0f;
             valuablesInDollarHaul.Clear();
             destroyedValuablesAccounted.Clear();
+            valuablesTransferredToBox.Clear();
+            extractedValuableBoxes.Clear();
+            destroyedValuableBoxes.Clear();
             lastMapValueFingerprint = "";
             mapValueInitial = mapValue;
             gameplayActive = true;
@@ -1097,6 +1075,9 @@ namespace OverlayHUD
             lostValue = 0f;
             valuablesInDollarHaul.Clear();
             destroyedValuablesAccounted.Clear();
+            valuablesTransferredToBox.Clear();
+            extractedValuableBoxes.Clear();
+            destroyedValuableBoxes.Clear();
             lastMapValueFingerprint = "";
             mapValueDirty = false;
             pendingMapValueRefresh = false;
@@ -2087,31 +2068,6 @@ namespace OverlayHUD
             Type semiFuncType = ResolveGameType("SemiFunc");
             object result = InvokeNoArgMethod(semiFuncType, "IsMasterClientOrSingleplayer");
             return !(result is bool value) || value;
-        }
-
-        private static float CalculateMapValue()
-        {
-            Type valuableType = ResolveGameType("ValuableObject");
-            if (valuableType == null) return 0f;
-
-            long startedAt = Stopwatch.GetTimestamp();
-            float total = 0f;
-            UnityEngine.Object[] valuables = UnityEngine.Object.FindObjectsOfType(valuableType);
-            long discoveredAt = Stopwatch.GetTimestamp();
-            for (int index = 0; index < valuables.Length; index++)
-            {
-                // The search already returns ValuableObject components.
-                total += ReadFloatMember(valuables[index], "dollarValueCurrent");
-            }
-            double elapsedMs = (Stopwatch.GetTimestamp() - startedAt) * 1000.0 / Stopwatch.Frequency;
-            if (elapsedMs >= 8.0 && instance != null)
-            {
-                double searchMs = (discoveredAt - startedAt) * 1000.0 / Stopwatch.Frequency;
-                instance.Logger.LogWarning("[Performance] Map value scan: "
-                    + elapsedMs.ToString("0.0", CultureInfo.InvariantCulture) + " ms, search="
-                    + searchMs.ToString("0.0", CultureInfo.InvariantCulture) + " ms, valuables=" + valuables.Length + ".");
-            }
-            return Math.Max(0f, total);
         }
 
         private static int? ResolveExtractionGoal()
