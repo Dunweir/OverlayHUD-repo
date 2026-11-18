@@ -100,6 +100,7 @@ const defaultUpgradeVisibility = allUpgradeKeys.reduce((accumulator, key) => {
 const defaultOverlayState = {
     level: 1,
     gameplayVisible: false,
+    legacyIcons: false,
     tabHidden: false,
     currencyVisible: false,
 
@@ -247,6 +248,7 @@ function normalizeOverlayState(rawState) {
 
     return {
         ...source,
+        legacyIcons: source.legacyIcons === true,
         tabHidden: source.tabHidden === true,
         currencyVisible: source.currencyVisible === true,
 
@@ -1218,6 +1220,20 @@ const server = http.createServer(async (request, response) => {
             if (result.ok) {
                 broadcastState();
             }
+            return;
+        }
+
+        if (request.method === "POST" && request.url === "/api/appearance") {
+            const payload = JSON.parse(await readBody(request) || "{}");
+            if (typeof payload.legacyIcons !== "boolean") {
+                sendJson(response, 422, { error: "legacyIcons must be a boolean" });
+                return;
+            }
+            const current = overlayState || defaultOverlayState;
+            const changed = current.legacyIcons !== payload.legacyIcons;
+            overlayState = { ...current, legacyIcons: payload.legacyIcons };
+            sendJson(response, 200, { ok: true });
+            if (changed) broadcastState();
             return;
         }
 

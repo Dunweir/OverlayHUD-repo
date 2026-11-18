@@ -1168,6 +1168,7 @@
                 return;
             }
 
+            monster = { ...monster, image: OverlayApp.resolveMonsterIcon(monster.image, latestState.legacyIcons) };
             const img = square.firstElementChild;
             const monsterKey = String(monster.id || monster.name);
             const shouldReveal = square.dataset.monsterKey !== monsterKey;
@@ -1229,7 +1230,7 @@
 
                     const revealImage = document.createElement("img");
                     revealImage.className = "monster-reveal-image";
-                    revealImage.src = monster.image;
+                    revealImage.src = OverlayApp.resolveMonsterIcon(monster.image, latestState.legacyIcons);
                     revealImage.alt = monster.name;
                     square.appendChild(revealImage);
 
@@ -1243,7 +1244,7 @@
                         if (finalized) return;
                         finalized = true;
                         if (square.dataset.monsterKey === monsterKey) {
-                            img.src = monster.image;
+                            img.src = OverlayApp.resolveMonsterIcon(monster.image, latestState.legacyIcons);
                             img.alt = monster.name;
                             square.dataset.imagePending = "";
                         }
@@ -1254,7 +1255,7 @@
                     setTimeout(finalizeReveal, 900);
                 });
             } else if (square.dataset.imagePending !== monster.image && !img.src.includes(monster.image)) {
-                img.src = monster.image;
+                img.src = OverlayApp.resolveMonsterIcon(monster.image, latestState.legacyIcons);
                 img.alt = monster.name;
             }
         }

@@ -50,6 +50,7 @@ const OverlayApp = (() => {
     const defaultState = {
         level: 1,
         gameplayVisible: false,
+        legacyIcons: false,
         tabHidden: false,
         currencyVisible: false,
 
@@ -220,6 +221,7 @@ const OverlayApp = (() => {
         return {
             ...defaultState,
             ...source,
+            legacyIcons: source.legacyIcons === true,
             tabHidden: source.tabHidden === true,
             currencyVisible: source.currencyVisible === true,
 
@@ -473,6 +475,12 @@ const OverlayApp = (() => {
             || monsterConfig.replacements.some((name) => name.toLowerCase() === key)
             || key === "gnome";
         return known ? (replacements[key] || key) : "new";
+    }
+
+    function resolveMonsterIcon(image, legacyIcons) {
+        if (!image || /\/(new|unknown)\.webp$/.test(image)) return image;
+        return image.replace(/^assets\/monsters(?:-legacy)?\//,
+            legacyIcons ? "assets/monsters-legacy/" : "assets/monsters/");
     }
 
     function getMonsterImage(monsterName) {
@@ -741,6 +749,7 @@ const OverlayApp = (() => {
         getCountsForLevel,
         getMonsterCount,
         getMonsterImage,
+        resolveMonsterIcon,
         getState,
         getTimerSeconds,
         removeMonster,

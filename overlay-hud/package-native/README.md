@@ -32,6 +32,7 @@ Settings are grouped by purpose in `BepInEx/config/local.overlay.overlay_hud.cfg
 
 Native HUD appearance settings can be changed live through **BepInEx Configuration Manager**, if available. Manual file edits require a config reload or game restart.
 
+- New monster artwork is enabled by default. Set `LegacyIcons = true` in **12 Appearance** to restore the original icons (`false` by default).
 - Choose `Language = en` or `ru` in **03 Native - General**; Russian is the default.
 - Show or hide individual HUD elements without stopping game-state tracking.
 - For hover tooltips, enable `ShowTooltips` and disable `UseGameUIEffects` in **07 Native - Effects**. Tooltips work when the game cursor is unlocked; the HUD does not unlock or capture it.
@@ -77,6 +78,7 @@ For bug reports, include `BepInEx/LogOutput.log`, your config and a short descri
 
 Внешний вид Native HUD можно менять на лету через **BepInEx Configuration Manager**, если он доступен. После ручного редактирования файла требуется перезагрузить конфиг или игру.
 
+- Новые иконки монстров включены по умолчанию. Установите `LegacyIcons = true` в **12 Appearance**, чтобы вернуть прежние (`false` по умолчанию).
 - Язык выбирается параметром `Language = ru` или `en` в **03 Native - General**; по умолчанию — русский.
 - Отдельные элементы HUD можно скрывать, не останавливая отслеживание состояния игры.
 - Для подсказок при наведении включите `ShowTooltips` и отключите `UseGameUIEffects` в **07 Native - Effects**. Подсказки работают при разблокированном игровом курсоре; сам HUD не разблокирует и не перехватывает его.

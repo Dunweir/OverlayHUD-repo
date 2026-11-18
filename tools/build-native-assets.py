@@ -83,14 +83,15 @@ test_cover_bounds()
 emoji_font_path = Path(os.environ.get("WINDIR", "C:/Windows")) / "Fonts/seguiemj.ttf"
 emoji_font = ImageFont.truetype(str(emoji_font_path), 256)
 OUT.mkdir(exist_ok=True)
-for source in list((ROOT / "assets/monsters").glob("*.webp")) + list((ROOT / "assets/upgrades").glob("*.webp")):
+for source in list((ROOT / "assets/monsters").glob("*.webp")) + list((ROOT / "assets/upgrades").glob("*.webp")) + list((ROOT / "assets/monsters-legacy").glob("*.webp")):
     icon = Image.open(source).convert("RGBA")
-    if source.parent.name == "monsters":
+    if source.parent.name in ("monsters", "monsters-legacy"):
+        key = ("legacy-" if source.parent.name == "monsters-legacy" else "") + source.stem
         icon = cover(icon)
-        save_checked(icon, source.stem + ".png", (ICON_SIZE, ICON_SIZE))
+        save_checked(icon, key + ".png", (ICON_SIZE, ICON_SIZE))
         mask = padded_alpha(icon)
         glow = tinted_mask(mask.filter(ImageFilter.GaussianBlur(16)))
-        save_checked(glow, "glow-" + source.stem + ".png", (PADDED_SIZE, PADDED_SIZE))
+        save_checked(glow, "glow-" + key + ".png", (PADDED_SIZE, PADDED_SIZE))
     else:
         # Upgrade artwork retains its original contain sizing and aspect ratio.
         icon.thumbnail((256, 256), Image.Resampling.LANCZOS)

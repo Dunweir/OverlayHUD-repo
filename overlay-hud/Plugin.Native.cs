@@ -20,6 +20,7 @@ namespace OverlayHUD
         private const string NativeMonstersSection = "06 Native - Monsters";
         private const string NativeEffectsSection = "07 Native - Effects";
         private const string NativeUpgradesSection = "08 Native - Upgrades";
+        private ConfigEntry<bool> legacyIcons;
         private bool nativeMode;
         private NativeHud nativeHud;
         private NativeTimestampWriter nativeTimestamps;
@@ -46,6 +47,8 @@ namespace OverlayHUD
             nativeMode = BindNativeSetting("01 General", "Renderer", RendererMode.Electron,
                 "Electron desktop HUD (default) or Native Unity HUD. Restart the game after changing.", 100).Value == RendererMode.Native;
 #endif
+            legacyIcons = BindNativeToggle("12 Appearance", "LegacyIcons", false,
+                "Use the original monster icons instead of the new artwork in either renderer.", 100);
             nativeEnabled = BindNativeToggle(NativeGeneralSection, "Enabled", true, "Show the native HUD without stopping game-state tracking.", 100);
             nativeLanguage = BindNativeSetting(NativeGeneralSection, "Language", NativeHudLanguage.DefaultLanguage,
                 "Native HUD language: ru (Russian) or en (English). Defaults to Russian for a Russian OS UI language, English otherwise. Saved choices are preserved. Applies immediately.", 90, new AcceptableValueList<string>("ru", "en"));
@@ -166,7 +169,7 @@ namespace OverlayHUD
         private void OnNativeSettingChanged(object sender, SettingChangedEventArgs args)
         {
             string section = args.ChangedSetting.Definition.Section;
-            if (section == NativeGeneralSection || section == NativeLayoutSection
+            if (section == "12 Appearance" || section == NativeGeneralSection || section == NativeLayoutSection
                 || section == NativeInformationSection || section == NativeMonstersSection
                 || section == NativeEffectsSection || section == NativeUpgradesSection)
                 nativeOptionsDirty = true;
@@ -179,6 +182,7 @@ namespace OverlayHUD
             nativeOptionsDirty = false;
             var options = new NativeHudOptions
             {
+                LegacyIcons = legacyIcons.Value,
                 Scale = nativeScale.Value,
                 OffsetX = nativeOffsetX.Value,
                 OffsetY = nativeOffsetY.Value,

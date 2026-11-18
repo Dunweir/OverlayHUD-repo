@@ -24,7 +24,7 @@ using UnityEngine.SceneManagement;
 
 namespace OverlayHUD
 {
-    [BepInPlugin("local.overlay.overlay_hud", "OverlayHUD", "26.11.4")]
+    [BepInPlugin("local.overlay.overlay_hud", "OverlayHUD", "26.11.5")]
     public sealed partial class Plugin : BaseUnityPlugin
     {
         private static Plugin instance;
@@ -295,7 +295,11 @@ namespace OverlayHUD
 
             InitializeNativeHud();
 #if !NATIVE_ONLY
-            if (!nativeMode) StartOverlayAppIfNeeded();
+            if (!nativeMode)
+            {
+                StartOverlayAppIfNeeded();
+                StartCoroutine(SyncIconAppearance());
+            }
 #endif
             PatchGameUpdates();
             StartCoroutine(SyncMonsterLocalization());

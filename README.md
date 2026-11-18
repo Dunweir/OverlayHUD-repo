@@ -1,17 +1,17 @@
-# OverlayHUD 26.11.4
+# OverlayHUD 26.11.5
 
 Локальный HUD-оверлей для **R.E.P.O.**, который показывает информацию о текущем забеге внутри игры или в отдельном прозрачном окне.
 
 **Автор: EgorSalad**  
 **OverlayHUD целиком создан с использованием Codex AI.**
 **Ныне поддерживается с помощью Claude Sonnet 5.**
-**Версия 26.11.4: синхронизацию ХП необходимо проверить в игровом лобби перед публикацией.**
+**Версия 26.11.5: синхронизацию ХП необходимо проверить в игровом лобби перед публикацией.**
 
 > OverlayHUD — неофициальный фанатский проект. Он не связан с semiwork, издателем R.E.P.O. или Thunderstore.
 
-## Что нового в 26.11.4
+## Что нового в 26.11.5
 
-Full и Native обновлены до версии 26.11.4. В пакет Native включён двуязычный README для Thunderstore (английский и русский) с явным раскрытием использования ИИ. В README пакета Full восстановлено указание на создание проекта с использованием Codex AI и поддержку с помощью ИИ.
+Обновлены 30 иконок монстров: новый набор используется по умолчанию в Full и Native. Чтобы вернуть прежние иконки, установите `LegacyIcons = true` в секции `[12 Appearance]` файла `BepInEx/config/local.overlay.overlay_hud.cfg`. Значение по умолчанию — `false`. Переключение через Configuration Manager применяется сразу в Native и в течение нескольких секунд в Electron; после ручной правки файла перезагрузите конфиг или игру.
 
 В Full сохранено исправление локализации из 26.11.3: комплектное Electron-приложение использует официальные русские и английские названия в подсказках, в том числе для монстров без собственной иконки.
 
@@ -33,8 +33,8 @@ Full и Native обновлены до версии 26.11.4. В пакет Nativ
 
 | Архив | Состав и режим по умолчанию |
 | --- | --- |
-| `EgorSalad-OverlayHUD-26.11.4-Full.zip` | Native + Electron; по умолчанию **Electron**. Плагин распаковывает и запускает комплектное приложение, синхронизирует состояние забега и закрывает приложение после игры. Native выбирается в конфиге. |
-| `EgorSalad-OverlayHUD-26.11.4-Native.zip` | Только Unity HUD внутри игры. Отдельная DLL без кода запуска приложения и HTTP-моста, без архива приложения и его настроек. |
+| `EgorSalad-OverlayHUD-26.11.5-Full.zip` | Native + Electron; по умолчанию **Electron**. Плагин распаковывает и запускает комплектное приложение, синхронизирует состояние забега и закрывает приложение после игры. Native выбирается в конфиге. |
+| `EgorSalad-OverlayHUD-26.11.5-Native.zip` | Только Unity HUD внутри игры. Отдельная DLL без кода запуска приложения и HTTP-моста, без архива приложения и его настроек. |
 
 **Устанавливайте только один вариант в профиль.** При смене сборки удалите прежний пакет, не оставляйте вторую DLL или остатки приложения в каталоге мода. Сохраните нужные timestamps. При переходе со старых версий или между сборками закройте игру, сохраните резервную копию и удалите `BepInEx/config/local.overlay.overlay_hud.cfg`: новый конфиг создаётся при следующем запуске. Старые секции и значения не мигрируют; нужные настройки задайте заново в новых секциях.
 
@@ -328,7 +328,7 @@ flowchart TD
 ## Установка через r2modman
 
 1. Откройте r2modman, выберите R.E.P.O. и создайте или выберите профиль.
-2. В настройках профиля (`Settings`) найдите `Import local mod` и выберите **один** архив: `EgorSalad-OverlayHUD-26.11.4-Full.zip` или `EgorSalad-OverlayHUD-26.11.4-Native.zip`. Предварительно распаковывать ZIP не нужно.
+2. В настройках профиля (`Settings`) найдите `Import local mod` и выберите **один** архив: `EgorSalad-OverlayHUD-26.11.5-Full.zip` или `EgorSalad-OverlayHUD-26.11.5-Native.zip`. Предварительно распаковывать ZIP не нужно.
 3. Убедитесь, что в профиле установлен BepInExPack.
 4. Запустите игру через кнопку `Start modded` в r2modman.
 5. Full по умолчанию распакует и запустит `OverlayHUD.exe`; Native-only покажет HUD прямо в игре после загрузки уровня.
@@ -367,6 +367,7 @@ BepInEx/config/local.overlay.overlay_hud.cfg
 | --- | --- |
 | `01 General` — только Full | `Renderer = Electron`; альтернатива `Native`. Смена требует перезапуска игры. |
 | `02 Detection` | `ScanIntervalSeconds = 3`, `StatusIntervalSeconds = 10`, `RequireLineOfSight = true`, `RevealUnknownMonsters = false`, `PreferPlayerVisionDetection = true`. |
+| `12 Appearance` — обе сборки | `LegacyIcons = false`: новые иконки; `true`: прежние иконки в активном рендерере. |
 | `03 Native - General` | `Enabled = true`, `Language = ru` (или `en`), `SaveTimestamps = true`. |
 | `04 Native - Layout` | `Alignment = Center`, `Scale = 1`, `OffsetX = 0`, `OffsetY = 20`, `HorizontalLayout = true`, `HorizontalColumns = 11`, `Columns = 4`, `MonsterSize = 70`, `UpgradeSize = 38`, `UpgradeRows = 2`, `WrapValueLabels = true`. |
 | `05 Native - Information` | `ShowLevel`, `ShowTimer`, `ShowMapValue`, `ShowLostValue`, `ShowUpgrades` — все `true`. |
@@ -552,7 +553,7 @@ powershell -NoProfile -File tools/Build-Packages.ps1 -BundlePath "C:\build\Overl
 
 Без `-RebuildDesktop` используется существующий `overlay-hud/package-flat/OverlayHUD_app.zip` либо архив из `-BundlePath`. Он допускается только при совпадении версии приложения с релизом и SHA-256 веб-файлов, файлов приложения и всех файлов `assets/` с текущими исходниками. Устаревшее или неполное содержимое отклоняется с указанием пересобрать desktop; одной новой DLL для исправления старого Electron-бандла недостаточно. Свежий архив проходит те же проверки. Скрипт собирает оба варианта и проверяет точный состав обоих ZIP до копирования в корень. Без `-Force` любой уже существующий выходной ZIP останавливает работу до сборки. Даже с `-Force` архив `EgorSalad-OverlayHUD-26.11.2.zip` **никогда не затрагивается**.
 
-Результаты в корне: `EgorSalad-OverlayHUD-26.11.4-Full.zip` и `EgorSalad-OverlayHUD-26.11.4-Native.zip`.
+Результаты в корне: `EgorSalad-OverlayHUD-26.11.5-Full.zip` и `EgorSalad-OverlayHUD-26.11.5-Native.zip`.
 
 Full содержит ровно 7 записей без каталогов:
 

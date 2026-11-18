@@ -221,6 +221,7 @@ namespace OverlayHUD
                 case "pony": key = "snatcher"; break;
             }
             if (!HasResource(key + ".png")) key = "new";
+            if (options.LegacyIcons && key != "new" && key != "unknown" && HasResource("legacy-" + key + ".png")) key = "legacy-" + key;
             return Texture(key + ".png");
         }
 

@@ -7,7 +7,7 @@ const { execFileSync } = require('node:child_process');
 
 const root = path.resolve(__dirname, '..');
 const read = (name) => fs.readFileSync(path.join(root, name), 'utf8');
-const files = ['Plugin.cs', 'Plugin.Native.cs', 'MonsterLocalization.cs'];
+const files = ['Plugin.cs', 'Plugin.Native.cs', 'MonsterLocalization.cs', 'Plugin.Appearance.cs'];
 
 // Deliberately limited to the directives used here; unknown/unbalanced guards
 // fail closed instead of silently making a source-contract test pass.
@@ -103,7 +103,7 @@ test('Full defaults to Electron and retains desktop lifecycle; Native cannot fal
   assert.match(full, /BindNativeSetting\("01 General", "Renderer", RendererMode\.Electron,/);
   assert.match(full, /nativeMode = false;/);
   const awake = method(variants.Full['Plugin.cs'], 'Awake');
-  assert.match(awake, /InitializeNativeHud\(\);\s*if \(!nativeMode\) StartOverlayAppIfNeeded\(\);/);
+  assert.match(awake, /InitializeNativeHud\(\);\s*if \(!nativeMode\)\s*\{\s*StartOverlayAppIfNeeded\(\);\s*StartCoroutine\(SyncIconAppearance\(\)\);/);
   assert.match(method(variants.Full['Plugin.cs'], 'OnDestroy'), /StopOverlayAppIfNeeded\(\);/);
   const native = method(variants.Native['Plugin.Native.cs'], 'InitializeNativeHud');
   assert.match(native, /nativeMode = true;/);

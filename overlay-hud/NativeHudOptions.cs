@@ -16,6 +16,7 @@ namespace OverlayHUD
         internal bool OnlyAliveMonsters = false, FilterUndetectedMonsters = false;
         internal bool WrapValueLabels = true, ShowTooltips = false;
         internal bool UseGameUIEffects = true;
+        internal bool LegacyIcons = false;
         internal string Language = NativeHudLanguage.DefaultLanguage, Alignment = "Center";
         internal HashSet<string> HiddenUpgrades = new HashSet<string>(StringComparer.Ordinal);
 

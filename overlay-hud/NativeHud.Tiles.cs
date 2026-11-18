@@ -37,6 +37,7 @@ namespace OverlayHUD
             internal bool Seen, HasHealth, HasCooldown, PlayerClose, PlayerVeryClose;
             internal double RespawnAt, RespawnDuration, CooldownReducedAt;
             internal string Name;
+            internal bool LegacyIcons;
         }
 
         private static NativeRoundedPanel Fill(string name, Transform parent, float x, float y, float w, float h, Color color, float radius = 999)
@@ -135,12 +136,13 @@ namespace OverlayHUD
         {
             tile.Monster = monster;
             string name = monster.Seen ? monster.Name : "unknown";
-            if (tile.Name != name || tile.Icon.texture == null)
+            if (tile.Name != name || tile.Icon.texture == null || tile.LegacyIcons != options.LegacyIcons)
             {
                 tile.PreviousIcon.texture = tile.Icon.texture;
                 tile.PreviousGlow.texture = tile.Glow.texture;
                 tile.PreviousIcon.enabled = tile.PreviousGlow.enabled = tile.Icon.texture != null;
                 tile.Name = name;
+                tile.LegacyIcons = options.LegacyIcons;
                 tile.Icon.texture = Icon(name);
                 tile.Glow.texture = Texture("glow-" + tile.Icon.texture.name);
                 tile.RevealedAt = created ? -10 : now;

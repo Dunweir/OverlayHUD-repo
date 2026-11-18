@@ -201,3 +201,43 @@ test('stored client preferences reach the real settings handler without restorin
     assert.equal(JSON.parse(stored).monsters, undefined);
     await api.stopOverlayServer();
 });
+
+test('plugin appearance switches both ways, validates booleans and preserves run state', async () => {
+    const { api, post, settings, get, broadcasts } = boot();
+    await post('/api/state', { state: null });
+    assert.equal((await post('/api/appearance', { legacyIcons: false })).status, 200);
+    assert.equal(get().legacyIcons, false);
+    await post('/api/state', { state: gameplay });
+    const before = get();
+    for (const legacyIcons of [true, false, true]) {
+        const result = await post('/api/appearance', { legacyIcons });
+        assert.equal(result.status, 200);
+        assert.deepEqual(get(), { ...before, legacyIcons });
+        assert.equal(broadcasts.at(-1).legacyIcons, legacyIcons);
+        const count = broadcasts.length;
+        await post('/api/appearance', { legacyIcons });
+        assert.equal(broadcasts.length, count, 'Heartbeat must not rerender an unchanged HUD');
+    }
+    for (const legacyIcons of ['false', 1, null, undefined]) {
+        assert.equal((await post('/api/appearance', { legacyIcons })).status, 422);
+        assert.equal(get().legacyIcons, true);
+    }
+    await settings({ legacyIcons: false, squareSize: 85 });
+    assert.equal(get().legacyIcons, true, 'Browser preferences must not override the plugin');
+    await api.stopOverlayServer();
+});
+
+test('artwork selection preserves aliases, placeholders and round-trips legacy paths', () => {
+    const start = clientSource.indexOf('    function resolveMonsterIcon(');
+    const end = clientSource.indexOf('    function getMonsterImage(', start);
+    const resolve = vm.runInNewContext(clientSource.slice(start, end) + '\nresolveMonsterIcon');
+    for (const file of fs.readdirSync(`${__dirname}/assets/monsters`)) {
+        const current = `assets/monsters/${file}`;
+        const legacy = /^(new|unknown)\.webp$/.test(file) ? current : `assets/monsters-legacy/${file}`;
+        assert.equal(resolve(current, false), current);
+        assert.equal(resolve(current, true), legacy);
+        assert.equal(resolve(legacy, false), current);
+        assert.equal(resolve(legacy, true), legacy);
+        assert.ok(fs.existsSync(`${__dirname}/${legacy}`));
+    }
+});
