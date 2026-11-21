@@ -26,19 +26,19 @@ This is the **Native edition**: the HUD is rendered through Unity, with its font
 
 By default, monsters are revealed **only after an encounter**. Undetected monsters remain placeholders, and receiving multiplayer data does not reveal their identities. The HUD hides while the map or quota counter is shown.
 
-The eye bar fills in blue while a monster notices you and glows red while it sees you or still tracks you during a chase. To hide it locally, set `ShowDetectionBar = false` in `[02 Detection]`.
+The eye bar fills in blue while a monster notices you and glows red while it sees you or still tracks you during a chase. To hide it locally, set `ShowDetectionBar = false` in `[Detection]`.
 
 ### Customization
 
-Settings are grouped by purpose in `BepInEx/config/local.overlay.overlay_hud.cfg`: detection, general HUD options, layout, information, monsters, effects and individual upgrades.
+Settings are grouped by purpose in `BepInEx/config/OverlayHUD.cfg`: detection, general HUD options, layout, information, monsters, effects and individual upgrades.
 
 Native HUD appearance settings can be changed live through **BepInEx Configuration Manager**, if available. Manual file edits require a config reload or game restart.
 
-- New monster artwork is enabled by default. Set `LegacyIcons = true` in **12 Appearance** to restore the original icons (`false` by default).
-- Choose `Language = en` or `ru` in **03 Native - General**; Russian is the default.
+- New monster artwork is enabled by default. Set `LegacyIcons = true` in **Appearance** to restore the original icons (`false` by default).
+- Choose `Language = en` or `ru` in **Native - General**; Russian is the default.
 - Show or hide individual HUD elements without stopping game-state tracking.
-- For hover tooltips, enable `ShowTooltips` and disable `UseGameUIEffects` in **07 Native - Effects**. Tooltips work when the game cursor is unlocked; the HUD does not unlock or capture it.
-- Timestamps are saved to `BepInEx/plugins/OverlayHUD/timestamps/` and can be disabled with `SaveTimestamps`.
+- For hover tooltips, enable `ShowTooltips` and disable `UseGameUIEffects` in **Native - Effects**. Tooltips work when the game cursor is unlocked; the HUD does not unlock or capture it.
+- Timestamps are saved to `BepInEx/plugins/OverlayHUD/timestamps/` when `SaveTimestamps = true` (off by default).
 
 ### Multiplayer and limitations
 
@@ -54,7 +54,7 @@ Team monster detection was inspired by the fork by NeverFun21, [OverlayHUD Multi
 
 ### Feedback
 
-For bug reports, include `BepInEx/LogOutput.log`, your config and a short description of the issue. Optional detailed logging is available under **99 Diagnostics**.
+For bug reports, include `BepInEx/LogOutput.log`, your config and a short description of the issue. Optional detailed logging is available under **Diagnostics**.
 
 [Report an issue](https://github.com/Dunweir/OverlayHUD-repo/issues) · [Source code and detailed documentation](https://github.com/Dunweir/OverlayHUD-repo)
 
@@ -78,19 +78,19 @@ For bug reports, include `BepInEx/LogOutput.log`, your config and a short descri
 
 По умолчанию монстры раскрываются **только после встречи**. Необнаруженные виды остаются заглушками, а получение данных в мультиплеере не раскрывает их названия. HUD скрывается при просмотре карты и показе счётчика квоты.
 
-Полоска с глазом заполняется голубым, пока монстр замечает вас, и светится красным, пока он видит вас или продолжает отслеживать в погоне. Чтобы скрыть её у себя, установите `ShowDetectionBar = false` в секции `[02 Detection]`.
+Полоска с глазом заполняется голубым, пока монстр замечает вас, и светится красным, пока он видит вас или продолжает отслеживать в погоне. Чтобы скрыть её у себя, установите `ShowDetectionBar = false` в секции `[Detection]`.
 
 ### Настройка
 
-Параметры находятся в `BepInEx/config/local.overlay.overlay_hud.cfg` и сгруппированы по назначению: обнаружение, общие настройки HUD, расположение, информация, монстры, эффекты и отдельные улучшения.
+Параметры находятся в `BepInEx/config/OverlayHUD.cfg` и сгруппированы по назначению: обнаружение, общие настройки HUD, расположение, информация, монстры, эффекты и отдельные улучшения.
 
 Внешний вид Native HUD можно менять на лету через **BepInEx Configuration Manager**, если он доступен. После ручного редактирования файла требуется перезагрузить конфиг или игру.
 
-- Новые иконки монстров включены по умолчанию. Установите `LegacyIcons = true` в **12 Appearance**, чтобы вернуть прежние (`false` по умолчанию).
-- Язык выбирается параметром `Language = ru` или `en` в **03 Native - General**; по умолчанию — русский.
+- Новые иконки монстров включены по умолчанию. Установите `LegacyIcons = true` в **Appearance**, чтобы вернуть прежние (`false` по умолчанию).
+- Язык выбирается параметром `Language = ru` или `en` в **Native - General**; по умолчанию — русский.
 - Отдельные элементы HUD можно скрывать, не останавливая отслеживание состояния игры.
-- Для подсказок при наведении включите `ShowTooltips` и отключите `UseGameUIEffects` в **07 Native - Effects**. Подсказки работают при разблокированном игровом курсоре; сам HUD не разблокирует и не перехватывает его.
-- Таймкоды сохраняются в `BepInEx/plugins/OverlayHUD/timestamps/`; запись отключается параметром `SaveTimestamps`.
+- Для подсказок при наведении включите `ShowTooltips` и отключите `UseGameUIEffects` в **Native - Effects**. Подсказки работают при разблокированном игровом курсоре; сам HUD не разблокирует и не перехватывает его.
+- Таймкоды сохраняются в `BepInEx/plugins/OverlayHUD/timestamps/`; запись включается параметром `SaveTimestamps = true` и по умолчанию выключена.
 
 ### Мультиплеер и ограничения
 
@@ -106,7 +106,7 @@ For bug reports, include `BepInEx/LogOutput.log`, your config and a short descri
 
 ### Обратная связь
 
-К сообщению об ошибке приложите `BepInEx/LogOutput.log`, конфиг и краткое описание проблемы. Подробные логи можно включить в секции **99 Diagnostics**.
+К сообщению об ошибке приложите `BepInEx/LogOutput.log`, конфиг и краткое описание проблемы. Подробные логи можно включить в секции **Diagnostics**.
 
 [Сообщить об ошибке](https://github.com/Dunweir/OverlayHUD-repo/issues) · [Исходники и подробная документация](https://github.com/Dunweir/OverlayHUD-repo)
 

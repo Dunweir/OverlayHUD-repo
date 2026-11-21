@@ -265,7 +265,7 @@ test("tray changes the shared overlay language and timestamp preference", async 
     const language = () => state.menu.find((item) => ["Язык / Language", "Language"].includes(item.label)).submenu;
     const timestamps = () => state.menu.find((item) => ["Прочее", "Other"].includes(item.label)).submenu.find((item) => ["Сохранять таймкоды", "Save timestamps"].includes(item.label));
     assert.equal(language()[0].checked, true);
-    assert.equal(timestamps().checked, true);
+    assert.equal(timestamps().checked, false);
     const preferences = { interfaceLanguage: "ru", saveTimestampsEnabled: true };
     state.window.webContents.executeJavaScript = async (script) => {
         return vm.runInNewContext(script, { OverlayApp: {

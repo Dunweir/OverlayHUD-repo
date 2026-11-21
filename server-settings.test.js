@@ -129,13 +129,14 @@ test('settings normalization uses existing preference rules', async () => {
     const state = get();
     assert.equal(state.interfaceLanguage, 'ru');
     assert.equal(state.hoverOpacity, 100);
-    assert.equal(state.saveTimestampsEnabled, true);
+    assert.equal(state.saveTimestampsEnabled, false);
     assert.equal(state.upgradeLayout, 'stacked');
     assert.equal(state.upgradeRows, 'single');
 });
 
 test('settings disable finalizes the original-language line once and resumes only next level', async () => {
     const { api, post, settings, get, writes } = boot();
+    await settings({ saveTimestampsEnabled: true });
     api.setGameLevel(1, 'Headman Manor');
     await post('/api/state', { state: { ...get(), monsters: [{ name: 'Gnome', count: 4 }] } });
     await settings({ interfaceLanguage: 'en', saveTimestampsEnabled: false });

@@ -9,7 +9,7 @@ Two alternative distributions share the same plugin GUID, manifest identity and 
 - **Full**: Native + Electron; `Renderer = Electron` by default.
 - **Native-only**: a separately compiled Unity HUD DLL, without desktop startup/storage or HTTP bridge code, an app archive, a renderer selector, or desktop config entries.
 
-Install only one distribution per profile. Remove the previous package before switching; do not leave duplicate DLLs or package remnants. Close the game, back up and remove `BepInEx/config/local.overlay.overlay_hud.cfg` when switching builds or upgrading from the old config schema. Old config sections/values are not migrated. Reapply desired settings using the new sections.
+Install only one distribution per profile. Remove the previous package before switching; do not leave duplicate DLLs or package remnants. Settings from numbered sections migrate automatically on startup.
 
 The plugin does not reveal the whole level roster to the HUD as seen. It builds the roster for status tracking, then sends a monster as encountered only after the game reports a player-visible or legacy close/vision encounter. Tick and Upscream use the legacy fallback while PlayerVision detection is enabled because their `EnemyOnScreen` path is not reliable in current testing.
 
@@ -32,25 +32,25 @@ The fallback in `assets/monster-localization.json` is extracted from the install
 
 ## Config
 
-BepInEx creates `BepInEx/config/local.overlay.overlay_hud.cfg` after first launch.
+BepInEx creates `BepInEx/config/OverlayHUD.cfg` after first launch.
 
 | Section | Settings |
 | --- | --- |
-| `01 General` (Full only) | `Renderer = Electron`; alternative `Native`, restart required |
-| `02 Detection` | `ScanIntervalSeconds = 3`, `StatusIntervalSeconds = 10` (minimum 10), `RequireLineOfSight = true`, `RevealUnknownMonsters = false`, `PreferPlayerVisionDetection = true` |
-| `03 Native - General` | `Enabled = true`, `Language = ru`, `SaveTimestamps = true` |
-| `04 Native - Layout` | `Alignment = Center`, `Scale = 1`, `OffsetX = 0`, `OffsetY = 30`, `HorizontalLayout = true`, `HorizontalColumns = 11`, `Columns = 4`, `MonsterSize = 70`, `UpgradeSize = 38`, `UpgradeRows = 2`, `WrapValueLabels = true` |
-| `05 Native - Information` | `ShowLevel`, `ShowTimer`, `ShowMapValue`, `ShowLostValue`, `ShowUpgrades` (all true) |
-| `06 Native - Monsters` | `ShowMonsters`, `ShowHealth`, `ShowRespawnTimer`, `ShowRespawnIndicator`, `ShowStrength`, `ShowMonsterCounts` (true); `OnlyAliveMonsters`, `FilterUndetectedMonsters` (false) |
-| `07 Native - Effects` | `Animations`, `ShowProximityWaves`, `ShowDamageNumbers`, `UseGameUIEffects` (true); `ShowDestroyedItemAlerts`, `ShowTooltips` (false) |
-| `08 Native - Upgrades` | Per-upgrade visibility, all true |
-| `09 Electron - App` (Full only) | `AutoStart = true`, `AutoClose = true`, `ExecutableRelativePath` empty, `ArchiveName = OverlayHUD_app.zip` |
-| `10 Electron - Connection` (Full only) | `Endpoint = http://127.0.0.1:8787/api/monster-seen`, `LevelEndpoint = http://127.0.0.1:8787/api/level` |
-| `99 Diagnostics` | `Logging = false` |
+| `General` (Full only) | `Renderer = Electron`; alternative `Native`, restart required |
+| `Detection` | `ScanIntervalSeconds = 3`, `StatusIntervalSeconds = 10` (minimum 10), `RevealMonstersOnEncounter = true`, `RevealUnknownMonsters = false`, `PreferPlayerVisionDetection = true` |
+| `Native - General` | `Enabled = true`, `Language = ru`, `SaveTimestamps = false` |
+| `Native - Layout` | `Alignment = Center`, `Scale = 1`, `OffsetX = 0`, `OffsetY = 30`, `HorizontalLayout = true`, `HorizontalColumns = 11`, `Columns = 4`, `MonsterSize = 70`, `UpgradeSize = 38`, `UpgradeRows = 2`, `WrapValueLabels = true` |
+| `Native - Information` | `ShowLevel`, `ShowTimer`, `ShowMapValue`, `ShowLostValue`, `ShowUpgrades` (all true) |
+| `Native - Monsters` | `ShowMonsters`, `ShowHealth`, `ShowRespawnTimer`, `ShowRespawnIndicator`, `ShowStrength`, `ShowMonsterCounts` (true); `OnlyAliveMonsters`, `FilterUndetectedMonsters` (false) |
+| `Native - Effects` | `Animations`, `ShowProximityWaves`, `ShowDamageNumbers`, `UseGameUIEffects` (true); `ShowDestroyedItemAlerts`, `ShowTooltips` (false) |
+| `Native - Upgrades` | Per-upgrade visibility, all true |
+| `Electron - App` (Full only) | `AutoStart = true`, `AutoClose = true`, `ExecutableRelativePath` empty, `ArchiveName = OverlayHUD_app.zip` |
+| `Electron - Connection` (Full only) | `Endpoint = http://127.0.0.1:8787/api/monster-seen`, `LevelEndpoint = http://127.0.0.1:8787/api/level` |
+| `Diagnostics` | `Logging = false` |
 
 Sections `03`–`08` apply live through Configuration Manager or a BepInEx config reload; the cfg file is not watched automatically. Native-only does not bind sections `01`, `09`, or `10`. It does not fall back to another renderer if HUD initialization fails.
 
-`ExecutableRelativePath` in `09 Electron - App` defaults to empty, selecting the external per-profile install below. Custom paths are relative to the plugin DLL or absolute, without external relocation. App-file relocation is independent of config migration: old sections and values have no compatibility layer.
+`ExecutableRelativePath` in `Electron - App` defaults to empty, selecting the external per-profile install below. Custom paths are relative to the plugin DLL or absolute, without external relocation. App-file relocation is independent of config migration: numbered sections migrate at startup.
 
 ## Desktop App Storage (Full only)
 

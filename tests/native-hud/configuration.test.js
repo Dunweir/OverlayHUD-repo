@@ -10,12 +10,12 @@ const sections = Object.fromEntries([...source.matchAll(/private const string (N
 const bindings = [...source.matchAll(/BindNative(?:Setting|Toggle)\((Native\w+Section), "([^"]+)", ([^,]+),\s*"([^"]*)", (\d+)/g)]
   .map((match) => ({ section: sections[match[1]], key: match[2], value: match[3], description: match[4], order: Number(match[5]) }));
 const expectedGroups = {
-  '03 Native - General': ['Enabled', 'Language', 'SaveTimestamps'],
-  '04 Native - Layout': ['Alignment', 'OffsetX', 'OffsetY', 'Scale', 'HorizontalLayout', 'HorizontalColumns', 'Columns', 'MonsterSize', 'UpgradeSize', 'UpgradeRows', 'WrapValueLabels'],
-  '05 Native - Information': ['ShowLevel', 'ShowTimer', 'ShowMapValue', 'ShowLostValue', 'ShowUpgrades'],
-  '06 Native - Monsters': ['ShowMonsters', 'ShowHealth', 'ShowRespawnTimer', 'ShowRespawnIndicator', 'ShowStrength', 'ShowMonsterCounts', 'OnlyAliveMonsters', 'FilterUndetectedMonsters'],
-  '07 Native - Effects': ['Animations', 'ShowProximityWaves', 'ShowDamageNumbers', 'ShowDestroyedItemAlerts', 'UseGameUIEffects', 'ShowTooltips'],
-  '08 Native - Upgrades': [],
+  'Native - General': ['Enabled', 'Language', 'SaveTimestamps'],
+  'Native - Layout': ['Alignment', 'OffsetX', 'OffsetY', 'Scale', 'HorizontalLayout', 'HorizontalColumns', 'Columns', 'MonsterSize', 'UpgradeSize', 'UpgradeRows', 'WrapValueLabels'],
+  'Native - Information': ['ShowLevel', 'ShowTimer', 'ShowMapValue', 'ShowLostValue', 'ShowUpgrades'],
+  'Native - Monsters': ['ShowMonsters', 'ShowHealth', 'ShowRespawnTimer', 'ShowRespawnIndicator', 'ShowStrength', 'ShowMonsterCounts', 'OnlyAliveMonsters', 'FilterUndetectedMonsters'],
+  'Native - Effects': ['Animations', 'ShowProximityWaves', 'ShowDamageNumbers', 'ShowDestroyedItemAlerts', 'UseGameUIEffects', 'ShowTooltips'],
+  'Native - Upgrades': [],
 };
 
 function compiledSource(nativeOnly) {
@@ -61,7 +61,7 @@ test('native settings use exactly the requested sections and intuitive display o
 
 test('native defaults and acceptable value constraints are preserved', () => {
   const specialDefaults = {
-    Language: 'NativeHudLanguage.DefaultLanguage', Alignment: '"Center"', OffsetX: '0f', OffsetY: '30f', Scale: '1f',
+    SaveTimestamps: 'false', Language: 'NativeHudLanguage.DefaultLanguage', Alignment: '"Center"', OffsetX: '0f', OffsetY: '30f', Scale: '1f',
     HorizontalColumns: '11', Columns: '4', MonsterSize: '70f', UpgradeSize: '38f', UpgradeRows: '2',
     OnlyAliveMonsters: 'false', FilterUndetectedMonsters: 'false', ShowDestroyedItemAlerts: 'false', ShowTooltips: 'false',
   };
@@ -94,14 +94,14 @@ test('live updates cover every native section and exclude restart-only renderer 
   const handler = source.slice(source.indexOf('private void OnNativeSettingChanged('), source.indexOf('private NativeHudOptions GetNativeOptions('));
   assert.deepEqual([...handler.matchAll(/section == (Native\w+Section)/g)].map((match) => sections[match[1]]), Object.keys(expectedGroups));
   assert.match(handler, /nativeOptionsDirty = true;/);
-  assert.doesNotMatch(handler, /01 General|Renderer/);
+  assert.doesNotMatch(handler, /"General"|Renderer/);
   assert.match(source, /Config.SettingChanged -= OnNativeSettingChanged;\s*Config.SettingChanged \+= OnNativeSettingChanged;/);
 });
 
 test('combined build defaults to Electron and retains initialization fallback', () => {
   const combined = compiledSource(false);
   assert.match(combined, /public enum RendererMode\s*\{\s*Electron,\s*Native\s*\}/);
-  assert.match(combined, /BindNativeSetting\("01 General", "Renderer", RendererMode.Electron,/);
+  assert.match(combined, /BindNativeSetting\("General", "Renderer", RendererMode.Electron,/);
   assert.match(combined, /Restart the game after changing/);
   assert.match(initializationFailure(combined), /nativeMode = false;/);
   assert.match(initializationFailure(combined), /Logger.LogError\("Native HUD initialization failed; using Electron for this session:/);
@@ -111,7 +111,7 @@ test('native-only build has no renderer selector, desktop wording or fallback', 
   const nativeOnly = compiledSource(true);
   assert.match(nativeOnly, /private bool nativeMode;/);
   assert.match(nativeOnly, /nativeMode = true;/);
-  assert.doesNotMatch(nativeOnly, /RendererMode|"Renderer"|"01 General"|Electron|desktop|HTTP bridge/i);
+  assert.doesNotMatch(nativeOnly, /RendererMode|"Renderer"|"General"|Electron|desktop|HTTP bridge/i);
   const failure = initializationFailure(nativeOnly);
   assert.match(failure, /nativeHud\?\.Dispose\(\);\s*nativeHud = null;/);
   assert.match(failure, /Logger.LogError\("Native HUD initialization failed: " \+ error\)/);

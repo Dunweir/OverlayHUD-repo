@@ -108,7 +108,7 @@ const defaultOverlayState = {
     upgradeVisibility: { ...defaultUpgradeVisibility },
     style: 1,
     interfaceLanguage: "ru",
-    saveTimestampsEnabled: true,
+    saveTimestampsEnabled: false,
     bgEnabled: false,
     timerVisible: true,
     upgradesVisible: true,
@@ -664,7 +664,7 @@ function getTimestampSession() {
 }
 
 function writeTimestampSession() {
-    if (overlayState?.saveTimestampsEnabled === false || !timestampSession) return;
+    if (overlayState?.saveTimestampsEnabled !== true || !timestampSession) return;
 
     try {
         fs.mkdirSync(path.dirname(timestampSession.filePath), { recursive: true });
@@ -766,7 +766,7 @@ function getMonsterTotals(monsters) {
 }
 
 function finalizeActiveTimestampLine() {
-    if (overlayState?.saveTimestampsEnabled === false || !timestampSession || timestampSession.activeLineIndex == null) return;
+    if (overlayState?.saveTimestampsEnabled !== true || !timestampSession || timestampSession.activeLineIndex == null) return;
 
     const monsters = formatMonsterTimestampList(overlayState?.monsters, timestampSession.activeLineLanguage);
     const line = timestampSession.lines[timestampSession.activeLineIndex] || "";
@@ -778,7 +778,7 @@ function finalizeActiveTimestampLine() {
 }
 
 function startTimestampLine(level, rawLevelName) {
-    if (overlayState?.saveTimestampsEnabled === false) return;
+    if (overlayState?.saveTimestampsEnabled !== true) return;
     finalizeActiveTimestampLine();
 
     const session = getTimestampSession();

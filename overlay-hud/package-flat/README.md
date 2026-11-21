@@ -11,9 +11,9 @@
 
 ## Что нового в 26.11.7
 
-Полоска обнаружения получила размер полоски ХП и плавные переходы. Голубая полоска заполняется, пока монстр замечает игрока. После обнаружения красная полоска пульсирует с внешним свечением. Во время погони она остаётся видна, пока игровой таймер отслеживания этой цели активен. Увеличенный глаз выделен тёмным контуром. Для красного состояния в кооперативе обновите мод у игрока и хоста. Чтобы скрыть индикатор у себя, установите `ShowDetectionBar = false` в секции `[02 Detection]`.
+Полоска обнаружения получила размер полоски ХП и плавные переходы. Голубая полоска заполняется, пока монстр замечает игрока. После обнаружения красная полоска пульсирует с внешним свечением. Во время погони она остаётся видна, пока игровой таймер отслеживания этой цели активен. Увеличенный глаз выделен тёмным контуром. Для красного состояния в кооперативе обновите мод у игрока и хоста. Чтобы скрыть индикатор у себя, установите `ShowDetectionBar = false` в секции `[Detection]`.
 
-Полоска заполняется плавнее, ХП скрывается на время деспавна. При выключенном RequireLineOfSight открытие известных монстров начинается сразу после готовности уровня.
+Полоска заполняется плавнее, ХП скрывается на время деспавна. При выключенном RevealMonstersOnEncounter открытие известных монстров начинается сразу после готовности уровня.
 
 Голубая полоска с глазом под ХП монстра показывает, насколько он заметил вашего персонажа. В кооперативе для этой функции версия 26.11.7 нужна и хосту, и игроку.
 
@@ -23,7 +23,7 @@
 
 ## Что нового в 26.11.5
 
-Обновлены 30 иконок монстров: новый набор используется по умолчанию в Full и Native. Чтобы вернуть прежние иконки, установите `LegacyIcons = true` в секции `[12 Appearance]` файла `BepInEx/config/local.overlay.overlay_hud.cfg`. Значение по умолчанию — `false`. Переключение через Configuration Manager применяется сразу в Native и в течение нескольких секунд в Electron; после ручной правки файла перезагрузите конфиг или игру.
+Обновлены 30 иконок монстров: новый набор используется по умолчанию в Full и Native. Чтобы вернуть прежние иконки, установите `LegacyIcons = true` в секции `[Appearance]` файла `BepInEx/config/OverlayHUD.cfg`. Значение по умолчанию — `false`. Переключение через Configuration Manager применяется сразу в Native и в течение нескольких секунд в Electron; после ручной правки файла перезагрузите конфиг или игру.
 
 Сохранено исправление локализации из 26.11.3: подсказки комплектного Electron-приложения
 используют официальные русские и английские названия, в том числе для монстров
@@ -64,17 +64,15 @@
 закройте игру и приложение, сохраните нужные таймкоды и удалите прежний пакет целиком,
 не оставляя вторую DLL или остатки приложения в каталоге мода.
 
-При переходе со старых версий или между сборками сохраните резервную копию и удалите
-`BepInEx/config/local.overlay.overlay_hud.cfg`. При следующем запуске создаётся
-чистый конфиг. Старые секции и значения не мигрируют; настройки задайте заново.
+При первом запуске значения из пронумерованных разделов переносятся автоматически.
 
 ## Конфигурация
 
-Файл: `BepInEx/config/local.overlay.overlay_hud.cfg`.
+Файл: `BepInEx/config/OverlayHUD.cfg`.
 В Full по умолчанию:
 
 ```ini
-[01 General]
+[General]
 Renderer = Electron
 ```
 
@@ -84,17 +82,17 @@ Native HUD Full пишет причину в лог и возвращается 
 
 | Секция | Настройки по умолчанию |
 | --- | --- |
-| `01 General` | `Renderer = Electron`; альтернатива `Native`, смена требует перезапуска |
-| `02 Detection` | `ScanIntervalSeconds = 3`, `StatusIntervalSeconds = 10` (минимум 10), `RequireLineOfSight = true`, `RevealUnknownMonsters = false`, `PreferPlayerVisionDetection = true` |
-| `03 Native - General` | `Enabled = true`, `Language = ru` (или `en`), `SaveTimestamps = true` |
-| `04 Native - Layout` | `Alignment = Center`, `Scale = 1`, `OffsetX = 0`, `OffsetY = 30`, `HorizontalLayout = true`, `HorizontalColumns = 11`, `Columns = 4`, `MonsterSize = 70`, `UpgradeSize = 38`, `UpgradeRows = 2`, `WrapValueLabels = true` |
-| `05 Native - Information` | `ShowLevel`, `ShowTimer`, `ShowMapValue`, `ShowLostValue`, `ShowUpgrades` — все `true` |
-| `06 Native - Monsters` | `ShowMonsters`, `ShowHealth`, `ShowRespawnTimer`, `ShowRespawnIndicator`, `ShowStrength`, `ShowMonsterCounts` — `true`; `OnlyAliveMonsters`, `FilterUndetectedMonsters` — `false` |
-| `07 Native - Effects` | `Animations`, `ShowProximityWaves`, `ShowDamageNumbers`, `UseGameUIEffects` — `true`; `ShowDestroyedItemAlerts`, `ShowTooltips` — `false` |
-| `08 Native - Upgrades` | Все 12 переключателей — `true`, список ниже |
-| `09 Electron - App` | `AutoStart = true`, `AutoClose = true`, `ExecutableRelativePath` — пусто, `ArchiveName = OverlayHUD_app.zip` |
-| `10 Electron - Connection` | `Endpoint = http://127.0.0.1:8787/api/monster-seen`, `LevelEndpoint = http://127.0.0.1:8787/api/level` |
-| `99 Diagnostics` | `Logging = false` |
+| `General` | `Renderer = Electron`; альтернатива `Native`, смена требует перезапуска |
+| `Detection` | `ScanIntervalSeconds = 3`, `StatusIntervalSeconds = 10` (минимум 10), `RevealMonstersOnEncounter = true`, `RevealUnknownMonsters = false`, `PreferPlayerVisionDetection = true` |
+| `Native - General` | `Enabled = true`, `Language = ru` (или `en`), `SaveTimestamps = false` |
+| `Native - Layout` | `Alignment = Center`, `Scale = 1`, `OffsetX = 0`, `OffsetY = 30`, `HorizontalLayout = true`, `HorizontalColumns = 11`, `Columns = 4`, `MonsterSize = 70`, `UpgradeSize = 38`, `UpgradeRows = 2`, `WrapValueLabels = true` |
+| `Native - Information` | `ShowLevel`, `ShowTimer`, `ShowMapValue`, `ShowLostValue`, `ShowUpgrades` — все `true` |
+| `Native - Monsters` | `ShowMonsters`, `ShowHealth`, `ShowRespawnTimer`, `ShowRespawnIndicator`, `ShowStrength`, `ShowMonsterCounts` — `true`; `OnlyAliveMonsters`, `FilterUndetectedMonsters` — `false` |
+| `Native - Effects` | `Animations`, `ShowProximityWaves`, `ShowDamageNumbers`, `UseGameUIEffects` — `true`; `ShowDestroyedItemAlerts`, `ShowTooltips` — `false` |
+| `Native - Upgrades` | Все 12 переключателей — `true`, список ниже |
+| `Electron - App` | `AutoStart = true`, `AutoClose = true`, `ExecutableRelativePath` — пусто, `ArchiveName = OverlayHUD_app.zip` |
+| `Electron - Connection` | `Endpoint = http://127.0.0.1:8787/api/monster-seen`, `LevelEndpoint = http://127.0.0.1:8787/api/level` |
+| `Diagnostics` | `Logging = false` |
 
 Native-only не создаёт секции `01`, `09`, `10`. Старые секции конфига не поддерживаются.
 
@@ -118,7 +116,7 @@ Native-only не создаёт секции `01`, `09`, `10`. Старые се
 - `UseGameUIEffects=true` включает экспериментальные эффекты игровой UI-камеры.
   Может снижать резкость. Для подсказок отключите его, включите `ShowTooltips`
   и разблокируйте курсор средствами игры. HUD не разблокирует и не захватывает курсор.
-- В `[08 Native - Upgrades]`: `strength`, `tumbleLaunch`, `range`, `sprintSpeed`,
+- В `[Native - Upgrades]`: `strength`, `tumbleLaunch`, `range`, `sprintSpeed`,
   `tumbleWings`, `crouchRest`, `extraJump`, `tumbleClimb`, `health`, `stamina`,
   `mapPlayerCount`, `deathHeadBattery`. Отдельный тип виден, если получен и включён `ShowUpgrades`.
 
@@ -149,7 +147,7 @@ Native скрывается при карте и счётчике квоты н�
 
 ## Хранение и обновление приложения (Full)
 
-При пустом `ExecutableRelativePath` в `[09 Electron - App]` приложение устанавливается в:
+При пустом `ExecutableRelativePath` в `[Electron - App]` приложение устанавливается в:
 
 ```text
 %LOCALAPPDATA%\OverlayHUD\profiles\<profile-key>\app\OverlayHUD.exe
@@ -196,7 +194,7 @@ Native не запускает перенос. Для переноса дост�
 - Native: проверьте `Renderer`, `Enabled`, загрузку игрового уровня и ошибки инициализации.
 - Electron: проверьте оконный/borderless-режим, свободный порт `8787`, архив рядом с DLL
   и фактический путь EXE в логе. При чёрном фоне отключите аппаратное ускорение в трее.
-- Для подробного лога включите `Logging=true` в `[99 Diagnostics]`.
+- Для подробного лога включите `Logging=true` в `[Diagnostics]`.
 - Не оставляйте две копии плагина. Приложите свежий лог и конфиг к отчёту об ошибке.
 
 Обновления игры и другие моды могут влиять на детекцию, стоимость и UI.

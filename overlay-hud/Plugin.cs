@@ -207,7 +207,7 @@ namespace OverlayHUD
         private int broadEnemyDiscoveryAttempts;
         private int statusFallbackCursor;
         private bool rosterPublished;
-        private bool previousRequireLineOfSight = true;
+        private bool previousRevealMonstersOnEncounter = true;
         private bool enemyRosterDirty;
         private bool mapValueDirty;
         private bool pendingMapValueRefresh;
@@ -258,7 +258,7 @@ namespace OverlayHUD
 #endif
         private ConfigEntry<float> scanInterval;
         private ConfigEntry<float> statusInterval;
-        private ConfigEntry<bool> requireLineOfSight;
+        private ConfigEntry<bool> revealMonstersOnEncounter;
         private ConfigEntry<bool> showDetectionBar;
         private ConfigEntry<bool> teamMonsterDetection;
         private ConfigEntry<bool> revealUnknownMonsters;
@@ -273,28 +273,78 @@ namespace OverlayHUD
 #endif
         private Harmony harmony;
 
+        private static void SetConfigFileName(ConfigFile config)
+        {
+            // BepInEx 5 constructs this object from the plugin GUID before Awake.
+            // Keep the same Config instance for Configuration Manager and runtime reloads.
+            var pathField = typeof(ConfigFile).GetField("<ConfigFilePath>k__BackingField",
+                BindingFlags.Instance | BindingFlags.NonPublic);
+            if (pathField == null) throw new System.IO.IOException("Unsupported BepInEx ConfigFile layout.");
+            string oldPath = config.ConfigFilePath;
+            string newPath = System.IO.Path.Combine(System.IO.Path.GetDirectoryName(oldPath), "OverlayHUD.cfg");
+            if (string.Equals(oldPath, newPath, StringComparison.OrdinalIgnoreCase)) return;
+            bool useExisting = System.IO.File.Exists(newPath);
+            if (!useExisting && System.IO.File.Exists(oldPath)) System.IO.File.Move(oldPath, newPath);
+            pathField.SetValue(config, newPath);
+            if (useExisting) config.Reload();
+        }
+
+        private static void MigrateConfigSections(ConfigFile config)
+        {
+            // Before the first Bind, BepInEx 5 stores the loaded, serialized settings here.
+            var property = typeof(ConfigFile).GetProperty("OrphanedEntries", BindingFlags.Instance | BindingFlags.NonPublic);
+            if (!(property?.GetValue(config, null) is Dictionary<ConfigDefinition, string> pending)) return;
+
+            foreach (var entry in new List<KeyValuePair<ConfigDefinition, string>>(pending))
+            {
+                string section = entry.Key.Section;
+                string key = entry.Key.Key;
+                if (section.Length > 3 && char.IsDigit(section[0]) && char.IsDigit(section[1]) && section[2] == ' ')
+                    section = section.Substring(3);
+                if (section == "Detection" && key == "RequireLineOfSight") key = "RevealMonstersOnEncounter";
+                if (section == entry.Key.Section && key == entry.Key.Key) continue;
+
+                var destination = new ConfigDefinition(section, key);
+                if (!pending.ContainsKey(destination)) pending.Add(destination, entry.Value);
+                pending.Remove(entry.Key);
+            }
+        }
+
         private void Awake()
         {
             instance = this;
+            try
+            {
+                SetConfigFileName(Config);
+            }
+            catch (System.IO.IOException error)
+            {
+                Logger.LogWarning("Could not switch config file: " + error.Message);
+            }
+            catch (UnauthorizedAccessException error)
+            {
+                Logger.LogWarning("Could not switch config file: " + error.Message);
+            }
+            MigrateConfigSections(Config);
             foreach (string typeName in new[] { "StatsManager", "PlayerController", "MapToolController", "CurrencyUI", "SemiUI", "GameDirector", "LoadingUI", "RunManager", "LevelGenerator", "SemiFunc", "ValuableObject", "RoundDirector", "PlayerAvatar" })
                 ResolveGameType(typeName);
             KeepPluginObjectAlive();
-            requireLineOfSight = BindNativeSetting("02 Detection", "RequireLineOfSight", true, "Reveal monsters only after an encounter. Disable to reveal the complete level roster as soon as it is known.", 100);
-            showDetectionBar = BindNativeToggle("02 Detection", "ShowDetectionBar", true, "Show the personal monster sight bar in either HUD. Red means the monster sees you.", 96);
-            teamMonsterDetection = BindNativeSetting("02 Detection", "TeamMonsterDetection", true, "Share monster encounters with teammates who also have team detection enabled.", 95);
-            revealUnknownMonsters = BindNativeSetting("02 Detection", "RevealUnknownMonsters", false, "Reveal monsters using the four-pointed star placeholder icon as soon as they are discovered, regardless of RequireLineOfSight. Monsters with their own icons keep their usual detection rules.", 90);
-            preferPlayerVisionDetection = BindNativeSetting("02 Detection", "PreferPlayerVisionDetection", true, "When enabled, show monsters when the player sees them. When disabled, use enemy-vision plus player-very-close detection.", 80);
-            scanInterval = BindNativeSetting("02 Detection", "ScanIntervalSeconds", 3f, "How often pending enemy roster sync is retried.", 70);
-            statusInterval = BindNativeSetting("02 Detection", "StatusIntervalSeconds", 10f, "How often monster health and respawn status are synced after the roster is known. Event-driven changes remain immediate; values below 10 are raised to 10.", 60);
-            debugLogging = BindNativeSetting("99 Diagnostics", "Logging", false, "Write additional diagnostic logs.", 100);
+            revealMonstersOnEncounter = BindNativeSetting("Detection", "RevealMonstersOnEncounter", true, "Reveal monsters only after an encounter. Disable to reveal the complete level roster as soon as it is known.", 100);
+            showDetectionBar = BindNativeToggle("Detection", "ShowDetectionBar", true, "Show the personal monster sight bar in either HUD. Red means the monster sees you.", 96);
+            teamMonsterDetection = BindNativeSetting("Detection", "TeamMonsterDetection", true, "Share monster encounters with teammates who also have team detection enabled.", 95);
+            revealUnknownMonsters = BindNativeSetting("Detection", "RevealUnknownMonsters", false, "Reveal monsters using the four-pointed star placeholder icon as soon as they are discovered, regardless of RevealMonstersOnEncounter. Monsters with their own icons keep their usual detection rules.", 90);
+            preferPlayerVisionDetection = BindNativeSetting("Detection", "PreferPlayerVisionDetection", true, "When enabled, show monsters when the player sees them. When disabled, use enemy-vision plus player-very-close detection.", 80);
+            scanInterval = BindNativeSetting("Detection", "ScanIntervalSeconds", 3f, "How often pending enemy roster sync is retried.", 70);
+            statusInterval = BindNativeSetting("Detection", "StatusIntervalSeconds", 10f, "How often monster health and respawn status are synced after the roster is known. Event-driven changes remain immediate; values below 10 are raised to 10.", 60);
+            debugLogging = BindNativeSetting("Diagnostics", "Logging", false, "Write additional diagnostic logs.", 100);
             if (statusInterval.Value < 10f) statusInterval.Value = 10f;
 #if !NATIVE_ONLY
-            autoStartOverlayApp = BindNativeSetting("09 Electron - App", "AutoStart", true, "Start the bundled OverlayHUD desktop app when the game starts.", 100);
-            autoCloseOverlayApp = BindNativeSetting("09 Electron - App", "AutoClose", true, "Close the bundled OverlayHUD desktop app when the game exits.", 90);
-            overlayAppRelativePath = BindNativeSetting("09 Electron - App", "ExecutableRelativePath", string.Empty, "Leave empty to install the bundled desktop app in LocalAppData/OverlayHUD, separately for each BepInEx profile. Custom paths are relative to this plugin DLL, or absolute.", 80);
-            overlayAppArchiveName = BindNativeSetting("09 Electron - App", "ArchiveName", "OverlayHUD_app.zip", "Bundled OverlayHUD desktop app archive next to this plugin DLL.", 70);
-            endpoint = BindNativeSetting("10 Electron - Connection", "Endpoint", "http://127.0.0.1:8787/api/monster-seen", "Monster endpoint on this PC.", 100);
-            levelEndpoint = BindNativeSetting("10 Electron - Connection", "LevelEndpoint", "http://127.0.0.1:8787/api/level", "Level sync endpoint on this PC.", 90);
+            autoStartOverlayApp = BindNativeSetting("Electron - App", "AutoStart", true, "Start the bundled OverlayHUD desktop app when the game starts.", 100);
+            autoCloseOverlayApp = BindNativeSetting("Electron - App", "AutoClose", true, "Close the bundled OverlayHUD desktop app when the game exits.", 90);
+            overlayAppRelativePath = BindNativeSetting("Electron - App", "ExecutableRelativePath", string.Empty, "Leave empty to install the bundled desktop app in LocalAppData/OverlayHUD, separately for each BepInEx profile. Custom paths are relative to this plugin DLL, or absolute.", 80);
+            overlayAppArchiveName = BindNativeSetting("Electron - App", "ArchiveName", "OverlayHUD_app.zip", "Bundled OverlayHUD desktop app archive next to this plugin DLL.", 70);
+            endpoint = BindNativeSetting("Electron - Connection", "Endpoint", "http://127.0.0.1:8787/api/monster-seen", "Monster endpoint on this PC.", 100);
+            levelEndpoint = BindNativeSetting("Electron - Connection", "LevelEndpoint", "http://127.0.0.1:8787/api/level", "Level sync endpoint on this PC.", 90);
 #endif
             Logger.LogInfo("OverlayHUD is running. Logging=" + debugLogging.Value);
 
@@ -880,12 +930,12 @@ namespace OverlayHUD
         private void TickScanCore()
         {
             if (!gameplayActive) return;
-            if (previousRequireLineOfSight && !requireLineOfSight.Value)
+            if (previousRevealMonstersOnEncounter && !revealMonstersOnEncounter.Value)
             {
                 enemyRosterDirty = true;
                 nextScanAt = 0f;
             }
-            previousRequireLineOfSight = requireLineOfSight.Value;
+            previousRevealMonstersOnEncounter = revealMonstersOnEncounter.Value;
             float now = Time.realtimeSinceStartup;
             if (mapValueDirty && now >= nextMapValueSyncAt)
             {
@@ -1267,7 +1317,7 @@ namespace OverlayHUD
             statusFallbackCursor = 0;
             rosterPublished = false;
             enemyRosterDirty = true;
-            scanPausedUntil = Time.realtimeSinceStartup + (requireLineOfSight.Value ? 2f : 0f);
+            scanPausedUntil = Time.realtimeSinceStartup + (revealMonstersOnEncounter.Value ? 2f : 0f);
             nextScanAt = scanPausedUntil;
             nextStatusSyncAt = scanPausedUntil;
             nextUpgradeSyncAt = scanPausedUntil;
@@ -1333,7 +1383,7 @@ namespace OverlayHUD
             // Roster construction is already a sizeable main-thread job. Spread the
             // remaining initial snapshots so level activation never performs them all
             // in the frame in which the HUD first becomes visible.
-            if (requireLineOfSight.Value) yield return null;
+            if (revealMonstersOnEncounter.Value) yield return null;
             if (!gameplayActive || !rosterPublished) yield break;
             RevealAllKnownEnemies(enemies);
 
@@ -1364,7 +1414,7 @@ namespace OverlayHUD
             {
                 ResolvedEnemyCandidate resolvedEnemy = enemies[index];
                 EnemyCandidate candidate = resolvedEnemy.Candidate;
-                if (requireLineOfSight.Value && !ShouldRevealUnknownMonster(candidate)) continue;
+                if (revealMonstersOnEncounter.Value && !ShouldRevealUnknownMonster(candidate)) continue;
                 RevealKnownEnemy(candidate, resolvedEnemy.MonsterName);
             }
         }
@@ -1403,7 +1453,7 @@ namespace OverlayHUD
 
             string nextFingerprint = fingerprint.ToString();
             bool firstPublication = !rosterPublished;
-            if (firstPublication && requireLineOfSight.Value)
+            if (firstPublication && revealMonstersOnEncounter.Value)
             {
                 if (nextFingerprint != pendingRosterFingerprint)
                 {
@@ -1696,7 +1746,7 @@ namespace OverlayHUD
             };
 
             if (!TryGetEnemyRespawnStatus(candidate, out bool alive, out float remaining)) return;
-            if (!requireLineOfSight.Value && !IsEnemySent(instanceId))
+            if (!revealMonstersOnEncounter.Value && !IsEnemySent(instanceId))
             {
                 RegisterEnemyParent(enemyParent);
                 string name = ResolveMonsterName(enemyParent);
@@ -2439,12 +2489,12 @@ namespace OverlayHUD
 
             foreach (Component component in GetKnownEnemyParentsSnapshot())
             {
-                AddEnemyCandidate(result, seenRoots, component, includeInactive: !requireLineOfSight.Value);
+                AddEnemyCandidate(result, seenRoots, component, includeInactive: !revealMonstersOnEncounter.Value);
             }
 
             foreach (Component component in FindSpawnedEnemiesFromDirector())
             {
-                AddEnemyCandidate(result, seenRoots, component, includeInactive: !requireLineOfSight.Value);
+                AddEnemyCandidate(result, seenRoots, component, includeInactive: !revealMonstersOnEncounter.Value);
             }
 
             float now = Time.realtimeSinceStartup;

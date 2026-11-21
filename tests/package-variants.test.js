@@ -64,7 +64,7 @@ const desktopSymbols = [
 ];
 
 const desktopStrings = [
-  '09 Electron - App', '10 Electron - Connection', 'OverlayHUD_app.zip',
+  'Electron - App', 'Electron - Connection', 'OverlayHUD_app.zip',
   '/api/monster-localization', 'http://127.0.0.1:8787',
 ];
 
@@ -100,7 +100,7 @@ test('Native compiles out desktop startup, shutdown, configuration and HTTP clie
 
 test('Full defaults to Electron and retains desktop lifecycle; Native cannot fall back', () => {
   const full = method(variants.Full['Plugin.Native.cs'], 'InitializeNativeHud');
-  assert.match(full, /BindNativeSetting\("01 General", "Renderer", RendererMode\.Electron,/);
+  assert.match(full, /BindNativeSetting\("General", "Renderer", RendererMode\.Electron,/);
   assert.match(full, /nativeMode = false;/);
   const awake = method(variants.Full['Plugin.cs'], 'Awake');
   assert.match(awake, /InitializeNativeHud\(\);\s*if \(!nativeMode\)\s*\{\s*StartOverlayAppIfNeeded\(\);\s*StartCoroutine\(SyncIconAppearance\(\)\);/);

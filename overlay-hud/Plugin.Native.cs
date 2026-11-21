@@ -14,12 +14,12 @@ namespace OverlayHUD
             Native
         }
 #endif
-        private const string NativeGeneralSection = "03 Native - General";
-        private const string NativeLayoutSection = "04 Native - Layout";
-        private const string NativeInformationSection = "05 Native - Information";
-        private const string NativeMonstersSection = "06 Native - Monsters";
-        private const string NativeEffectsSection = "07 Native - Effects";
-        private const string NativeUpgradesSection = "08 Native - Upgrades";
+        private const string NativeGeneralSection = "Native - General";
+        private const string NativeLayoutSection = "Native - Layout";
+        private const string NativeInformationSection = "Native - Information";
+        private const string NativeMonstersSection = "Native - Monsters";
+        private const string NativeEffectsSection = "Native - Effects";
+        private const string NativeUpgradesSection = "Native - Upgrades";
         private ConfigEntry<bool> legacyIcons;
         private bool nativeMode;
         private NativeHud nativeHud;
@@ -44,15 +44,15 @@ namespace OverlayHUD
 #if NATIVE_ONLY
             nativeMode = true;
 #else
-            nativeMode = BindNativeSetting("01 General", "Renderer", RendererMode.Electron,
+            nativeMode = BindNativeSetting("General", "Renderer", RendererMode.Electron,
                 "Electron desktop HUD (default) or Native Unity HUD. Restart the game after changing.", 100).Value == RendererMode.Native;
 #endif
-            legacyIcons = BindNativeToggle("12 Appearance", "LegacyIcons", false,
+            legacyIcons = BindNativeToggle("Appearance", "LegacyIcons", false,
                 "Use the original monster icons instead of the new artwork in either renderer.", 100);
             nativeEnabled = BindNativeToggle(NativeGeneralSection, "Enabled", true, "Show the native HUD without stopping game-state tracking.", 100);
             nativeLanguage = BindNativeSetting(NativeGeneralSection, "Language", NativeHudLanguage.DefaultLanguage,
                 "Native HUD language: ru (Russian) or en (English). Defaults to Russian for a Russian OS UI language, English otherwise. Saved choices are preserved. Applies immediately.", 90, new AcceptableValueList<string>("ru", "en"));
-            nativeSaveTimestamps = BindNativeSetting(NativeGeneralSection, "SaveTimestamps", true,
+            nativeSaveTimestamps = BindNativeSetting(NativeGeneralSection, "SaveTimestamps", false,
                 "Save level start times, map names and seen monster names/counts in BepInEx/plugins/OverlayHUD/timestamps. Disabling finalizes the current line; enabling starts at the next level.", 80);
 
             nativeAlignment = BindNativeSetting(NativeLayoutSection, "Alignment", "Center",
@@ -81,7 +81,7 @@ namespace OverlayHUD
             nativeTimer = BindNativeToggle(NativeInformationSection, "ShowTimer", true, "Show the elapsed level timer.", 90);
             nativeMapValue = BindNativeToggle(NativeInformationSection, "ShowMapValue", true, "Show the value of valuables remaining on the map.", 80);
             nativeLostValue = BindNativeToggle(NativeInformationSection, "ShowLostValue", true, "Show the lost value of valuables.", 70);
-            nativeUpgrades = BindNativeToggle(NativeInformationSection, "ShowUpgrades", true, "Show player upgrade icons; individual upgrades can also be hidden in 08 Native - Upgrades.", 60);
+            nativeUpgrades = BindNativeToggle(NativeInformationSection, "ShowUpgrades", true, "Show player upgrade icons; individual upgrades can also be hidden in Native - Upgrades.", 60);
 
             nativeMonsters = BindNativeToggle(NativeMonstersSection, "ShowMonsters", true, "Show the monster tiles; does not hide the level, timer, values or upgrades.", 100);
             nativeHealth = BindNativeToggle(NativeMonstersSection, "ShowHealth", true, "Show monster health bars. Numeric HP is available in hover tooltips when ShowTooltips is enabled.", 90);
@@ -169,7 +169,7 @@ namespace OverlayHUD
         private void OnNativeSettingChanged(object sender, SettingChangedEventArgs args)
         {
             string section = args.ChangedSetting.Definition.Section;
-            if (section == "12 Appearance" || section == NativeGeneralSection || section == NativeLayoutSection
+            if (section == "Appearance" || section == NativeGeneralSection || section == NativeLayoutSection
                 || section == NativeInformationSection || section == NativeMonstersSection
                 || section == NativeEffectsSection || section == NativeUpgradesSection)
                 nativeOptionsDirty = true;

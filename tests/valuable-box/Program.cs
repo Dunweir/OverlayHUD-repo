@@ -12,6 +12,7 @@ namespace OverlayHUD
         static HashSet<int> destroyedValuablesAccounted = new();
         static bool runLevel = true;
         float mapValue = 10000, lostValue;
+        bool gameplayActive = true;
         int alerts;
         readonly Setting debugLogging = new();
         readonly Log Logger = new();
@@ -46,8 +47,8 @@ namespace OverlayHUD
             Check(CalculateMapValue() == 1750, "Loose value missing");
 
             // StartAbsorbLocal runs on host and clients before the host removes the original.
-            ValuableBoxAbsorbPrefix(phys);
-            ValuableBoxAbsorbPrefix(phys);
+            ValuableBoxAbsorbPrefix(box, phys);
+            ValuableBoxAbsorbPrefix(box, phys);
             box.activeAbsorptions.Add(new Absorption { valueToAdd = 1750 });
             PhysGrabObjectDestroyingPrefix(phys);
             PhysGrabObjectDestroyingPrefix(phys); // RPC fallback must be idempotent.
@@ -82,9 +83,23 @@ namespace OverlayHUD
             AccountForDestroyedValuableBox(extracted);
             Check(instance.lostValue == 2550, "Extracted box counted as lost");
 
+            // The pit path can bypass both ExplodeValuableBox and DestroyPhysGrabObject.
+            var detector = new Component();
+            detector.Components["ItemValuableBox"] = extracted;
+            ValuableBoxAbsorbPrefix(extracted, phys);
+            extracted.currentValue = 900;
+            extracted.activeAbsorptions.Add(new Absorption { valueToAdd = 80 });
+            before = instance.mapValue;
+            ValuableBoxImpactPrefix(detector, default);
+            extracted.activeAbsorptions.Clear();
+            extracted.currentValue = 0;
+            ValuableBoxExplodePrefix(extracted);
+            Check(instance.lostValue == 3530 && instance.mapValue == before - 980,
+                "Falling refilled box must lose stored and pending cargo exactly once");
+
             runLevel = false;
             var outside = new ValuableObject();
-            ValuableBoxAbsorbPrefix(outside);
+            ValuableBoxAbsorbPrefix(box, outside);
             Check(!IsValuableTransferredToBox(outside), "Transfer tracked outside run");
             Console.WriteLine($"Valuable box checks passed: {checks}.");
         }
@@ -122,12 +137,17 @@ namespace UnityEngine
         public Component GetComponent(string name) => Components.GetValueOrDefault(name);
     }
 }
+namespace Photon.Pun
+{
+    public struct PhotonMessageInfo { public object Sender; }
+    public static class PhotonNetwork { public static bool InRoom; public static object MasterClient; }
+}
 namespace HarmonyLib
 {
     public class Harmony
     {
         public void Patch(MethodInfo method, HarmonyMethod prefix = null, HarmonyMethod postfix = null) { }
     }
-    public class HarmonyMethod { public HarmonyMethod(MethodInfo method) { } }
+    public class HarmonyMethod { public HarmonyMethod(MethodInfo method) { } public HarmonyMethod(Type type, string name) { } }
     public static class AccessTools { public static MethodInfo Method(string name) => null; }
 }

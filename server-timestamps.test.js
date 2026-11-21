@@ -54,6 +54,7 @@ const translations = {
 
 test('live game tables update both languages without changing identity or counts', async () => {
     const { api, writes } = loadServer();
+    await api.patchState({ saveTimestampsEnabled: true });
     api.setGameLevel(1, 'Manor');
     await api.patchState({ monsters: [{ name: 'Gnomes', count: 4 }] });
     const result = await api.post('/api/monster-localization', { names: {
@@ -82,11 +83,11 @@ test('invalid localization is rejected atomically and missing translations fall 
     }
 });
 
-test('timestamp setting defaults to true and normalizes only booleans', async () => {
+test('timestamp setting defaults to false and normalizes only booleans', async () => {
     const { api } = loadServer();
-    assert.equal(api.normalizeOverlayState({}).saveTimestampsEnabled, true);
+    assert.equal(api.normalizeOverlayState({}).saveTimestampsEnabled, false);
     for (const value of [true, false, null, undefined, 0, 1, 'false', {}, []]) {
-        const expected = typeof value === 'boolean' ? value : true;
+        const expected = value === true;
         assert.equal(api.normalizeOverlayState({ saveTimestampsEnabled: value }).saveTimestampsEnabled, expected);
         await api.postState({ saveTimestampsEnabled: value });
         assert.equal(api.getNormalizedOverlayState().saveTimestampsEnabled, expected);
@@ -125,7 +126,7 @@ for (const [initial, next, heading, monster, nextHeading] of [
 ]) {
     test(`active line retains ${initial} after switching to ${next}`, async () => {
         const { api, writes } = loadServer();
-        await api.postState({ interfaceLanguage: initial });
+        await api.postState({ saveTimestampsEnabled: true, interfaceLanguage: initial });
         api.setGameLevel(1, 'Swiftbroom Academy');
         await api.patchState({ interfaceLanguage: next, monsters: [{ name: 'Animal' }] });
         api.setGameLevel(2, 'MacJannek Station');
@@ -145,7 +146,7 @@ test('unknown timestamp names bypass localization and plural inference in both l
             { name: 'Robes' }, { name: 'Animal', unknown: true },
             { name: '  Modded / 未知  ', unknown: true }
         ], language)), ['Robes', 'Animal', '  Modded / 未知  ']);
-        await api.postState({ interfaceLanguage: language });
+        await api.postState({ saveTimestampsEnabled: true, interfaceLanguage: language });
         api.setGameLevel(1, '  Modded Museum / 未知  ');
         assert.ok(writes.at(-1).text.includes('1   Modded Museum / 未知  \n'));
         api.setGameLevel(2, 'Museum of Human Arts');
@@ -156,7 +157,7 @@ test('unknown timestamp names bypass localization and plural inference in both l
 test('timestamp locations omit the game Level prefix in both languages', async () => {
     for (const language of ['ru', 'en']) {
         const { api, writes } = loadServer();
-        await api.postState({ interfaceLanguage: language });
+        await api.postState({ saveTimestampsEnabled: true, interfaceLanguage: language });
         api.setGameLevel(1, 'Level - New Map');
         assert.match(writes.at(-1).text, /1 New Map\n$/);
         assert.doesNotMatch(writes.at(-1).text, /Level -/);
@@ -169,12 +170,11 @@ test('timestamp locations omit the game Level prefix in both languages', async (
 
 test('line-of-sight detection remains enabled by default', () => {
     const plugin = fs.readFileSync(`${__dirname}/overlay-hud/Plugin.cs`, 'utf8');
-    assert.match(plugin, /BindNativeSetting\("02 Detection", "RequireLineOfSight", true,/);
+    assert.match(plugin, /BindNativeSetting\("Detection", "RevealMonstersOnEncounter", true,/);
 });
 
 test('disabled from startup creates no files, including on shutdown', async () => {
     const { api, writes, directories } = loadServer();
-    await api.postState({ saveTimestampsEnabled: false });
     api.setGameLevel(1, 'Manor');
     api.setGameLevel(2, 'Museum');
     api.setGameplayVisibility(false);
@@ -187,6 +187,7 @@ test('disabled from startup creates no files, including on shutdown', async () =
 
 test('disable finalizes once, stops writes and resumes only on the next level', async () => {
     const { api, writes, directories } = loadServer();
+    await api.patchState({ saveTimestampsEnabled: true });
     api.setGameLevel(1, 'Headman Manor');
     await api.patchState({ monsters: [{ name: 'Gnome', count: 4 }] });
     await api.patchState({ saveTimestampsEnabled: false });

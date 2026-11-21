@@ -5,6 +5,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Reflection;
 using HarmonyLib;
+using Photon.Pun;
 using UnityEngine;
 
 namespace OverlayHUD
@@ -18,6 +19,10 @@ namespace OverlayHUD
 
         private void PatchValuableBoxEvents(Harmony harmony)
         {
+            MethodInfo impact = AccessTools.Method("PhysGrabObjectImpactDetector:DestroyObjectRPC");
+            if (impact != null)
+                harmony.Patch(impact, prefix: new HarmonyMethod(typeof(Plugin), nameof(ValuableBoxImpactPrefix)));
+            Patch("OnDestroy", nameof(ValuableBoxExplodePrefix), true);
             Patch("UpdateValueRPC", nameof(ValuableBoxValuePostfix), false);
             Patch("OnExtracted", nameof(ValuableBoxExtractedPrefix), true);
             Patch("ExplodeValuableBox", nameof(ValuableBoxExplodePrefix), true);
@@ -43,9 +48,16 @@ namespace OverlayHUD
                 extractedValuableBoxes.Add(box.GetInstanceID());
         }
 
+        // Pits destroy via the impact detector. Its listeners may clear or disable the box.
+        private static void ValuableBoxImpactPrefix(object __instance, PhotonMessageInfo _info)
+        {
+            if (PhotonNetwork.InRoom && _info.Sender != PhotonNetwork.MasterClient) return;
+            ValuableBoxExplodePrefix(__instance);
+        }
+
         private static void ValuableBoxExplodePrefix(object __instance)
         {
-            if (IsRunLevel()) AccountForDestroyedValuableBox(__instance);
+            if (instance != null && instance.gameplayActive && IsRunLevel()) AccountForDestroyedValuableBox(__instance);
         }
 
         private static void AccountForDestroyedValuableBox(object source)
@@ -58,11 +70,18 @@ namespace OverlayHUD
                 instance?.AddLostValue(value, "valuable box destroyed");
         }
 
-        private static void ValuableBoxAbsorbPrefix(object target)
+        private static void ValuableBoxAbsorbPrefix(object __instance, object target)
         {
             if (!IsRunLevel()) return;
             Component valuable = GetValuableComponent(target);
-            if (valuable != null) valuablesTransferredToBox.Add(valuable.GetInstanceID());
+            if (valuable == null) return;
+            valuablesTransferredToBox.Add(valuable.GetInstanceID());
+            // Boxes can be refilled after extraction or reactivation.
+            if (__instance is UnityEngine.Object box)
+            {
+                extractedValuableBoxes.Remove(box.GetInstanceID());
+                destroyedValuableBoxes.Remove(box.GetInstanceID());
+            }
         }
 
         private static bool IsValuableTransferredToBox(object valuable)

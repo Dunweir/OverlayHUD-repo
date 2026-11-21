@@ -40,7 +40,7 @@ let localServerModule = null;
 let hoverBoundsGeneration = 0;
 let screenshotInProgress = false;
 let systemLanguage = "en";
-let overlayPreferences = { interfaceLanguage: systemLanguage, saveTimestampsEnabled: true };
+let overlayPreferences = { interfaceLanguage: systemLanguage, saveTimestampsEnabled: false };
 let stopGameLifetimeWatcher = () => {};
 let lifetimeArgv = process.argv;
 let forceExitTimer = null;
@@ -576,7 +576,7 @@ function startHoverTracking() {
 function updateTrayPreferences(preferences) {
     const next = {
         interfaceLanguage: preferences.interfaceLanguage === "en" ? "en" : "ru",
-        saveTimestampsEnabled: preferences.saveTimestampsEnabled !== false
+        saveTimestampsEnabled: preferences.saveTimestampsEnabled === true
     };
     if (next.interfaceLanguage === overlayPreferences.interfaceLanguage
         && next.saveTimestampsEnabled === overlayPreferences.saveTimestampsEnabled) return;
