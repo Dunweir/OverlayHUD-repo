@@ -207,6 +207,7 @@ namespace OverlayHUD
         private int broadEnemyDiscoveryAttempts;
         private int statusFallbackCursor;
         private bool rosterPublished;
+        private bool previousRequireLineOfSight = true;
         private bool enemyRosterDirty;
         private bool mapValueDirty;
         private bool pendingMapValueRefresh;
@@ -879,6 +880,12 @@ namespace OverlayHUD
         private void TickScanCore()
         {
             if (!gameplayActive) return;
+            if (previousRequireLineOfSight && !requireLineOfSight.Value)
+            {
+                enemyRosterDirty = true;
+                nextScanAt = 0f;
+            }
+            previousRequireLineOfSight = requireLineOfSight.Value;
             float now = Time.realtimeSinceStartup;
             if (mapValueDirty && now >= nextMapValueSyncAt)
             {
@@ -1358,17 +1365,22 @@ namespace OverlayHUD
                 ResolvedEnemyCandidate resolvedEnemy = enemies[index];
                 EnemyCandidate candidate = resolvedEnemy.Candidate;
                 if (requireLineOfSight.Value && !ShouldRevealUnknownMonster(candidate)) continue;
-                int instanceId = candidate.Root.GetInstanceID();
-                if (!TryMarkEnemySent(instanceId)) continue;
-
-                pendingEncounterIds.Remove(instanceId);
-                MarkMonsterSeen(resolvedEnemy.MonsterName, candidate);
-                if (debugLogging.Value)
-                {
-                    Logger.LogInfo("Revealed level monster: " + resolvedEnemy.MonsterName + " from " + candidate.Component.GetType().Name + " / " + candidate.Root.name);
-                }
-                StartCoroutine(PostSeenMonster(resolvedEnemy.MonsterName, instanceId, GetMonsterMetadata(candidate)));
+                RevealKnownEnemy(candidate, resolvedEnemy.MonsterName);
             }
+        }
+
+        private void RevealKnownEnemy(EnemyCandidate candidate, string monsterName)
+        {
+            int instanceId = candidate.Root.GetInstanceID();
+            if (!TryMarkEnemySent(instanceId)) return;
+
+            pendingEncounterIds.Remove(instanceId);
+            MarkMonsterSeen(monsterName, candidate);
+            if (debugLogging.Value)
+            {
+                Logger.LogInfo("Revealed level monster: " + monsterName + " from " + candidate.Component.GetType().Name + " / " + candidate.Root.name);
+            }
+            StartCoroutine(PostSeenMonster(monsterName, instanceId, GetMonsterMetadata(candidate)));
         }
 
         private bool SyncMonsterRoster(List<ResolvedEnemyCandidate> enemies)
@@ -1684,6 +1696,12 @@ namespace OverlayHUD
             };
 
             if (!TryGetEnemyRespawnStatus(candidate, out bool alive, out float remaining)) return;
+            if (!requireLineOfSight.Value && !IsEnemySent(instanceId))
+            {
+                RegisterEnemyParent(enemyParent);
+                string name = ResolveMonsterName(enemyParent);
+                if (name != null) RevealKnownEnemy(candidate, name);
+            }
             bool shouldIncludeHealth = IsEnemySent(instanceId);
             float health = 0f;
             float maxHealth = 0f;
@@ -2421,12 +2439,12 @@ namespace OverlayHUD
 
             foreach (Component component in GetKnownEnemyParentsSnapshot())
             {
-                AddEnemyCandidate(result, seenRoots, component);
+                AddEnemyCandidate(result, seenRoots, component, includeInactive: !requireLineOfSight.Value);
             }
 
             foreach (Component component in FindSpawnedEnemiesFromDirector())
             {
-                AddEnemyCandidate(result, seenRoots, component);
+                AddEnemyCandidate(result, seenRoots, component, includeInactive: !requireLineOfSight.Value);
             }
 
             float now = Time.realtimeSinceStartup;
@@ -2544,12 +2562,12 @@ namespace OverlayHUD
             }
         }
 
-        private static void AddEnemyCandidate(List<EnemyCandidate> result, HashSet<int> seenRoots, Component component)
+        private static void AddEnemyCandidate(List<EnemyCandidate> result, HashSet<int> seenRoots, Component component, bool includeInactive = false)
         {
             if (component == null) return;
 
             GameObject root = GetEnemyRoot(component);
-            if (root == null || !root.activeInHierarchy) return;
+            if (root == null || (!includeInactive && !root.activeInHierarchy)) return;
 
             Component enemyParent = component.GetType().Name == "EnemyParent"
                 ? component
