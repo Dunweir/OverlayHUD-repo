@@ -301,10 +301,12 @@ test('optional ZIPs contain distinct DLLs, correct markers and a current desktop
   skip: process.env.OVERLAYHUD_CHECK_PACKAGES !== '1' && 'Set OVERLAYHUD_CHECK_PACKAGES=1 after packaging',
 }, () => {
   const manifest = JSON.parse(read('overlay-hud/package-flat/manifest.json'));
+  const release = read('overlay-hud/OverlayHUD.csproj').match(/<Version>([^<]+)<\/Version>/)[1];
+  assert.equal(release.split('-')[0], manifest.version_number);
   const common = ['icon.png', 'manifest.json', 'OverlayHUD.dll', 'README.md', 'LICENSE', 'THIRD_PARTY_NOTICES.md'];
   const artifacts = {};
   for (const name of ['Full', 'Native']) {
-    const archivePath = path.join(root, `EgorSalad-OverlayHUD-${manifest.version_number}-${name}.zip`);
+    const archivePath = path.join(root, `EgorSalad-OverlayHUD-${release}-${name}.zip`);
     assert.ok(fs.existsSync(archivePath), `Missing completed package: ${archivePath}`);
     const artifact = artifacts[name] = inspectArchive(archivePath, name === 'Full');
     assert.deepEqual(artifact.Entries.sort(), [...common, ...(name === 'Full' ? ['OverlayHUD_app.zip'] : [])].sort());
@@ -316,7 +318,7 @@ test('optional ZIPs contain distinct DLLs, correct markers and a current desktop
     }
   }
   assert.notEqual(artifacts.Full.Hash, artifacts.Native.Hash, 'Both packages contain the same DLL');
-  assert.equal(artifacts.Full.Desktop.Version, manifest.version_number, 'Desktop version differs from release');
+  assert.equal(artifacts.Full.Desktop.Version, release, 'Desktop version differs from release');
   for (const source of desktopSources) {
     const expected = createHash('sha256').update(fs.readFileSync(path.join(root, source))).digest('hex');
     assert.equal(artifacts.Full.Desktop.Hashes[desktopEntry(source)], expected, `Stale desktop source: ${source}`);

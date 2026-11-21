@@ -131,10 +131,11 @@ if (@(Compare-Object -ReferenceObject @($fullManifest.dependencies) -DifferenceO
 }
 [xml] $projectXml = Get-Content -LiteralPath $project -Raw
 $projectVersion = $projectXml.SelectSingleNode('/Project/PropertyGroup/Version').InnerText
-if ($projectVersion -cne $version) {
+if (($projectVersion -cne $version) -and ($projectVersion -cne "$version-beta")) {
     throw "Project version $projectVersion differs from manifest version $version."
 }
 
+$version = $projectVersion
 $fullOutput = Join-Path $repoRoot "EgorSalad-OverlayHUD-$version-Full.zip"
 $nativeOutput = Join-Path $repoRoot "EgorSalad-OverlayHUD-$version-Native.zip"
 Assert-OutputAvailable $fullOutput

@@ -22,6 +22,10 @@ namespace OverlayHUD
             internal RawImage Icon, PreviousIcon, Glow, PreviousGlow, StrengthIcon;
             internal CanvasGroup Group, CountGroup, StrengthGroup, HealthGroup, CooldownGroup, DamageGroup;
             internal NativeRoundedPanel Bar, Flash, TimerPill;
+            internal NativeRoundedPanel VisionTrack, VisionFill;
+            internal CanvasGroup VisionGroup;
+            internal float VisionRatio;
+            internal RawImage VisionGlow;
             internal NativeOutline Border;
             internal NativeOutline[] Waves;
             internal readonly float[] WaveStarted = { -100, -100 };
@@ -104,6 +108,17 @@ namespace OverlayHUD
             var track = Fill("HealthTrack", tile.Content, -1, CardSize + 14 - HealthHeight, 72, HealthHeight, new Color(0, 0, 0, .76f));
             tile.HealthGroup = track.gameObject.AddComponent<CanvasGroup>();
             tile.Bar = Fill("Health", track.transform, 2, 2, 68, HealthHeight - 4, Color.green);
+            var cyan = new Color32(106, 211, 255, 255);
+            tile.VisionTrack = Fill("VisionTrack", tile.Content, -1, CardSize + 16, 72, HealthHeight, new Color(0, 0, 0, .76f));
+            tile.VisionGlow = Image("SightGlow", tile.VisionTrack.transform, -8, -8, 88, HealthHeight + 16);
+            tile.VisionGlow.texture = Texture("sight-glow.png");
+            tile.VisionGlow.enabled = false;
+            tile.VisionGroup = tile.VisionTrack.gameObject.AddComponent<CanvasGroup>();
+            tile.VisionGroup.alpha = 0;
+            tile.VisionFill = Fill("Detection", tile.VisionTrack.transform, 2, 2, 0, HealthHeight - 4, cyan);
+            var rim = Fill("EyeRim", tile.VisionTrack.transform, -2, (HealthHeight - 15) / 2, 20, 15, new Color32(13, 19, 24, 255));
+            var eye = Fill("Eye", rim.transform, 2, 2, 16, 11, Color.white);
+            Fill("Pupil", eye.transform, 5, 2, 6, 7, Color.black);
             tile.TimerPill = Fill("CooldownPill", tile.Content, 6, CooldownTop, 58, 18.7f, new Color(0, 0, 0, CooldownPillAlpha));
             tile.LabelBacking = tile.TimerPill.rectTransform;
             tile.CooldownGroup = tile.LabelBacking.gameObject.AddComponent<CanvasGroup>();
@@ -183,7 +198,7 @@ namespace OverlayHUD
             tile.StrengthBacking.sizeDelta = new Vector2(strengthX + strengthWidth + 7, 22);
 
             bool hasHealth = monster.Health.HasValue && monster.MaxHealth > 0;
-            tile.HasHealth = showHealth && monster.Seen && hasHealth;
+            tile.HasHealth = showHealth && monster.Seen && monster.Alive && hasHealth;
             float ratio = hasHealth ? Mathf.Clamp01(monster.Health.Value / monster.MaxHealth.Value) : 0;
             if (created) tile.HealthRatio = tile.TargetHealthRatio = ratio;
             if (tile.TargetHealthRatio != ratio)
@@ -253,10 +268,39 @@ namespace OverlayHUD
                 track.localScale = new Vector3(1, Mathf.Lerp(.55f, 1, tile.HealthAlpha), 1);
                 track.anchoredPosition = new Vector2(-1, -CardSize - 14 + HealthHeight + 4 * (1 - tile.HealthAlpha));
 
+                AnimateVision(tile, dt);
                 AnimateCooldown(tile, now, dt);
                 AnimateDamage(tile, now);
                 AnimateWaves(tile, now);
             }
+        }
+
+        private void AnimateVision(Tile tile, float dt)
+        {
+            int progress = tile.Monster.Detection;
+            float targetAlpha = progress > 0 ? 1 : 0;
+            float alpha = options.Animations ? Mathf.MoveTowards(tile.VisionGroup.alpha, targetAlpha, dt / .2f) : targetAlpha;
+            tile.VisionGroup.alpha = alpha;
+            if (alpha == 0)
+            {
+                tile.VisionRatio = 0;
+                return;
+            }
+            var track = tile.VisionTrack.rectTransform;
+            track.localScale = new Vector3(1, Mathf.Lerp(.55f, 1, alpha), 1);
+            track.anchoredPosition = new Vector2(-1, -CardSize - (showHealth ? 16 : 4) + 3 * (1 - alpha));
+            if (progress == 0) return; // Retain the last fill and color throughout fade-out.
+            tile.VisionGlow.enabled = progress == 100;
+            if (tile.VisionGlow.enabled)
+            {
+                float pulse = options.Animations ? .72f + .25f * Mathf.Cos(Time.unscaledTime * 2 * Mathf.PI / 1.3f) : .72f;
+                tile.VisionGlow.color = new Color(1, .13f, .09f, pulse);
+            }
+            float target = progress / 100f;
+            tile.VisionRatio = options.Animations ? Mathf.Lerp(tile.VisionRatio, target, 1 - Mathf.Exp(-dt / .13f)) : target;
+            tile.VisionFill.rectTransform.sizeDelta = new Vector2(68 * tile.VisionRatio, HealthHeight - 4);
+            Color color = progress == 100 ? new Color32(255, 63, 53, 255) : new Color32(106, 211, 255, 255);
+            tile.VisionFill.color = options.Animations ? Color.Lerp(tile.VisionFill.color, color, 1 - Mathf.Exp(-dt * 22)) : color;
         }
 
         private void AnimateCooldown(Tile tile, float now, float dt)

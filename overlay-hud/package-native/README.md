@@ -26,6 +26,8 @@ This is the **Native edition**: the HUD is rendered through Unity, with its font
 
 By default, monsters are revealed **only after an encounter**. Undetected monsters remain placeholders, and receiving multiplayer data does not reveal their identities. The HUD hides while the map or quota counter is shown.
 
+The eye bar fills in blue while a monster notices you and glows red while it sees you or still tracks you during a chase. To hide it locally, set `ShowDetectionBar = false` in `[02 Detection]`.
+
 ### Customization
 
 Settings are grouped by purpose in `BepInEx/config/local.overlay.overlay_hud.cfg`: detection, general HUD options, layout, information, monsters, effects and individual upgrades.
@@ -75,6 +77,8 @@ For bug reports, include `BepInEx/LogOutput.log`, your config and a short descri
 - **Таймкоды сессии** — локальные текстовые записи начала уровней, карт и встреченных монстров.
 
 По умолчанию монстры раскрываются **только после встречи**. Необнаруженные виды остаются заглушками, а получение данных в мультиплеере не раскрывает их названия. HUD скрывается при просмотре карты и показе счётчика квоты.
+
+Полоска с глазом заполняется голубым, пока монстр замечает вас, и светится красным, пока он видит вас или продолжает отслеживать в погоне. Чтобы скрыть её у себя, установите `ShowDetectionBar = false` в секции `[02 Detection]`.
 
 ### Настройка
 

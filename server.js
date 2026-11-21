@@ -826,6 +826,8 @@ function updateMonsterStatuses(rawStatuses, replay = false) {
             ...statuses.get(sourceId),
             ...(rawStatus.unknown === true ? { unknown: true } : {}),
 
+            detection: rawStatus.alive ? (Number.isFinite(rawStatus.detection)
+                ? Math.max(0, Math.min(100, rawStatus.detection)) : statuses.get(sourceId)?.detection || 0) : 0,
             alive: rawStatus.alive,
             respawnRemaining: Number.isFinite(remaining) ? Math.max(0, remaining) : 0,
             respawnEndsAt: Number.isFinite(remaining) && remaining > 0 ? Date.now() + remaining * 1000 : null,
@@ -845,6 +847,7 @@ function updateMonsterStatuses(rawStatuses, replay = false) {
 
         const proximityStatuses = sourceIds.map((id) => proximityBySourceId.get(id)).filter(Boolean);
         const proximityPatch = {
+            detection: Math.max(0, ...sourceStatuses.map(status => status.detection || 0)),
             playerClose: proximityStatuses.some((status) => status.playerClose),
             playerVeryClose: proximityStatuses.some((status) => status.playerVeryClose)
         };

@@ -29,6 +29,7 @@ namespace OverlayHUD
         private void ResetRespawnNetwork()
         {
             ResetTeamEncounters();
+            foreach (var parent in new List<Component>(visionExpires.Keys)) SetVisionProgress(parent, 0);
             networkHealth.Clear();
             networkRespawns.Clear();
             respawnSession = Guid.NewGuid().ToString("N");
@@ -42,9 +43,10 @@ namespace OverlayHUD
             if (PhotonNetwork.InRoom)
             {
                 PhotonNetwork.LocalPlayer.SetCustomProperties(new Hashtable { { RespawnProtocol, null } });
-                PhotonNetwork.LocalPlayer.SetCustomProperties(new Hashtable { { HealthProtocol, null }, { TeamEncounterProtocol, null } });
+                PhotonNetwork.LocalPlayer.SetCustomProperties(new Hashtable { { HealthProtocol, null }, { VisionProtocol, null }, { TeamEncounterProtocol, null } });
             }
             ResetTeamEncounters();
+            foreach (var parent in new List<Component>(visionExpires.Keys)) SetVisionProgress(parent, 0);
             networkHealth.Clear();
             networkRespawns.Clear();
         }
@@ -71,6 +73,8 @@ namespace OverlayHUD
                 PhotonNetwork.LocalPlayer.SetCustomProperties(new Hashtable { { RespawnProtocol, respawnSession } });
             if (!Equals(PhotonNetwork.LocalPlayer.CustomProperties[HealthProtocol], respawnSession))
                 PhotonNetwork.LocalPlayer.SetCustomProperties(new Hashtable { { HealthProtocol, respawnSession } });
+            if (!Equals(PhotonNetwork.LocalPlayer.CustomProperties[VisionProtocol], respawnSession))
+                PhotonNetwork.LocalPlayer.SetCustomProperties(new Hashtable { { VisionProtocol, respawnSession } });
             TickTeamEncounters();
             if (!gameplayActive) return;
             if (!PhotonNetwork.IsMasterClient) return;
@@ -114,6 +118,7 @@ namespace OverlayHUD
         {
             ReceiveTeamEncounter(message);
             ReceiveHealthEvent(message);
+            ReceiveVisionProgress(message);
             if (message.Code != RespawnEventCode || !gameplayActive || !PhotonNetwork.InRoom
                 || PhotonNetwork.IsMasterClient || message.Sender != PhotonNetwork.MasterClient?.ActorNumber) return;
             if (!(message.CustomData is object[] packet) || packet.Length != 4

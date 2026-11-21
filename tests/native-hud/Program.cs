@@ -636,6 +636,19 @@ Check(incremental.GetDisplayMonsters(50).Single().Id == 1 && incremental.GetDisp
     && !incremental.GetDisplayMonsters(50).Single().Seen, "Level reset retained grouping history/reveal");
 Console.WriteLine("Native HUD grouping checks passed.");
 
+var sight = new NativeHudState();
+Roster(sight, "Gnomes", new[] { 1, 2, 3 });
+sight.Apply("monster-status", "{\"statuses\":[{\"id\":1,\"detection\":25},{\"id\":2,\"detection\":75}]}", 0);
+Check(sight.GetDisplayMonsters(0).Single().Detection == 0, "Unseen group exposed detection");
+sight.Apply("monster-seen", "{\"id\":1}", 1);
+Check(sight.GetDisplayMonsters(1).Single().Detection == 25, "Unseen group member contributed detection");
+sight.Apply("monster-seen", "{\"id\":2}", 2);
+Check(sight.GetDisplayMonsters(2).Single().Detection == 75, "Group should show highest detection");
+sight.Apply("monster-status", "{\"statuses\":[{\"id\":2,\"alive\":false}]}", 3);
+Check(sight.GetDisplayMonsters(3).Single().Detection == 25, "Dead member contributed detection");
+sight.Apply("monster-status", "{\"statuses\":[{\"id\":1,\"detection\":0}]}", 4);
+Check(sight.GetDisplayMonsters(4).Single().Detection == 0, "Lost sight retained detection");
+
 var proximity = new NativeHudState();
 proximity.Apply("monster-status", "{\"statuses\":[{\"id\":1,\"alive\":true,\"playerClose\":true,\"playerVeryClose\":true}]}", 0);
 Check(proximity.Monsters[1].PlayerClose && proximity.Monsters[1].PlayerVeryClose && !proximity.Monsters[1].Seen,

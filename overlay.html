@@ -946,7 +946,7 @@
                 img.alt = "Unknown Monster";
             }
             square.removeAttribute("title");
-            square.querySelectorAll(".monster-count, .strength-required, .monster-tooltip, .monster-health-bar").forEach((element) => element.remove());
+            square.querySelectorAll(".monster-count, .strength-required, .monster-tooltip, .monster-health-bar, .monster-vision-bar").forEach((element) => element.remove());
         }
 
         function getMonsterStrengthText(monster) {
@@ -974,7 +974,7 @@
 
             const health = Number(status?.health);
             const maxHealth = Number(status?.maxHealth);
-            const hasHealth = Number.isFinite(health) && Number.isFinite(maxHealth) && maxHealth > 0;
+            const hasHealth = status?.alive !== false && Number.isFinite(health) && Number.isFinite(maxHealth) && maxHealth > 0;
             bar.classList.toggle("is-hidden", !hasHealth);
             if (!hasHealth) return;
 
@@ -1220,6 +1220,19 @@
 
             updateMonsterTooltip(square, monster, status);
             updateMonsterHealthBar(square, status);
+            let vision = square.querySelector(".monster-vision-bar");
+            if (!vision) {
+                vision = document.createElement("div");
+                vision.className = "monster-vision-bar is-hidden";
+                vision.innerHTML = '<span></span><i></i>';
+                square.appendChild(vision);
+            }
+            const progress = status?.alive === false ? 0 : status?.detection || 0;
+            vision.classList.toggle("is-hidden", progress === 0);
+            if (progress > 0) {
+                vision.style.setProperty("--detection", progress / 100);
+                vision.classList.toggle("is-detected", progress === 100);
+            }
             updateMonsterDamageFeedback(square, status, monsterKey);
             updateMonsterCooldownFeedback(square, status, monsterKey);
 

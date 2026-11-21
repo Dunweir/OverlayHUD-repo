@@ -24,7 +24,7 @@ using UnityEngine.SceneManagement;
 
 namespace OverlayHUD
 {
-    [BepInPlugin("local.overlay.overlay_hud", "OverlayHUD", "26.11.6")]
+    [BepInPlugin("local.overlay.overlay_hud", "OverlayHUD", "26.11.7")]
     public sealed partial class Plugin : BaseUnityPlugin
     {
         private static Plugin instance;
@@ -258,6 +258,7 @@ namespace OverlayHUD
         private ConfigEntry<float> scanInterval;
         private ConfigEntry<float> statusInterval;
         private ConfigEntry<bool> requireLineOfSight;
+        private ConfigEntry<bool> showDetectionBar;
         private ConfigEntry<bool> teamMonsterDetection;
         private ConfigEntry<bool> revealUnknownMonsters;
         private ConfigEntry<bool> preferPlayerVisionDetection;
@@ -278,6 +279,7 @@ namespace OverlayHUD
                 ResolveGameType(typeName);
             KeepPluginObjectAlive();
             requireLineOfSight = BindNativeSetting("02 Detection", "RequireLineOfSight", true, "Reveal monsters only after an encounter. Disable to reveal the complete level roster as soon as it is known.", 100);
+            showDetectionBar = BindNativeToggle("02 Detection", "ShowDetectionBar", true, "Show the personal monster sight bar in either HUD. Red means the monster sees you.", 96);
             teamMonsterDetection = BindNativeSetting("02 Detection", "TeamMonsterDetection", true, "Share monster encounters with teammates who also have team detection enabled.", 95);
             revealUnknownMonsters = BindNativeSetting("02 Detection", "RevealUnknownMonsters", false, "Reveal monsters using the four-pointed star placeholder icon as soon as they are discovered, regardless of RequireLineOfSight. Monsters with their own icons keep their usual detection rules.", 90);
             preferPlayerVisionDetection = BindNativeSetting("02 Detection", "PreferPlayerVisionDetection", true, "When enabled, show monsters when the player sees them. When disabled, use enemy-vision plus player-very-close detection.", 80);
@@ -654,6 +656,7 @@ namespace OverlayHUD
                     Logger.LogInfo("Patched PhysGrabObject.GrabPlayerAddRPC for last-grabber tracking.");
                 }
 
+                PatchVisionProgress(harmony);
                 if (enemyVisionTrigger != null)
                 {
                     harmony.Patch(enemyVisionTrigger, postfix: enemyVisionTriggerPostfix);
@@ -714,6 +717,7 @@ namespace OverlayHUD
             TickNativeHud();
             TickRespawnNetwork();
             if (!gameplayActive) return;
+            ExpireVisionProgress();
             TickScan();
         }
 
@@ -1256,7 +1260,7 @@ namespace OverlayHUD
             statusFallbackCursor = 0;
             rosterPublished = false;
             enemyRosterDirty = true;
-            scanPausedUntil = Time.realtimeSinceStartup + 2f;
+            scanPausedUntil = Time.realtimeSinceStartup + (requireLineOfSight.Value ? 2f : 0f);
             nextScanAt = scanPausedUntil;
             nextStatusSyncAt = scanPausedUntil;
             nextUpgradeSyncAt = scanPausedUntil;
@@ -1322,7 +1326,7 @@ namespace OverlayHUD
             // Roster construction is already a sizeable main-thread job. Spread the
             // remaining initial snapshots so level activation never performs them all
             // in the frame in which the HUD first becomes visible.
-            yield return null;
+            if (requireLineOfSight.Value) yield return null;
             if (!gameplayActive || !rosterPublished) yield break;
             RevealAllKnownEnemies(enemies);
 
@@ -1387,7 +1391,7 @@ namespace OverlayHUD
 
             string nextFingerprint = fingerprint.ToString();
             bool firstPublication = !rosterPublished;
-            if (!rosterPublished)
+            if (firstPublication && requireLineOfSight.Value)
             {
                 if (nextFingerprint != pendingRosterFingerprint)
                 {
@@ -1398,8 +1402,8 @@ namespace OverlayHUD
 
                 rosterStableScans++;
                 if (rosterStableScans < 2) return false;
-                rosterPublished = true;
             }
+            rosterPublished = true;
 
             // The first empty roster has the same fingerprint as the reset state.
             if (!firstPublication && nextFingerprint == lastRosterFingerprint) return true;
@@ -1474,6 +1478,7 @@ namespace OverlayHUD
                 Component statusEnemyParent = GetEnemyParent(candidate);
                 bool playerClose = IsEnemyParentPlayerClose(statusEnemyParent);
                 bool playerVeryClose = IsEnemyParentPlayerVeryClose(statusEnemyParent);
+                int detection = alive && IsEnemySent(instanceId) ? GetVisionProgress(statusEnemyParent) : 0;
 
                 if (!lastAliveBySourceId.TryGetValue(instanceId, out bool previousAlive) || previousAlive != alive)
                 {
@@ -1500,7 +1505,7 @@ namespace OverlayHUD
                 }
                 fingerprint.Append(instanceId).Append(':').Append(alive ? '1' : '0').Append(':').Append(remainingText)
                     .Append(':').Append(healthText).Append('/').Append(maxHealthText)
-                    .Append(':').Append(playerClose ? '1' : '0').Append(':').Append(playerVeryClose ? '1' : '0').Append(';');
+                    .Append(':').Append(detection).Append(':').Append(playerClose ? '1' : '0').Append(':').Append(playerVeryClose ? '1' : '0').Append(';');
 
                 // Tier and strength are immutable for a spawned enemy and were already sent
                 // with the roster. Avoid their reflection-heavy lookup in the periodic fallback.
@@ -1516,7 +1521,7 @@ namespace OverlayHUD
                     .Append(",\"alive\":").Append(alive ? "true" : "false")
                     .Append(",\"respawnRemaining\":").Append(remainingText)
                     .Append(",\"playerClose\":").Append(playerClose ? "true" : "false")
-                    .Append(",\"playerVeryClose\":").Append(playerVeryClose ? "true" : "false");
+                    .Append(",\"detection\":").Append(detection).Append(",\"playerVeryClose\":").Append(playerVeryClose ? "true" : "false");
                 if (hasHealth)
                 {
                     json.Append(",\"health\":").Append(healthText.Length > 0 ? healthText : "0");
@@ -1685,6 +1690,7 @@ namespace OverlayHUD
             bool hasHealth = shouldIncludeHealth && TryGetEnemyHealth(candidate, out health, out maxHealth);
             bool playerClose = IsEnemyParentPlayerClose(enemyParent);
             bool playerVeryClose = IsEnemyParentPlayerVeryClose(enemyParent);
+            int detection = alive && IsEnemySent(instanceId) ? GetVisionProgress(enemyParent) : 0;
 
             float roundedRemaining = alive ? 0f : (float)Math.Ceiling(Math.Max(0f, remaining) * 10f) / 10f;
             string remainingText = roundedRemaining.ToString("0.0", CultureInfo.InvariantCulture);
@@ -1693,7 +1699,7 @@ namespace OverlayHUD
             string tierMetadata = ",\"tier\":" + GetEnemyTierJson(candidate);
             string monsterMetadata = GetMonsterMetadata(candidate);
             string fingerprint = instanceId + ":" + (alive ? "1" : "0") + ":" + remainingText + ":" + healthText + "/" + maxHealthText
-                + ":" + (playerClose ? "1" : "0") + ":" + (playerVeryClose ? "1" : "0") + tierMetadata + monsterMetadata;
+                + ":" + detection + ":" + (playerClose ? "1" : "0") + ":" + (playerVeryClose ? "1" : "0") + tierMetadata + monsterMetadata;
             if (lastImmediateStatusBySourceId.TryGetValue(instanceId, out string previousFingerprint)
                 && previousFingerprint == fingerprint)
             {
@@ -1706,7 +1712,7 @@ namespace OverlayHUD
                 .Append(",\"alive\":").Append(alive ? "true" : "false")
                 .Append(",\"respawnRemaining\":").Append(remainingText)
                 .Append(",\"playerClose\":").Append(playerClose ? "true" : "false")
-                .Append(",\"playerVeryClose\":").Append(playerVeryClose ? "true" : "false");
+                .Append(",\"detection\":").Append(detection).Append(",\"playerVeryClose\":").Append(playerVeryClose ? "true" : "false");
             if (hasHealth)
             {
                 json.Append(",\"health\":").Append(healthText.Length > 0 ? healthText : "0");

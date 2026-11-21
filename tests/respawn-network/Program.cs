@@ -76,6 +76,9 @@ namespace OverlayHUD
             teamReveals++;
             return true;
         }
+        private readonly Dictionary<Component, float> visionExpires = new Dictionary<Component, float>();
+        private int detection;
+        private void SetVisionProgress(Component parent, int percent) { detection = percent; }
         private bool gameplayActive = true;
         private int updated;
         private readonly List<float> publishedHealth = new List<float>();
@@ -98,6 +101,17 @@ namespace OverlayHUD
             PhotonView.Views[7] = parent.View;
             plugin.TickRespawnNetwork();
             Check(Equals(PhotonNetwork.LocalPlayer.CustomProperties[RespawnProtocol], plugin.respawnSession), "Capability advertised");
+            object[] VisionPacket(int percent) => new object[] { VisionProtocol, plugin.respawnSession, 7, percent, PhotonNetwork.Time };
+            Receive(VisionPacket(50));
+            Receive(VisionPacket(101));
+            Receive(VisionPacket(75), 2);
+            Check(plugin.detection == 50, "Accept only valid personal vision from master");
+            Receive(VisionPacket(100));
+            Check(plugin.detection == 99, "Legacy full progress is not confirmed sight");
+            Receive(new object[] { VisionProtocol, plugin.respawnSession, 7, 100, PhotonNetwork.Time, true });
+            Check(plugin.detection == 100, "Host confirmed sight stays red");
+            Receive(VisionPacket(0));
+            Check(plugin.detection == 0, "Clear detection on lost sight");
             object[] Packet(double at, float remaining) => new object[] { RespawnProtocol, plugin.respawnSession, at, new object[] { new object[] { 7, false, remaining } } };
             void Receive(object packet, int sender = 1) => plugin.ReceiveRespawnEvent(new EventData { Code = RespawnEventCode, Sender = sender, CustomData = packet });
             Receive(Packet(99, 30));

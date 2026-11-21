@@ -16,6 +16,7 @@ namespace OverlayHUD
             internal int? Tier;
             internal string Name;
             internal bool Seen, Alive = true;
+            internal int Detection;
             internal bool PlayerClose, PlayerVeryClose;
             internal float? Health, MaxHealth;
             internal double RespawnAt;
@@ -141,6 +142,8 @@ namespace OverlayHUD
                 monster.PlayerClose = (bool)data["playerClose"];
             if (data["playerVeryClose"]?.Type == JTokenType.Boolean)
                 monster.PlayerVeryClose = (bool)data["playerVeryClose"];
+            if (data["detection"] != null) monster.Detection = (int)Math.Min(100, Math.Max(0, FiniteNumber(data["detection"]) ?? 0));
+            if (!monster.Alive) monster.Detection = 0;
             if (!monster.Alive) monster.PlayerClose = monster.PlayerVeryClose = false;
             monster.Health = MergeHealth(monster.Health, data["health"]);
             monster.MaxHealth = MergeHealth(monster.MaxHealth, data["maxHealth"]);
@@ -240,6 +243,7 @@ namespace OverlayHUD
                     display.Alive |= member.Alive;
                     if (member.Seen && member.Alive)
                     {
+                        display.Detection = Math.Max(display.Detection, member.Detection);
                         display.PlayerClose |= member.PlayerClose;
                         display.PlayerVeryClose |= member.PlayerVeryClose;
                     }
@@ -271,6 +275,7 @@ namespace OverlayHUD
                 {
                     Id = member.Id, Name = member.Name, Tier = member.Tier, Unknown = member.Unknown,
                     Seen = member.Seen, Alive = member.Alive, Health = member.Health, MaxHealth = member.MaxHealth,
+                    Detection = member.Seen && member.Alive ? member.Detection : 0,
                     PlayerClose = member.Seen && member.Alive && member.PlayerClose,
                     PlayerVeryClose = member.Seen && member.Alive && member.PlayerVeryClose,
                     RespawnAt = !member.Alive && member.RespawnAt > now ? member.RespawnAt : 0,

@@ -948,7 +948,8 @@ body {
     transform: translateY(-3px) scale(0.9);
 }
 
-.monster-health-bar {
+.monster-health-bar,
+.monster-vision-bar {
     --monster-health-ratio: 100%;
     position: absolute;
     right: auto;
@@ -969,6 +970,52 @@ body {
     transition: opacity 0.18s ease, transform 0.18s ease;
 }
 
+.monster-vision-bar {
+    bottom: calc(-16px - max(10px, var(--square-size) * 0.145));
+    color: #6ad3ff;
+    transition: color .16s ease, opacity .2s ease, transform .2s ease;
+}
+.monster-vision-bar { overflow: visible; }
+.monster-vision-bar.is-detected {
+    color: #ff3f35;
+    box-shadow: 0 0 7px 2px rgba(255, 46, 31, .72);
+    animation: sight-glow 1.3s ease-in-out infinite alternate;
+}
+@keyframes sight-glow {
+    from { box-shadow: 0 0 5px 1px rgba(255, 46, 31, .52); }
+    to { box-shadow: 0 0 9px 3px rgba(255, 46, 31, .92); }
+}
+@media (prefers-reduced-motion: reduce) {
+    .monster-vision-bar.is-detected { animation: none; }
+}
+.monster-vision-bar i {
+    position: absolute;
+    left: -4px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 20px;
+    height: 15px;
+    border: 2px solid #0d1318;
+    border-radius: 50%;
+    background: radial-gradient(circle, #07141c 3px, white 3.5px);
+    box-shadow: 0 0 1px #07141c;
+}
+.monster-vision-bar span {
+    display: block;
+    width: 100%;
+    height: 100%;
+    border-radius: inherit;
+    background: currentColor;
+    transform-origin: left;
+    transform: scaleX(var(--detection, 0));
+    transition: transform .25s linear;
+}
+.hide-monster-health-bars .monster-vision-bar { bottom: -14px; }
+
+@starting-style {
+    .monster-vision-bar { opacity: 0; transform: translateX(-50%) translateY(-4px) scaleY(.55); }
+}
+.monster-vision-bar.is-hidden,
 .monster-health-bar.is-hidden {
     opacity: 0;
     transform: translateX(-50%) translateY(-4px) scaleY(0.55);
@@ -1286,6 +1333,8 @@ body {
     .monsters-squares,
     .monster-health-bar,
     .monster-health-fill,
+    .monster-vision-bar,
+    .monster-vision-bar span,
     .strength-required,
     .monster-cooldown::before,
     .monster-cooldown-time,
