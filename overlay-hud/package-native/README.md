@@ -1,10 +1,10 @@
 # OverlayHUD — Native
 
-**An in-game HUD for R.E.P.O. / Информационный HUD внутри R.E.P.O.**
+**Monster and loot tracker for R.E.P.O. / Трекер монстров и ценностей для R.E.P.O.**
 
-**AI disclosure:** OverlayHUD was created entirely using Codex AI. Development and maintenance are AI-assisted.
+AI tools including Claude and GPT were used to create OverlayHUD.
 
-**Использование ИИ:** OverlayHUD целиком создан с использованием Codex AI. Разработка и поддержка ведутся с помощью ИИ.
+При создании OverlayHUD использовались ИИ-инструменты Claude и GPT.
 
 [English](#english) · [Русский](#русский)
 
@@ -13,6 +13,28 @@
 Keep track of your run without leaving the game. OverlayHUD displays encountered monsters, player upgrades and valuable statistics directly inside R.E.P.O., with a customizable layout and optional visual effects.
 
 This is the **Native edition**: the HUD is rendered through Unity, with its fonts and icons bundled into the plugin. No separate application or window is required.
+
+### Encounters and damage
+
+Watch the rightmost monster take a 25 HP hit and start its respawn countdown. Two unknown tiles then reveal their monsters.
+
+![Monster encounters, damage and respawn](https://raw.githubusercontent.com/Dunweir/OverlayHUD-repo/master/docs/images/encounter-damage.webp)
+
+### When a monster spots you
+
+Look under the third tile. The blue eye bar fills as the monster notices you, then glows red when it spots you.
+
+![Personal detection bar](https://raw.githubusercontent.com/Dunweir/OverlayHUD-repo/master/docs/images/monster-sight.webp)
+
+### Native game UI effects
+
+**UseGameUIEffects on** · Game bloom and colour fringing
+
+![Game UI effects on](https://raw.githubusercontent.com/Dunweir/OverlayHUD-repo/master/docs/images/ui-effects-on.png)
+
+**UseGameUIEffects off** · Sharper text and icons
+
+![Game UI effects off](https://raw.githubusercontent.com/Dunweir/OverlayHUD-repo/master/docs/images/ui-effects-off.png)
 
 ### Features
 

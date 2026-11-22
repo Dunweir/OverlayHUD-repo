@@ -2,8 +2,8 @@
   "name": "OverlayHUD",
   "author": "EgorSalad",
   "version_number": "26.11.7",
-  "website_url": "https://github.com/Dunweir/overlay_repo",
-  "description": "Native + Electron HUD for R.E.P.O. Electron by default; optional in-game Unity HUD. Monsters, health, respawn timers, upgrades, level time and values.",
+  "website_url": "https://github.com/Dunweir/OverlayHUD-repo",
+  "description": "Monster and loot tracker for R.E.P.O. Track encounters, detection, HP, damage, respawn timers, upgrades and lost valuables. Includes in-game and windowed HUDs.",
   "dependencies": [
     "BepInEx-BepInExPack-5.4.2305"
   ]

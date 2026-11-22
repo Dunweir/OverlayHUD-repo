@@ -105,7 +105,7 @@ Before installing the update, close the game and any running OverlayHUD Electron
 
 ### Package contract
 
-`EgorSalad-OverlayHUD-26.11.7-Full.zip` has exactly seven root entries:
+`EgorSalad-OverlayHUD-26.11.7-Full.zip` has exactly eight root entries:
 
 ```text
 icon.png
@@ -113,10 +113,11 @@ manifest.json
 OverlayHUD.dll
 OverlayHUD_app.zip
 README.md
+CHANGELOG.md
 LICENSE
 THIRD_PARTY_NOTICES.md
 ```
 
-`EgorSalad-OverlayHUD-26.11.7-Native.zip` has exactly six root entries: the same list without `OverlayHUD_app.zip`, using the separately compiled Native DLL and `package-native/` README, manifest and notices. Native notices include the complete font license without desktop runtime references. Full templates come from `package-flat/`; the icon and repository MIT license are shared. No directory entries or leading `./` records are added.
+`EgorSalad-OverlayHUD-26.11.7-Native.zip` has exactly seven root entries: the same list without `OverlayHUD_app.zip`, using the separately compiled Native DLL and `package-native/` README, manifest and notices. Native notices include the complete font license without desktop runtime references. Full templates come from `package-flat/`; the icon and repository MIT license are shared. No directory entries or leading `./` records are added.
 
 A normal development build remains `dotnet build overlay-hud/OverlayHUD.csproj -c Release` (Full). For releases use the packaging script rather than manually copying a potentially stale DLL between layouts.

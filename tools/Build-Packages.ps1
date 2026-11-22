@@ -209,11 +209,11 @@ finally {
 }
 [void](Get-Command dotnet -ErrorAction Stop)
 
-$commonNames = @('icon.png', 'manifest.json', 'OverlayHUD.dll', 'README.md', 'LICENSE', 'THIRD_PARTY_NOTICES.md')
+$commonNames = @('icon.png', 'manifest.json', 'OverlayHUD.dll', 'README.md', 'CHANGELOG.md', 'LICENSE', 'THIRD_PARTY_NOTICES.md')
 $variants = @(
     [pscustomobject]@{
         Name = 'Full'; NativeOnly = 'false'; Template = $fullTemplate
-        Entries = @('icon.png', 'manifest.json', 'OverlayHUD.dll', 'OverlayHUD_app.zip', 'README.md', 'LICENSE', 'THIRD_PARTY_NOTICES.md')
+        Entries = @('icon.png', 'manifest.json', 'OverlayHUD.dll', 'OverlayHUD_app.zip', 'README.md', 'CHANGELOG.md', 'LICENSE', 'THIRD_PARTY_NOTICES.md')
         Output = $fullOutput
     },
     [pscustomobject]@{
@@ -248,6 +248,7 @@ foreach ($variant in $variants) {
     Assert-File $dll
     Copy-Item -LiteralPath $dll -Destination (Join-Path $stage 'OverlayHUD.dll')
     Copy-Item -LiteralPath (Join-Path $fullTemplate 'icon.png') -Destination (Join-Path $stage 'icon.png')
+    Copy-Item -LiteralPath (Join-Path $repoRoot 'CHANGELOG.md') -Destination (Join-Path $stage 'CHANGELOG.md')
     Copy-Item -LiteralPath (Join-Path $repoRoot 'LICENSE') -Destination (Join-Path $stage 'LICENSE')
     foreach ($name in @('README.md', 'manifest.json', 'THIRD_PARTY_NOTICES.md')) {
         Copy-Item -LiteralPath (Join-Path $variant.Template $name) -Destination (Join-Path $stage $name)

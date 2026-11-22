@@ -303,7 +303,7 @@ test('optional ZIPs contain distinct DLLs, correct markers and a current desktop
   const manifest = JSON.parse(read('overlay-hud/package-flat/manifest.json'));
   const release = read('overlay-hud/OverlayHUD.csproj').match(/<Version>([^<]+)<\/Version>/)[1];
   assert.equal(release.split('-')[0], manifest.version_number);
-  const common = ['icon.png', 'manifest.json', 'OverlayHUD.dll', 'README.md', 'LICENSE', 'THIRD_PARTY_NOTICES.md'];
+  const common = ['icon.png', 'manifest.json', 'OverlayHUD.dll', 'README.md', 'CHANGELOG.md', 'LICENSE', 'THIRD_PARTY_NOTICES.md'];
   const artifacts = {};
   for (const name of ['Full', 'Native']) {
     const archivePath = path.join(root, `EgorSalad-OverlayHUD-${release}-${name}.zip`);

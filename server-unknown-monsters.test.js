@@ -4,7 +4,7 @@ const fs = require('node:fs');
 const vm = require('node:vm');
 const http = require('node:http');
 
-async function fixture(t) {
+async function fixture(t, { saveTimestamps = false } = {}) {
     const writes = [];
     const context = vm.createContext({
         require: (name) => name === 'fs' ? {
@@ -33,6 +33,7 @@ async function fixture(t) {
             req.end(payload === undefined ? undefined : JSON.stringify(payload));
         });
     }
+    if (saveTimestamps) await request('settings', { settings: { saveTimestampsEnabled: true } });
     await request('level', { level: 1, levelName: 'Modded Museum Annex / 地下' });
     return { request, writes, state: async () => (await request('state')).state };
 }
@@ -259,7 +260,7 @@ test('early status metadata survives unrelated roster and partial updates', asyn
 });
 
 test('known monsters use game strength and retain image, localization and partial HP', async (t) => {
-    const { request, state, writes } = await fixture(t);
+    const { request, state, writes } = await fixture(t, { saveTimestamps: true });
     await request('roster', { monsters: [{ id: 8, name: 'Animal', strengthForceMax: 6, strength: 10 }] });
     await request('monster-seen', { id: 8, name: 'Animal' });
     await request('monster-status', { statuses: [{ id: 8, alive: true, health: 50, maxHealth: 100 }] });
