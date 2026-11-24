@@ -16,13 +16,15 @@ namespace OverlayHUD
         private static readonly HashSet<int> valuablesTransferredToBox = new HashSet<int>();
         private static readonly HashSet<int> extractedValuableBoxes = new HashSet<int>();
         private static readonly HashSet<int> destroyedValuableBoxes = new HashSet<int>();
+        private static readonly HashSet<Component> valuableBoxes = new HashSet<Component>();
 
         private void PatchValuableBoxEvents(Harmony harmony)
         {
             MethodInfo impact = AccessTools.Method("PhysGrabObjectImpactDetector:DestroyObjectRPC");
             if (impact != null)
                 harmony.Patch(impact, prefix: new HarmonyMethod(typeof(Plugin), nameof(ValuableBoxImpactPrefix)));
-            Patch("OnDestroy", nameof(ValuableBoxExplodePrefix), true);
+            Patch("Start", nameof(ValuableBoxStartedPostfix), false);
+            Patch("OnDestroy", nameof(ValuableBoxDestroyedPrefix), true);
             Patch("UpdateValueRPC", nameof(ValuableBoxValuePostfix), false);
             Patch("OnExtracted", nameof(ValuableBoxExtractedPrefix), true);
             Patch("ExplodeValuableBox", nameof(ValuableBoxExplodePrefix), true);
@@ -40,6 +42,17 @@ namespace OverlayHUD
         private static void ValuableBoxValuePostfix()
         {
             if (IsRunLevel()) instance?.ScheduleMapValueRefresh("valuable box value changed");
+        }
+
+        private static void ValuableBoxStartedPostfix(Component __instance)
+        {
+            valuableBoxes.Add(__instance);
+        }
+
+        private static void ValuableBoxDestroyedPrefix(Component __instance)
+        {
+            valuableBoxes.Remove(__instance);
+            ValuableBoxExplodePrefix(__instance);
         }
 
         private static void ValuableBoxExtractedPrefix(object __instance)
@@ -143,30 +156,32 @@ namespace OverlayHUD
 
         private static float CalculateMapValue()
         {
-            Type valuableType = ResolveGameType("ValuableObject");
-            if (valuableType == null) return 0f;
-
             long startedAt = Stopwatch.GetTimestamp();
             float total = 0f;
-            UnityEngine.Object[] valuables = UnityEngine.Object.FindObjectsOfType(valuableType);
-            long discoveredAt = Stopwatch.GetTimestamp();
-            for (int index = 0; index < valuables.Length; index++)
+            object director = ReadMember(ResolveGameType("ValuableDirector"), "instance");
+            IList valuables = ReadMember(director, "valuableList") as IList;
+            if (valuables == null)
             {
-                // The search already returns ValuableObject components.
-                if (!IsValuableTransferredToBox(valuables[index]))
-                    total += ReadFloatMember(valuables[index], "dollarValueCurrent");
+                Type valuableType = ResolveGameType("ValuableObject");
+                if (valuableType != null)
+                    valuables = UnityEngine.Object.FindObjectsByType(valuableType, FindObjectsSortMode.None);
             }
-            Type boxType = ResolveGameType("ItemValuableBox");
-            if (boxType != null)
-                foreach (UnityEngine.Object box in UnityEngine.Object.FindObjectsOfType(boxType))
+            int count = valuables?.Count ?? 0;
+            for (int index = 0; index < count; index++)
+            {
+                var valuable = valuables[index] as Component;
+                if (valuable != null && valuable.gameObject.activeInHierarchy && !IsValuableTransferredToBox(valuable))
+                    total += ReadFloatMember(valuable, "dollarValueCurrent");
+            }
+            foreach (Component box in valuableBoxes)
+                if (box != null && box.gameObject.activeInHierarchy)
                     total += ReadValuableBoxValue(box);
             double elapsedMs = (Stopwatch.GetTimestamp() - startedAt) * 1000.0 / Stopwatch.Frequency;
             if (elapsedMs >= 8.0 && instance != null)
             {
-                double searchMs = (discoveredAt - startedAt) * 1000.0 / Stopwatch.Frequency;
                 instance.Logger.LogWarning("[Performance] Map value scan: "
-                    + elapsedMs.ToString("0.0", CultureInfo.InvariantCulture) + " ms, search="
-                    + searchMs.ToString("0.0", CultureInfo.InvariantCulture) + " ms, valuables=" + valuables.Length + ".");
+                    + elapsedMs.ToString("0.0", CultureInfo.InvariantCulture) + " ms, valuables=" + count
+                    + ", boxes=" + valuableBoxes.Count + ".");
             }
             return Math.Max(0f, total);
         }

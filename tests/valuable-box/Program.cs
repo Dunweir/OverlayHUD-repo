@@ -17,10 +17,10 @@ namespace OverlayHUD
         readonly Setting debugLogging = new();
         readonly Log Logger = new();
         static bool IsRunLevel() => runLevel;
-        static Type ResolveGameType(string name) => name == "ValuableObject" ? typeof(ValuableObject) : typeof(ItemValuableBox);
+        static Type ResolveGameType(string name) => name == "ValuableDirector" ? typeof(ValuableDirector) : typeof(ValuableObject);
         static Component GetValuableComponent(object o) => (o as Component)?.GetComponent("ValuableObject");
         static int GetValuableKey(object o) => ((Component)o).GetInstanceID();
-        static object ReadMember(object o, string name) => o?.GetType().GetField(name)?.GetValue(o);
+        static object ReadMember(object o, string name) => (o as Type ?? o?.GetType())?.GetField(name)?.GetValue(o);
         static float ReadFloatMember(object o, string name) => Convert.ToSingle(ReadMember(o, name) ?? 0f);
         static float ReadValuableCurrentValue(object o) => ReadFloatMember(o, "dollarValueCurrent");
         static float ReadValuableOriginalValue(object o) => ReadFloatMember(o, "dollarValueOriginal");
@@ -42,8 +42,9 @@ namespace OverlayHUD
             var phys = new PhysGrabObject();
             phys.Components["ValuableObject"] = valuable;
             var box = new ItemValuableBox();
-            UnityEngine.Object.World.Add(valuable);
-            UnityEngine.Object.World.Add(box);
+            ValuableDirector.instance.valuableList.Add(valuable);
+            ValuableBoxStartedPostfix(box);
+            ValuableBoxStartedPostfix(box);
             Check(CalculateMapValue() == 1750, "Loose value missing");
 
             // StartAbsorbLocal runs on host and clients before the host removes the original.
@@ -55,11 +56,14 @@ namespace OverlayHUD
             Check(instance.lostValue == 0 && instance.alerts == 0, "Transfer counted as destruction");
             Check(instance.mapValue == 10000, "Transfer reduced remaining value");
             Check(CalculateMapValue() == 1750, "Animation double-counted the original or lost pending value");
-            UnityEngine.Object.World.Remove(valuable);
+            ValuableDirector.instance.valuableList.Remove(valuable);
             Check(CalculateMapValue() == 1750, "Pending absorption not counted after original removal");
             box.activeAbsorptions.Clear();
             box.currentValue = 1750;
             Check(CalculateMapValue() == 1750, "Stored value lost after animation");
+            box.gameObject.activeInHierarchy = false;
+            Check(CalculateMapValue() == 0, "Inactive box counted");
+            box.gameObject.activeInHierarchy = true;
 
             // Ordinary damage and extraction must keep their original accounting behavior.
             var broken = new ValuableObject { dollarValueCurrent = 800, dollarValueOriginal = 1000, inHaul = true };
@@ -96,6 +100,8 @@ namespace OverlayHUD
             ValuableBoxExplodePrefix(extracted);
             Check(instance.lostValue == 3530 && instance.mapValue == before - 980,
                 "Falling refilled box must lose stored and pending cargo exactly once");
+            ValuableBoxDestroyedPrefix(box);
+            Check(CalculateMapValue() == 0, "Destroyed box retained");
 
             runLevel = false;
             var outside = new ValuableObject();
@@ -112,6 +118,11 @@ namespace OverlayHUD
         public bool inHaul;
         public ValuableObject() { Components["ValuableObject"] = this; }
     }
+    class ValuableDirector
+    {
+        public static ValuableDirector instance = new();
+        public List<ValuableObject> valuableList = new();
+    }
     class PhysGrabObject : Component { public bool dead; }
     class Absorption { public float valueToAdd; }
     class ItemValuableBox : Component
@@ -127,12 +138,14 @@ namespace UnityEngine
     {
         static int nextId;
         readonly int id = ++nextId;
-        public static List<Object> World = new();
         public int GetInstanceID() => id;
-        public static Object[] FindObjectsOfType(Type type) => World.Where(type.IsInstanceOfType).ToArray();
+        public static Object[] FindObjectsByType(Type type, FindObjectsSortMode mode) => throw new Exception("Unexpected scene scan");
     }
+    public enum FindObjectsSortMode { None }
+    public class GameObject { public bool activeInHierarchy = true; }
     public class Component : Object
     {
+        public GameObject gameObject = new();
         public Dictionary<string, Component> Components = new();
         public Component GetComponent(string name) => Components.GetValueOrDefault(name);
     }

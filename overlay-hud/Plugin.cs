@@ -123,7 +123,7 @@ namespace OverlayHUD
         private static class PlayerUpgradeTypes
         {
             internal static readonly Type StatsManager = ResolveGameType("StatsManager");
-            internal static readonly Type PlayerController = ResolveGameType("PlayerController");
+            internal static readonly Type PlayerAvatar = ResolveGameType("PlayerAvatar");
         }
 
         private static readonly Dictionary<string, string> UpgradeStateKeyByPunMethod = new Dictionary<string, string>
@@ -218,6 +218,7 @@ namespace OverlayHUD
         private string lastGameUiFingerprint;
 
         private float nextGameUiVisibilityAt;
+        private bool inPauseMenu;
         private Coroutine pendingGameplayActivation;
         private Coroutine pendingUpgradeSnapshot;
 
@@ -233,6 +234,10 @@ namespace OverlayHUD
 
             internal static readonly FieldInfo MapInstance = Find(MapType, "instance");
             internal static readonly FieldInfo MapVisual = Find(MapType, "VisualTransform");
+            internal static readonly FieldInfo EscapePageInstance = Find(ResolveGameType("MenuPageEsc"), "instance");
+            private static readonly Type MenuType = ResolveGameType("MenuManager");
+            internal static readonly FieldInfo MenuInstance = Find(MenuType, "instance");
+            internal static readonly FieldInfo CurrentMenuPage = Find(MenuType, "currentMenuPage");
             internal static readonly FieldInfo CurrencyInstance = Find(CurrencyType, "instance");
             internal static readonly FieldInfo UiText = Find(SemiUiType, "uiText");
             internal static readonly FieldInfo ShowTimer = Find(SemiUiType, "showTimer");
@@ -260,6 +265,7 @@ namespace OverlayHUD
         private ConfigEntry<float> statusInterval;
         private ConfigEntry<bool> revealMonstersOnEncounter;
         private ConfigEntry<bool> showDetectionBar;
+        private ConfigEntry<bool> hideInPauseMenu;
         private ConfigEntry<bool> teamMonsterDetection;
         private ConfigEntry<bool> revealUnknownMonsters;
         private ConfigEntry<bool> preferPlayerVisionDetection;
@@ -329,6 +335,7 @@ namespace OverlayHUD
             foreach (string typeName in new[] { "StatsManager", "PlayerController", "MapToolController", "CurrencyUI", "SemiUI", "GameDirector", "LoadingUI", "RunManager", "LevelGenerator", "SemiFunc", "ValuableObject", "RoundDirector", "PlayerAvatar" })
                 ResolveGameType(typeName);
             KeepPluginObjectAlive();
+            hideInPauseMenu = BindNativeToggle("Appearance", "HideInPauseMenu", false, "Hide the HUD while your pause menu or one of its submenus is open.", 80);
             revealMonstersOnEncounter = BindNativeSetting("Detection", "RevealMonstersOnEncounter", true, "Reveal monsters only after an encounter. Disable to reveal the complete level roster as soon as it is known.", 100);
             showDetectionBar = BindNativeToggle("Detection", "ShowDetectionBar", true, "Show the personal monster sight bar in either HUD. Red means the monster sees you.", 96);
             teamMonsterDetection = BindNativeSetting("Detection", "TeamMonsterDetection", true, "Share monster encounters with teammates who also have team detection enabled.", 95);
@@ -735,6 +742,9 @@ namespace OverlayHUD
                     patchedUpgradeTypes++;
                 }
                 Logger.LogInfo("Patched " + patchedUpgradeTypes + " PunManager upgrade methods for event-driven sync.");
+                MethodInfo receiveStats = AccessTools.Method("PunManager:ReceiveSyncData");
+                if (receiveStats != null)
+                    harmony.Patch(receiveStats, postfix: new HarmonyMethod(typeof(Plugin), nameof(PlayerStatsReceivedPostfix)));
 
             }
             catch (Exception error)
@@ -799,12 +809,20 @@ namespace OverlayHUD
             instance?.HandleLevelChanged(__instance);
         }
 
-        private static void PlayerUpgradeAppliedPostfix(MethodBase __originalMethod, string _steamID, int __result)
+        private static void PlayerStatsReceivedPostfix(bool finalChunk)
         {
+            if (finalChunk && instance != null && instance.gameplayActive) instance.QueueAllPlayerUpgrades();
+        }
+
+        private static void PlayerUpgradeAppliedPostfix(MethodBase __originalMethod, string _steamID)
+        {
+            if (instance == null || !instance.gameplayActive) return;
             string methodName = __originalMethod?.Name;
             if (methodName != null && UpgradeStateKeyByPunMethod.TryGetValue(methodName, out string stateKey))
             {
-                instance?.SyncPlayerUpgradeValueIfLocal(stateKey, _steamID, __result);
+                string localId = ResolveLocalPlayerSteamId();
+                // With no local avatar yet, defer a local table read. Never use the event owner's value.
+                if (string.IsNullOrEmpty(localId) || localId == _steamID) instance.pendingUpgradeKeys.Add(stateKey);
             }
         }
 
@@ -851,7 +869,7 @@ namespace OverlayHUD
 
         private static void ExtractionCompletedPostfix()
         {
-            instance?.RefreshMapValue("extraction completed");
+            instance?.ScheduleMapValueRefresh("extraction completed");
         }
 
         private static void ValuableDollarValueSetRpcPostfix(object __instance, float value)
@@ -1108,6 +1126,7 @@ namespace OverlayHUD
             lastMapValueFingerprint = "";
             mapValueInitial = mapValue;
             gameplayActive = true;
+            inPauseMenu = false;
             lastGameUiFingerprint = null;
             SyncGameUiVisibilityIfChanged();
             ScheduleMapValueRefresh("local gameplay ready");
@@ -1149,17 +1168,6 @@ namespace OverlayHUD
             {
                 Logger.LogInfo("Reset map value: " + reason + ".");
             }
-        }
-
-        private void RefreshMapValue(string reason)
-        {
-            if (!IsRunLevel()) return;
-            mapValue = CalculateMapValue();
-            if (debugLogging.Value)
-            {
-                Logger.LogInfo("Refreshed map value after " + reason + ": " + mapValue.ToString("0", CultureInfo.InvariantCulture) + ".");
-            }
-            MarkMapValueDirty();
         }
 
         private void ScheduleMapValueRefresh(string reason)
@@ -2188,30 +2196,18 @@ namespace OverlayHUD
 
         private static void TrackDollarHaulValuable(object source, bool inHaul)
         {
-            if (!IsRunLevel()) return;
-            int key = GetValuableKey(source);
-            if (key == 0) return;
+            if (instance == null || !instance.gameplayActive || !(source is Component valuable)) return;
+            int key = valuable.GetInstanceID();
             if (inHaul) valuablesInDollarHaul.Add(key);
             else valuablesInDollarHaul.Remove(key);
         }
 
-        private static bool IsValuableInDollarHaul(object source)
+        private static bool IsValuableInDollarHaul(Component valuable)
         {
-            int key = GetValuableKey(source);
-            if (key != 0 && valuablesInDollarHaul.Contains(key)) return true;
+            if (valuablesInDollarHaul.Contains(valuable.GetInstanceID())) return true;
 
             object roundDirector = ReadMember(ResolveGameType("RoundDirector"), "instance");
-            if (!(ReadMember(roundDirector, "dollarHaulList") is IEnumerable dollarHaulList)) return false;
-
-            foreach (object item in dollarHaulList)
-            {
-                if (item == null) continue;
-                int itemKey = GetValuableKey(item);
-                if (key != 0 && itemKey == key) return true;
-                if (ReferencesSameUnityObject(source, item)) return true;
-            }
-
-            return false;
+            return ReadMember(roundDirector, "dollarHaulList") is IList haul && haul.Contains(valuable.gameObject);
         }
 
         private static int GetValuableKey(object source)
@@ -2227,33 +2223,10 @@ namespace OverlayHUD
             return 0;
         }
 
-        private static bool ReferencesSameUnityObject(object left, object right)
-        {
-            int leftId = GetUnityObjectId(left);
-            if (leftId == 0) return false;
-
-            if (leftId == GetUnityObjectId(right)) return true;
-
-            Component leftValuable = GetValuableComponent(left);
-            Component rightValuable = GetValuableComponent(right);
-            if (leftValuable != null && rightValuable != null && leftValuable.GetInstanceID() == rightValuable.GetInstanceID()) return true;
-
-            GameObject leftGameObject = GetGameObject(left);
-            GameObject rightGameObject = GetGameObject(right);
-            return leftGameObject != null && rightGameObject != null && leftGameObject.GetInstanceID() == rightGameObject.GetInstanceID();
-        }
-
         private static int GetUnityObjectId(object source)
         {
             if (source is UnityEngine.Object unityObject) return unityObject.GetInstanceID();
             return 0;
-        }
-
-        private static GameObject GetGameObject(object source)
-        {
-            if (source is GameObject gameObject) return gameObject;
-            if (source is Component component) return component.gameObject;
-            return null;
         }
 
         private static object GetValuableSource(object source)
@@ -2305,31 +2278,16 @@ namespace OverlayHUD
             StartCoroutine(PostLevel(level, levelName));
             lastSyncedUpgrades.Clear();
             pendingUpgradeKeys.Clear();
+            QueueAllPlayerUpgrades();
+            nextUpgradeSyncAt = Time.realtimeSinceStartup + 2f;
+        }
+
+        private void QueueAllPlayerUpgrades()
+        {
             for (int index = 0; index < TrackedPlayerUpgrades.Length; index++)
             {
                 pendingUpgradeKeys.Add(TrackedPlayerUpgrades[index].Key);
             }
-            nextUpgradeSyncAt = Time.realtimeSinceStartup + 2f;
-        }
-
-        private void SyncPlayerUpgradeValueIfLocal(string stateKey, string steamId, int value)
-        {
-            if (!gameplayActive || string.IsNullOrEmpty(stateKey)) return;
-
-            string localSteamId = ResolveLocalPlayerSteamId();
-            if (!string.IsNullOrEmpty(localSteamId) && !string.Equals(localSteamId, steamId, StringComparison.Ordinal)) return;
-
-            int normalizedValue = Math.Max(0, value);
-            if (lastSyncedUpgrades.TryGetValue(stateKey, out int previousValue) && previousValue == normalizedValue) return;
-
-            pendingUpgradeKeys.Remove(stateKey);
-            lastSyncedUpgrades[stateKey] = normalizedValue;
-            var json = new StringBuilder("{\"upgrades\":{\"")
-                .Append(stateKey)
-                .Append("\":")
-                .Append(normalizedValue)
-                .Append("}}");
-            StartCoroutine(PostPlayerUpgrades(json.ToString(), 1));
         }
 
         private void SyncGameUiVisibilityIfChanged()
@@ -2339,14 +2297,20 @@ namespace OverlayHUD
                 && GameUiFields.MapVisual?.GetValue(map) is Transform visual
                 && visual != null && visual.gameObject.activeInHierarchy;
             bool quotaVisible = IsCurrencyUiVisible();
-            string json = "{\"hidden\":" + (mapVisible || quotaVisible ? "true" : "false")
-                + ",\"mapHidden\":" + (mapVisible ? "true" : "false")
+            // PageSwap replaces Escape with Settings and other submenus until play resumes.
+            bool menuOpen = GameUiFields.MenuInstance?.GetValue(null) is Component manager && manager != null
+                && GameUiFields.CurrentMenuPage?.GetValue(manager) is Component page && page != null;
+            inPauseMenu = menuOpen && (inPauseMenu ||
+                (GameUiFields.EscapePageInstance?.GetValue(null) is Behaviour escape && escape != null && escape.isActiveAndEnabled));
+            bool hideAtAllPositions = mapVisible || (hideInPauseMenu.Value && inPauseMenu);
+            string json = "{\"hidden\":" + (hideAtAllPositions || quotaVisible ? "true" : "false")
+                + ",\"mapHidden\":" + (hideAtAllPositions ? "true" : "false")
                 + ",\"currencyVisible\":" + (quotaVisible ? "true" : "false") + "}";
             if (lastGameUiFingerprint == json) return;
             lastGameUiFingerprint = json;
             if (debugLogging.Value)
             {
-                Logger.LogInfo("Game UI visibility: map=" + mapVisible + ", currency=" + quotaVisible + ".");
+                Logger.LogInfo("Game UI visibility: map=" + mapVisible + ", currency=" + quotaVisible + ", pause=" + inPauseMenu + ".");
             }
             // Legacy desktop apps still use hidden; updated apps check the HUD's top anchor locally.
             StartCoroutine(PostGameUiVisibility(json));
@@ -2367,7 +2331,7 @@ namespace OverlayHUD
                 && current != hidden;
         }
 
-        private IEnumerator SyncPlayerUpgradesIfChanged(HashSet<string> onlyKeys = null)
+        private IEnumerator SyncPlayerUpgradesIfChanged(HashSet<string> onlyKeys)
         {
             // Spread the initial reads across frames to limit their per-frame cost.
             yield return null;
@@ -2381,6 +2345,15 @@ namespace OverlayHUD
             long setupStartedAt = Stopwatch.GetTimestamp();
             object statsManager = ReadMember(PlayerUpgradeTypes.StatsManager, "instance");
             string steamId = ResolveLocalPlayerSteamId();
+            if (string.IsNullOrEmpty(steamId) || statsManager == null ||
+                (Photon.Pun.PhotonNetwork.InRoom && !Photon.Pun.PhotonNetwork.IsMasterClient &&
+                 !Equals(ReadMember(statsManager, "statsSynced"), true)))
+            {
+                pendingUpgradeKeys.UnionWith(onlyKeys);
+                nextUpgradeSyncAt = Time.realtimeSinceStartup + 0.5f;
+                pendingUpgradeSnapshot = null;
+                yield break;
+            }
             double setupMs = (Stopwatch.GetTimestamp() - setupStartedAt) * 1000.0 / Stopwatch.Frequency;
             double totalReadMs = 0;
             double maxReadMs = 0;
@@ -2390,7 +2363,7 @@ namespace OverlayHUD
             for (int index = 0; index < TrackedPlayerUpgrades.Length; index++)
             {
                 KeyValuePair<string, string> binding = TrackedPlayerUpgrades[index];
-                if (onlyKeys != null && !onlyKeys.Contains(binding.Key)) continue;
+                if (!onlyKeys.Contains(binding.Key)) continue;
                 long readStartedAt = Stopwatch.GetTimestamp();
                 int? value = ResolveLocalPlayerUpgrade(statsManager, steamId, binding.Value);
                 double readMs = (Stopwatch.GetTimestamp() - readStartedAt) * 1000.0 / Stopwatch.Frequency;
@@ -2431,20 +2404,11 @@ namespace OverlayHUD
             object upgradesValue = ReadMember(statsManager, memberName);
             if (!(upgradesValue is IDictionary upgrades)) return null;
 
-            object value = !string.IsNullOrEmpty(steamId) && upgrades.Contains(steamId) ? upgrades[steamId] : null;
-            if (value == null && upgrades.Count == 1)
-            {
-                foreach (DictionaryEntry entry in upgrades)
-                {
-                    value = entry.Value;
-                    break;
-                }
-            }
-
-            if (value == null) return null;
+            if (string.IsNullOrEmpty(steamId)) return null;
+            if (!upgrades.Contains(steamId)) return 0;
             try
             {
-                return Math.Max(0, Convert.ToInt32(value));
+                return Math.Max(0, Convert.ToInt32(upgrades[steamId]));
             }
             catch
             {
@@ -2454,11 +2418,7 @@ namespace OverlayHUD
 
         private static string ResolveLocalPlayerSteamId()
         {
-            object playerController = ReadMember(PlayerUpgradeTypes.PlayerController, "instance");
-            string steamId = ReadMember(playerController, "playerSteamID") as string;
-            if (!string.IsNullOrEmpty(steamId)) return steamId;
-
-            object playerAvatar = ReadMember(playerController, "playerAvatarScript");
+            object playerAvatar = ReadMember(PlayerUpgradeTypes.PlayerAvatar, "instance");
             return ReadMember(playerAvatar, "steamID") as string;
         }
 

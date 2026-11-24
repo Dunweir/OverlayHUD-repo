@@ -374,7 +374,7 @@ BepInEx/config/OverlayHUD.cfg
 | --- | --- |
 | `General` — только Full | `Renderer = Electron`; альтернатива `Native`. Смена требует перезапуска игры. |
 | `Detection` | `ScanIntervalSeconds = 3`, `StatusIntervalSeconds = 10`, `RevealMonstersOnEncounter = true`, `TeamMonsterDetection = true`, `RevealUnknownMonsters = false`, `PreferPlayerVisionDetection = true`. |
-| `Appearance` — обе сборки | `LegacyIcons = false`: новые иконки; `true`: прежние иконки в активном рендерере. |
+| `Appearance` — обе сборки | `LegacyIcons = false` включает новые иконки. `HideInPauseMenu = false` по умолчанию. Установите `true`, чтобы скрывать HUD в своём меню паузы (Esc), в том числе в открытых из него настройках. |
 | `Native - General` | `Enabled = true`, `Language = ru` (или `en`), `SaveTimestamps = false`. |
 | `Native - Layout` | `Alignment = Center`, `Scale = 1`, `OffsetX = 0`, `OffsetY = 30`, `HorizontalLayout = true`, `HorizontalColumns = 11`, `Columns = 4`, `MonsterSize = 70`, `UpgradeSize = 38`, `UpgradeRows = 2`, `WrapValueLabels = true`. |
 | `Native - Information` | `ShowLevel`, `ShowTimer`, `ShowMapValue`, `ShowLostValue`, `ShowUpgrades` — все `true`. |
