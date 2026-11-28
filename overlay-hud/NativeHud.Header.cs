@@ -11,9 +11,10 @@ namespace OverlayHUD
 
         private const float HeaderUpgradeGap = 7.22f;
         private const float HeaderPillGap = 10;
+        private const float GameLevelTimerWidth = 78;
         private RectTransform headerPanel, headerSummaryPanel, headerUpgradePanel;
-        private HeaderItem headerLevel, headerMap, headerLoss;
-        private NativeBitmapText headerLevelCaption, headerLevelNumber, headerTimer;
+        private HeaderItem headerLevel, headerMap, headerLoss, currencyGroup;
+        private NativeBitmapText headerLevelCaption, headerLevelNumber, headerTimer, headerSlash;
         private RectTransform headerTimerSeparator;
         private readonly HeaderItem[] headerUpgradeItems = new HeaderItem[12];
         private static readonly string[] UpgradeKeys =
@@ -32,7 +33,11 @@ namespace OverlayHUD
         {
             internal RectTransform Root;
             internal NativeBitmapText Caption, Number;
+            internal TMPro.TextMeshProUGUI Price;
             internal RawImage Icon;
+            internal NativeRoundedPanel Backing;
+            internal Mask UpgradeMask;
+            internal Shadow IconShadow;
             internal string TooltipKey;
             internal int Order, Count;
             internal Vector2 TargetPosition;
@@ -57,12 +62,14 @@ namespace OverlayHUD
             headerLevelCaption = CreateHeaderText(headerLevel.Root, 28, "LEVEL", amber);
             headerLevelNumber = CreateHeaderText(headerLevel.Root, 48, "0", amber);
             headerTimer = CreateHeaderText(headerLevel.Root, 32, "00:00", HeaderColor(247, 251, 255));
+            headerSlash = CreateHeaderText(headerLevel.Root, 37, "/", HeaderColor(187, 174, 140));
             headerTimerSeparator = Rect("TimerSeparator", headerLevel.Root, 0, 4, 1, 46);
             var separator = headerTimerSeparator.gameObject.AddComponent<RawImage>();
             separator.color = HeaderColor(255, 178, 0, .32f);
             separator.raycastTarget = false;
             headerMap = CreateHeaderCurrency("MapValue", "MAP", HeaderColor(45, 190, 115, .16f), HeaderColor(156, 255, 192));
             headerLoss = CreateHeaderCurrency("LostValue", "LOSS", HeaderColor(225, 70, 70, .17f), HeaderColor(255, 154, 154));
+            currencyGroup = new HeaderItem { Root = Rect("Currency", headerSummaryPanel, 0, 0, 0, 0) };
 
             for (int i = 0; i < UpgradeKeys.Length; i++)
             {
@@ -72,11 +79,14 @@ namespace OverlayHUD
                 item.Order = i;
                 item.TooltipKey = UpgradeKeys[i];
                 // A rounded backing alone does not clip the rectangular upgrade artwork.
-                item.Root.gameObject.AddComponent<Mask>().showMaskGraphic = true;
+                item.UpgradeMask = item.Root.gameObject.AddComponent<Mask>();
+                item.UpgradeMask.showMaskGraphic = true;
                 item.Icon = Rect("Icon", item.Root, 0, 0, size * .82f, size)
                     .gameObject.AddComponent<RawImage>();
                 item.Icon.texture = Texture("upgrade-" + UpgradeFiles[i] + ".png");
                 item.Icon.raycastTarget = false;
+                item.IconShadow = AddGameShadow(item.Icon);
+                item.IconShadow.enabled = false;
                 item.Number = CreateHeaderText(item.Root, size * .69f, "0", foreground);
                 headerUpgradeItems[i] = item;
                 item.Root.gameObject.SetActive(false);
@@ -98,10 +108,20 @@ namespace OverlayHUD
                 FitHeaderItem(headerLevel, availableWidth);
                 pills.Add(headerLevel);
             }
+            var amounts = options.GameStyle ? new List<HeaderItem>() : pills;
             RefreshHeaderCurrency(headerMap, state.MapValue, options.ShowMapValue,
-                options.Translate("КАРТА", "MAP"), availableWidth, pills);
+                options.Translate("КАРТА", "MAP"), availableWidth, amounts);
             RefreshHeaderCurrency(headerLoss, state.LostValue, options.ShowLostValue,
-                options.Translate("ПОТЕРЯ", "LOSS"), availableWidth, pills);
+                options.Translate("ПОТЕРЯ", "LOSS"), availableWidth, amounts);
+            bool groupVisible = options.GameStyle && amounts.Count > 0;
+            currencyGroup.Root.gameObject.SetActive(groupVisible);
+            if (groupVisible)
+            {
+                LayoutHeaderItems(currencyGroup.Root, amounts, availableWidth, options.WrapValueLabels ? 2 : HeaderPillGap,
+                    options.WrapValueLabels, alignLeft: true);
+                pills.Add(currencyGroup);
+            }
+            else currencyGroup.Positioned = false;
             Vector2 summarySize = LayoutHeaderItems(headerSummaryPanel, pills, availableWidth, HeaderPillGap, false);
 
             var upgrades = new List<HeaderItem>();
@@ -114,6 +134,8 @@ namespace OverlayHUD
                     && !(options.HiddenUpgrades?.Contains(key) ?? false);
                 item.Root.gameObject.SetActive(visible);
                 if (!visible) { item.Positioned = false; continue; }
+                item.UpgradeMask.enabled = item.Backing.enabled = !options.GameStyle;
+                item.IconShadow.enabled = options.GameStyle;
                 item.Count = count;
                 string value = count.ToString(CultureInfo.InvariantCulture);
                 SetHeaderFont(item.Number, teko, size * .69f);
@@ -127,7 +149,7 @@ namespace OverlayHUD
                     iconHeight = item.Icon.texture.height * fit;
                 }
                 SetHeaderRect(item.Icon.rectTransform, 0, (size - iconHeight) / 2, iconWidth, iconHeight);
-                float numberWidth = item.Number.Measure(value);
+                float numberWidth = HeaderTextWidth(item.Number, value, upgradeCount: options.GameStyle);
                 float numberX = size * .82f + 3;
                 SetHeaderRect(item.Number.rectTransform, numberX, 0, numberWidth, size);
                 item.Root.sizeDelta = new Vector2(numberX + numberWidth + HeaderUpgradeGap, size);
@@ -150,7 +172,7 @@ namespace OverlayHUD
             float width, height;
             if (horizontal)
             {
-                float gap = hasSummary && hasUpgrades ? HeaderPillGap : 0;
+                float gap = hasSummary && hasUpgrades ? (groupVisible ? 26 : HeaderPillGap) : 0;
                 width = summarySize.x + gap + upgradeSize.x;
                 height = Math.Max(summarySize.y, upgradeSize.y);
                 headerSummaryPanel.anchoredPosition = new Vector2(0, -(height - summarySize.y) / 2);
@@ -174,28 +196,50 @@ namespace OverlayHUD
         {
             bool visible = options.ShowLevel || options.ShowTimer;
             headerLevel.Root.gameObject.SetActive(visible);
+            headerLevel.Backing.enabled = !options.GameStyle;
+            headerLevelCaption.color = headerLevelNumber.color = options.GameStyle ? GameLevelColor : HeaderColor(255, 178, 0);
             headerLevelCaption.gameObject.SetActive(options.ShowLevel);
             headerLevelNumber.gameObject.SetActive(options.ShowLevel);
             headerTimer.gameObject.SetActive(options.ShowTimer);
-            headerTimerSeparator.gameObject.SetActive(options.ShowLevel && options.ShowTimer);
+            headerTimerSeparator.gameObject.SetActive(!options.GameStyle && options.ShowLevel && options.ShowTimer);
+            headerSlash.gameObject.SetActive(options.GameStyle && options.ShowLevel && options.ShowTimer);
             string caption = options.Translate("УРОВЕНЬ", "LEVEL");
             SetHeaderCaption(headerLevelCaption, caption, 28);
             if (!visible) { headerLevel.Positioned = false; return; }
             double elapsed = now - state.StartedAt;
             if (double.IsNaN(elapsed) || double.IsInfinity(elapsed)) elapsed = 0;
             long seconds = (long)Math.Min(int.MaxValue, Math.Max(0, Math.Floor(elapsed)));
-            bool hours = seconds >= 3600;
+            bool hours = !options.GameStyle && seconds >= 3600;
+            long minutes = hours ? seconds / 60 % 60 : seconds / 60;
             string timer = (hours ? (seconds / 3600).ToString("00", CultureInfo.InvariantCulture) + ":" : "")
-                + (seconds / 60 % 60).ToString("00", CultureInfo.InvariantCulture) + ":"
+                + minutes.ToString("00", CultureInfo.InvariantCulture) + ":"
                 + (seconds % 60).ToString("00", CultureInfo.InvariantCulture);
             string level = state.Level.ToString(CultureInfo.InvariantCulture);
             headerLevelNumber.Value = level;
             headerTimer.Value = timer;
+            if (options.GameStyle && options.ShowLevel)
+            {
+                float w = Math.Max(HeaderTextWidth(headerLevelCaption, caption), HeaderTextWidth(headerLevelNumber, level));
+                SetHeaderRect(headerLevelCaption.rectTransform, 10, 7, w, 23);
+                SetHeaderRect(headerLevelNumber.rectTransform, 10, 31, w, 35);
+                float width = w + 20;
+                if (options.ShowTimer)
+                {
+                    float slashWidth = HeaderTextWidth(headerSlash, "/");
+                    SetHeaderRect(headerSlash.rectTransform, width - 4, 7, slashWidth, 60);
+                    width += slashWidth;
+                    float timerWidth = HeaderTextWidth(headerTimer, timer);
+                    SetHeaderRect(headerTimer.rectTransform, width + 1, 7, timerWidth, 60);
+                    width += timerWidth + 11;
+                }
+                headerLevel.Root.sizeDelta = new Vector2(width, 74);
+                return;
+            }
             float x = 13;
             if (options.ShowLevel)
             {
-                float captionWidth = headerLevelCaption.Measure(caption);
-                float numberWidth = headerLevelNumber.Measure(level);
+                float captionWidth = HeaderTextWidth(headerLevelCaption, caption);
+                float numberWidth = HeaderTextWidth(headerLevelNumber, level);
                 SetHeaderRect(headerLevelCaption.rectTransform, x, 4, captionWidth, 46);
                 x += captionWidth + 8;
                 SetHeaderRect(headerLevelNumber.rectTransform, x, 4, numberWidth, 46);
@@ -209,7 +253,7 @@ namespace OverlayHUD
                     SetHeaderRect(headerTimerSeparator, x, 4, 1, 46);
                     x += 13;
                 }
-                float timerWidth = Math.Max(hours ? 83 : 55, headerTimer.Measure(timer));
+                float timerWidth = Math.Max(hours ? 83 : 55, HeaderTextWidth(headerTimer, timer));
                 SetHeaderRect(headerTimer.rectTransform, x, 4, timerWidth, 46);
                 x += timerWidth;
             }
@@ -228,16 +272,37 @@ namespace OverlayHUD
             float availableWidth, List<HeaderItem> pills)
         {
             bool visible = enabled && amount > 0;
+            var parent = options.GameStyle ? currencyGroup.Root : headerSummaryPanel;
+            if (item.Root.parent != parent)
+            {
+                item.Root.SetParent(parent, false);
+                item.Positioned = false;
+            }
             item.Root.gameObject.SetActive(visible);
-            SetHeaderCaption(item.Caption, caption, 22);
             if (!visible) { item.Positioned = false; return; }
+            item.Backing.enabled = !options.GameStyle;
+            if (options.GameStyle)
+            {
+                LayoutGamePrice(item, amount, caption);
+                FitHeaderItem(item, availableWidth);
+                pills.Add(item);
+                return;
+            }
+            if (item.Price != null) item.Price.gameObject.SetActive(false);
+            if (item.Icon != null) item.Icon.enabled = false;
+            item.Caption.gameObject.SetActive(true);
+            SetHeaderCaption(item.Caption, caption, 22);
+            SetHeaderFont(item.Number, teko, 34);
+            item.Number.color = item == headerLoss ? HeaderColor(255, 154, 154) : HeaderColor(156, 255, 192);
+            item.Number.enabled = true;
             string value = "$" + amount.ToString("N0", CultureInfo.InvariantCulture);
             item.Number.Value = value;
             float captionWidth = item.Caption.Measure(caption);
             float numberWidth = item.Number.Measure(value);
             if (options.WrapValueLabels)
             {
-                float width = Math.Min(190, Math.Max(captionWidth, numberWidth) + 22);
+                float width = Math.Max(captionWidth, numberWidth) + 22;
+                width = Math.Min(190, width);
                 item.Root.sizeDelta = new Vector2(width, 63);
                 SetHeaderRect(item.Caption.rectTransform, 11, 4, width - 22, 22);
                 SetHeaderRect(item.Number.rectTransform, 11, 26, width - 22, 34);
@@ -296,7 +361,7 @@ namespace OverlayHUD
             background.Radius = radius;
             background.color = color;
             background.raycastTarget = false;
-            return new HeaderItem { Root = rect };
+            return new HeaderItem { Root = rect, Backing = background };
         }
 
         private static void FitHeaderItem(HeaderItem item, float availableWidth)
@@ -308,7 +373,7 @@ namespace OverlayHUD
         }
 
         private Vector2 LayoutHeaderItems(RectTransform parent, List<HeaderItem> items,
-            float availableWidth, float gap, bool balanced)
+            float availableWidth, float gap, bool balanced, bool alignLeft = false)
         {
             var rows = new List<HeaderRow>();
             HeaderRow row = null;
@@ -339,7 +404,7 @@ namespace OverlayHUD
             float y = 0;
             foreach (HeaderRow line in rows)
             {
-                float x = HeaderAlignmentOffset(width, line.Width);
+                float x = alignLeft ? 0 : HeaderAlignmentOffset(width, line.Width);
                 foreach (HeaderItem item in line.Items)
                 {
                     item.TargetPosition = new Vector2(x, -y - (line.Height - item.Height) / 2);
@@ -358,6 +423,7 @@ namespace OverlayHUD
         {
             float blend = options.Animations ? 1 - Mathf.Exp(-dt * 18) : 1;
             AnimateHeaderItem(headerLevel, blend);
+            AnimateHeaderItem(currencyGroup, blend);
             AnimateHeaderItem(headerMap, blend);
             AnimateHeaderItem(headerLoss, blend);
             foreach (var item in headerUpgradeItems) AnimateHeaderItem(item, blend);

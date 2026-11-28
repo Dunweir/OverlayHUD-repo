@@ -82,7 +82,7 @@ Native HUD Full пишет причину в лог и возвращается 
 | `General` | `Renderer = Electron`; альтернатива `Native`, смена требует перезапуска |
 | `Detection` | `ScanIntervalSeconds = 3`, `StatusIntervalSeconds = 10` (минимум 10), `RevealMonstersOnEncounter = true`, `RevealUnknownMonsters = false`, `PreferPlayerVisionDetection = true` |
 | `Native - General` | `Enabled = true`, `Language = ru` (или `en`), `SaveTimestamps = false` |
-| `Native - Layout` | `Alignment = Center`, `Scale = 1`, `OffsetX = 0`, `OffsetY = 30`, `HorizontalLayout = true`, `HorizontalColumns = 11`, `Columns = 4`, `MonsterSize = 70`, `UpgradeSize = 38`, `UpgradeRows = 2`, `WrapValueLabels = true` |
+| `Native - Layout` | `Alignment = Center`, `Scale = 1`, `OffsetX = 0`, `OffsetY = 50`, `HorizontalLayout = true`, `HorizontalColumns = 11`, `Columns = 4`, `MonsterSize = 70`, `UpgradeSize = 38`, `UpgradeRows = 2`, `WrapValueLabels = true` |
 | `Native - Information` | `ShowLevel`, `ShowTimer`, `ShowMapValue`, `ShowLostValue`, `ShowUpgrades` — все `true` |
 | `Native - Monsters` | `ShowMonsters`, `ShowHealth`, `ShowRespawnTimer`, `ShowRespawnIndicator`, `ShowStrength`, `ShowMonsterCounts` — `true`; `OnlyAliveMonsters`, `FilterUndetectedMonsters` — `false` |
 | `Native - Effects` | `Animations`, `ShowProximityWaves`, `ShowDamageNumbers`, `UseGameUIEffects` — `true`; `ShowDestroyedItemAlerts`, `ShowTooltips` — `false` |
@@ -104,7 +104,7 @@ Native-only не создаёт секции `01`, `09`, `10`. Старые се
 - `HorizontalLayout=true` использует `HorizontalColumns`, `false` — `Columns`.
   Диапазон 1–24; лишние монстры переносятся на следующий ряд, а не скрываются.
 - `MonsterSize` — 32–128, `UpgradeSize` — 20–64 до общего масштаба;
-  `UpgradeRows` — 1 или 2. `WrapValueLabels` размещает подписи над суммами.
+  `UpgradeRows` — 1 или 2. `WrapValueLabels` в стиле Classic размещает подписи над суммами, а в Game располагает стоимость карты над потерями.
 - `ShowHealth` управляет полосками ХП. Числовой таймер и круговой индикатор респавна
   независимы. Сила: зелёный — хватает, красный — нет, `X` — нельзя поднять, `?` — нет данных.
 - `OnlyAliveMonsters` скрывает погибших встреченных монстров; только вместе с ним

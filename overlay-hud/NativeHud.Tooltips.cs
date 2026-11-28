@@ -45,7 +45,7 @@ namespace OverlayHUD
         private void UpdateTooltips()
         {
             // The game's lens distortion invalidates ordinary screen-space hit tests.
-            if (gameUIEffectsActive || options == null || !options.Enabled || !options.ShowTooltips
+            if (gameUIEffectsActive || options == null || options.GameStyle || !options.Enabled || !options.ShowTooltips
                 || root == null || !root.activeSelf || !root.activeInHierarchy
                 || state.Hidden || !state.Visible || Cursor.lockState == CursorLockMode.Locked)
             {

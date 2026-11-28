@@ -130,7 +130,7 @@ for name, emoji in [("strength", "\U0001f4aa"), ("destruction", "\U0001f4a5")]:
 # Roboto for Cyrillic and health labels. Atlas coordinates use a top-left origin.
 characters = ''.join(chr(c) for c in list(range(32, 127)) + list(range(0x400, 0x460)))
 for name, filename in [("teko", "Teko.ttf"), ("roboto", "Roboto-ExtraBold.ttf"),
-                       ("roboto-bold", "Roboto-Bold.ttf")]:
+                       ("roboto-bold", "Roboto-Bold.ttf"), ("roboto-regular", "Roboto-Regular.ttf")]:
     font = ImageFont.truetype(str(ROOT / "assets/fonts" / filename), 72)
     # Teko is a static regular face; synthesize the heavier browser weight.
     stroke = 1 if name == "teko" else 0

@@ -21,6 +21,7 @@ namespace OverlayHUD
         private const string NativeEffectsSection = "Native - Effects";
         private const string NativeUpgradesSection = "Native - Upgrades";
         private ConfigEntry<bool> legacyIcons;
+        private ConfigEntry<string> nativeStyle;
         private bool nativeMode;
         private NativeHud nativeHud;
         private NativeTimestampWriter nativeTimestamps;
@@ -49,6 +50,9 @@ namespace OverlayHUD
 #endif
             legacyIcons = BindNativeToggle("Appearance", "LegacyIcons", false,
                 "Use the original monster icons instead of the new artwork in either renderer.", 100);
+            nativeStyle = BindNativeSetting("Native - Appearance", "Style", "Classic",
+                "Game uses the in-game quota text and inventory slot artwork. Applies immediately.", 100,
+                new AcceptableValueList<string>("Classic", "Game"));
             nativeEnabled = BindNativeToggle(NativeGeneralSection, "Enabled", true, "Show the native HUD without stopping game-state tracking.", 100);
             nativeLanguage = BindNativeSetting(NativeGeneralSection, "Language", NativeHudLanguage.DefaultLanguage,
                 "Native HUD language: ru (Russian) or en (English). Defaults to Russian for a Russian OS UI language, English otherwise. Saved choices are preserved. Applies immediately.", 90, new AcceptableValueList<string>("ru", "en"));
@@ -59,7 +63,7 @@ namespace OverlayHUD
                 "Horizontal screen alignment of the HUD: Left, Center or Right. OffsetX shifts it from this anchor. Applies immediately.", 120, new AcceptableValueList<string>("Left", "Center", "Right"));
             nativeOffsetX = BindNativeSetting(NativeLayoutSection, "OffsetX", 0f,
                 "Horizontal offset from the selected Alignment in scaled HUD pixels; positive moves right. Applies immediately.", 110, new AcceptableValueRange<float>(-1920f, 1920f));
-            nativeOffsetY = BindNativeSetting(NativeLayoutSection, "OffsetY", 30f,
+            nativeOffsetY = BindNativeSetting(NativeLayoutSection, "OffsetY", 50f,
                 "Distance from screen top in scaled HUD pixels. Applies immediately.", 100, new AcceptableValueRange<float>(0f, 1080f));
             nativeScale = BindNativeSetting(NativeLayoutSection, "Scale", 1f,
                 "HUD scale relative to 1080p. Applies immediately.", 90, new AcceptableValueRange<float>(0.5f, 2f));
@@ -75,7 +79,7 @@ namespace OverlayHUD
                 "Player upgrade icon size in HUD pixels before Scale is applied. Applies immediately.", 40, new AcceptableValueRange<float>(20f, 64f));
             nativeUpgradeRows = BindNativeSetting(NativeLayoutSection, "UpgradeRows", 2,
                 "Number of rows used to arrange visible player upgrades (1 or 2). Applies immediately.", 30, new AcceptableValueRange<int>(1, 2));
-            nativeWrapValueLabels = BindNativeToggle(NativeLayoutSection, "WrapValueLabels", true, "Place map/loss labels above their amounts; false keeps labels and amounts on one line.", 20);
+            nativeWrapValueLabels = BindNativeToggle(NativeLayoutSection, "WrapValueLabels", true, "Stack map value above loss in Game style, or put labels above amounts in Classic. Disable for inline display.", 20);
 
             nativeLevel = BindNativeToggle(NativeInformationSection, "ShowLevel", true, "Show the current level number.", 100);
             nativeTimer = BindNativeToggle(NativeInformationSection, "ShowTimer", true, "Show the elapsed level timer.", 90);
@@ -97,8 +101,8 @@ namespace OverlayHUD
             nativeDamageNumbers = BindNativeToggle(NativeEffectsSection, "ShowDamageNumbers", true, "Show floating monster damage numbers.", 80);
             nativeDestroyedItemAlerts = BindNativeToggle(NativeEffectsSection, "ShowDestroyedItemAlerts", false, "Show notifications about destroyed valuables and their last holder.", 70);
             nativeGameUIEffects = BindNativeToggle(NativeEffectsSection, "UseGameUIEffects", true,
-                "Experimental: render the native HUD through the game's UI camera and compositor to inherit real game HUD effects. The game's lower-resolution render texture reduces HUD sharpness; hover tooltips are disabled while active. Falls back to the normal HUD while the game UI is unavailable.", 60);
-            nativeTooltips = BindNativeToggle(NativeEffectsSection, "ShowTooltips", false, "Show monster and upgrade tooltips on hover while the game cursor is unlocked. Does not unlock or capture the cursor. Tooltips are disabled while UseGameUIEffects is active.", 50);
+                "Use the game's UI camera for either HUD style. Disable for sharper text and icons. Applies immediately.", 60);
+            nativeTooltips = BindNativeToggle(NativeEffectsSection, "ShowTooltips", false, "Show monster and upgrade tooltips in Classic style while the game cursor is unlocked. Does not unlock or capture the cursor. Tooltips are disabled while UseGameUIEffects is active.", 50);
 
             BindNativeUpgrade("strength", "Strength");
             BindNativeUpgrade("tumbleLaunch", "Tumble Launch");
@@ -169,7 +173,7 @@ namespace OverlayHUD
         private void OnNativeSettingChanged(object sender, SettingChangedEventArgs args)
         {
             string section = args.ChangedSetting.Definition.Section;
-            if (section == "Appearance" || section == NativeGeneralSection || section == NativeLayoutSection
+            if (section == "Appearance" || section == "Native - Appearance" || section == NativeGeneralSection || section == NativeLayoutSection
                 || section == NativeInformationSection || section == NativeMonstersSection
                 || section == NativeEffectsSection || section == NativeUpgradesSection)
                 nativeOptionsDirty = true;
@@ -183,6 +187,7 @@ namespace OverlayHUD
             var options = new NativeHudOptions
             {
                 LegacyIcons = legacyIcons.Value,
+                GameStyle = nativeStyle.Value == "Game",
                 Scale = nativeScale.Value,
                 OffsetX = nativeOffsetX.Value,
                 OffsetY = nativeOffsetY.Value,

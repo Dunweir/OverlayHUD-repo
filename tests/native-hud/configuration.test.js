@@ -61,7 +61,7 @@ test('native settings use exactly the requested sections and intuitive display o
 
 test('native defaults and acceptable value constraints are preserved', () => {
   const specialDefaults = {
-    SaveTimestamps: 'false', Language: 'NativeHudLanguage.DefaultLanguage', Alignment: '"Center"', OffsetX: '0f', OffsetY: '30f', Scale: '1f',
+    SaveTimestamps: 'false', Language: 'NativeHudLanguage.DefaultLanguage', Alignment: '"Center"', OffsetX: '0f', OffsetY: '50f', Scale: '1f',
     HorizontalColumns: '11', Columns: '4', MonsterSize: '70f', UpgradeSize: '38f', UpgradeRows: '2',
     OnlyAliveMonsters: 'false', FilterUndetectedMonsters: 'false', ShowDestroyedItemAlerts: 'false', ShowTooltips: 'false',
   };

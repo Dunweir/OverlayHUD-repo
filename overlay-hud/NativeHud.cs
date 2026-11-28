@@ -17,12 +17,12 @@ namespace OverlayHUD
         private NativeHudOptions options = new NativeHudOptions();
         private float layoutWidth;
         private CanvasScaler scaler;
-        private float requestedScale = 1, offsetX, offsetY = 30;
+        private float requestedScale = 1, offsetX, offsetY = 50;
         private int stripColumns = 11;
         private bool showHealth = true, showRespawn = true, showUpgrades = true, showStrength = true;
         private GameObject root;
         private RectTransform panel;
-        private NativeFontAtlas teko, roboto, robotoBold;
+        private NativeFontAtlas teko, roboto, robotoBold, robotoRegular;
         private CanvasGroup visibilityGroup;
         private float visibilityAlpha;
         private double displayedLevelStart = double.NaN;
@@ -58,7 +58,7 @@ namespace OverlayHUD
                 visibilityGroup.blocksRaycasts = false;
                 visibilityGroup.interactable = false;
                 CreateHeader();
-                CreateAlerts();
+                alertLayer = StretchStyleRect("Alerts", panel);
                 CreateTooltips();
                 root.SetActive(false);
             }
@@ -101,6 +101,8 @@ namespace OverlayHUD
         {
             if (ReferenceEquals(options, settings)) return;
             options = settings;
+            if (options.GameStyle && robotoRegular == null) robotoRegular = LoadFont("roboto-regular");
+            foreach (var row in alertRows) row.LaidOut = null;
             nextRefresh = 0;
             requestedScale = options.Scale;
             offsetX = options.OffsetX;
@@ -134,6 +136,7 @@ namespace OverlayHUD
         {
             UpdateGameUIEffects();
             UpdateAlerts(now);
+            ObserveLoss(now);
             // Game UI suppression and the user's master switch must be immediate.
             if (state.Hidden || !options.Enabled)
             {
@@ -164,6 +167,7 @@ namespace OverlayHUD
                     tiles.Clear();
                     displayedLevelStart = state.StartedAt;
                 }
+                RefreshGameStyleSources(now);
                 float gridY = RefreshHeader(now);
                 var ordered = state.GetDisplayMonsters(now);
                 ordered.RemoveAll(monster => !options.ShouldDisplayMonster(monster));
@@ -177,6 +181,14 @@ namespace OverlayHUD
                     }
                 int gridColumns = horizontal ? stripColumns : columns;
                 float rowPitch = NativeHudLayout.MonsterRowPitch(options.MonsterSize, showHealth);
+                if (options.GameStyle && showRespawn)
+                    rowPitch = Math.Max(rowPitch, options.MonsterSize * 1.55f);
+                if (options.GameStyle)
+                {
+                    float bottom = CardSize + GameDamageOffset(showHealth, true, true, showRespawn);
+                    if (options.ShowDamageNumbers) bottom += GameTileTextSize;
+                    rowPitch = Math.Max(rowPitch, (bottom + 6) * options.MonsterSize / CardSize);
+                }
                 for (int index = 0; index < ordered.Count; index++)
                 {
                     var monster = ordered[index];
@@ -197,7 +209,8 @@ namespace OverlayHUD
             AnimateHeader(Time.unscaledDeltaTime);
             Animate(now);
             FitToScreen();
-            PositionAlerts();
+            PositionAlerts(now);
+            AnimateLoss(now);
             if (state.Visible) UpdateTooltips(); else HideTooltips();
         }
 
@@ -247,6 +260,8 @@ namespace OverlayHUD
                     throw new InvalidDataException("Cannot decode native HUD asset " + name);
                 texture.name = name;
                 texture.filterMode = FilterMode.Trilinear;
+                if (name.StartsWith("upgrade-", StringComparison.Ordinal))
+                    texture.mipMapBias = -.65f;
                 texture.wrapMode = TextureWrapMode.Clamp;
                 textures.Add(name, texture);
                 return texture;
@@ -270,6 +285,7 @@ namespace OverlayHUD
         public void Dispose()
         {
             if (root != null) UnityEngine.Object.Destroy(root);
+            ClearEmojiTextures();
             foreach (var texture in textures.Values) UnityEngine.Object.Destroy(texture);
             textures.Clear();
         }
@@ -343,6 +359,11 @@ namespace OverlayHUD
         internal float Size;
         internal bool Centered;
         private string value = "";
+        private int visibleCharacters = int.MaxValue;
+        internal int VisibleCharacters
+        {
+            set { if (visibleCharacters != value) { visibleCharacters = value; SetVerticesDirty(); } }
+        }
         internal string Value
         {
             set { if (this.value == value) return; this.value = value; SetVerticesDirty(); }
@@ -366,8 +387,10 @@ namespace OverlayHUD
             var bounds = rectTransform.rect;
             float x = bounds.xMin + (Centered ? (bounds.width - totalAdvance * scale) / 2f : 0);
             float baseline = NativeHudLayout.TextBaseline(bounds.center.y, Atlas.lineTop, Atlas.lineBottom, scale);
+            int count = 0;
             foreach (char c in value)
             {
+                if (count++ >= visibleCharacters) break;
                 if (!Atlas.Index.TryGetValue(c, out var glyph)) glyph = Atlas.Index['?'];
                 float left = x + glyph.left * scale;
                 float top = baseline - glyph.top * scale;

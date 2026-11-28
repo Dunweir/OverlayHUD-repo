@@ -26,13 +26,14 @@ namespace OverlayHUD
 
         internal static float AvailableWidth(float viewportWidth) => Math.Max(0, viewportWidth - ScreenMargin * 2);
 
-        internal static Line BuildLine(string player, string action, string item, float availableWidth, Func<string, float> measure)
+        internal static Line BuildLine(string player, string action, string item, float availableWidth, Func<string, float> measure,
+            float trailingWidth = 0)
         {
             player = player.ToUpperInvariant();
             action = action.ToUpperInvariant();
             item = item.ToUpperInvariant();
             float prefix = FontSize + measure(" ");
-            float fixedWidth = PaddingX * 2 + prefix + Gap * 2;
+            float fixedWidth = PaddingX * 2 + prefix + Gap * 2 + trailingWidth;
             float textBudget = Math.Max(0, availableWidth - fixedWidth);
             // Preserve the action first; share remaining space between the two names.
             action = FitText(action, textBudget, measure);

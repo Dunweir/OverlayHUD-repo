@@ -12,6 +12,7 @@ namespace OverlayHUD
         {
             internal int Id;
             internal int Count = 1;
+            internal int? SpawnGroup;
             internal bool Unknown;
             internal int? Tier;
             internal string Name;
@@ -36,6 +37,7 @@ namespace OverlayHUD
         private sealed class DisplayGroup
         {
             internal string Name;
+            internal int? SpawnGroup;
             internal int? Tier;
             internal readonly List<int> Members = new List<int>();
         }
@@ -45,10 +47,11 @@ namespace OverlayHUD
         internal readonly Dictionary<int, Monster> Monsters = new Dictionary<int, Monster>();
         internal readonly Dictionary<string, int> Upgrades = new Dictionary<string, int>();
         internal int MapValue, LostValue;
+        internal bool HasMapValue;
         internal int Level;
         internal bool Visible, Hidden;
         internal double StartedAt;
-        internal DestroyedItemAlert LastDestroyedItem;
+        internal List<DestroyedItemAlert> DestroyedItems { get; private set; } = new List<DestroyedItemAlert>();
         private long destroyedItemSequence;
 
         internal void Apply(string route, string json, double now)
@@ -64,8 +67,9 @@ namespace OverlayHUD
                     displayGroups.Clear();
                     groupById.Clear();
                     Upgrades.Clear();
-                    LastDestroyedItem = null;
+                    DestroyedItems = new List<DestroyedItemAlert>();
                     MapValue = LostValue = 0;
+                    HasMapValue = false;
                     StartedAt = now;
                     Visible = true;
                     break;
@@ -76,10 +80,11 @@ namespace OverlayHUD
                     string player = SanitizeAlertName(data["player"], 60);
                     string item = SanitizeAlertName(data["item"], 80);
                     if (player.Length == 0 || item.Length == 0 || double.IsNaN(now) || double.IsInfinity(now)) break;
-                    LastDestroyedItem = new DestroyedItemAlert
+                    DestroyedItems.RemoveAll(previous => now - previous.At > NativeAlertLifetime.MaxFreshAge);
+                    DestroyedItems.Add(new DestroyedItemAlert
                     {
                         Player = player, Item = item, At = now, Sequence = ++destroyedItemSequence
-                    };
+                    });
                     break;
                 case "upgrades":
                     foreach (var entry in ((JObject)(data["upgrades"] ?? data)).Properties())
@@ -88,6 +93,7 @@ namespace OverlayHUD
                 case "map-value":
                     MapValue = Math.Max(0, (int)data["value"]);
                     LostValue = Math.Max(0, (int?)data["lost"] ?? 0);
+                    HasMapValue = true;
                     break;
                 case "roster":
                 case "monster-status":
@@ -124,6 +130,7 @@ namespace OverlayHUD
                 Monsters.Add(id, monster = new Monster { Id = id });
             if (data["name"] != null) monster.Name = (string)data["name"];
             monster.Seen |= seen;
+            if (data["spawnGroup"]?.Type == JTokenType.Integer) monster.SpawnGroup = (int)data["spawnGroup"];
             // Plugin metadata omits this flag for known enemies; partial events must retain it.
             monster.Unknown |= (bool?)data["unknown"] == true;
             if (data["tier"] != null)
@@ -207,7 +214,12 @@ namespace OverlayHUD
             string name = monster.Unknown ? null : GroupName(monster.Name);
             if (groupById.TryGetValue(monster.Id, out DisplayGroup previous))
             {
-                if (previous.Name == name && previous.Tier == monster.Tier) return;
+                if (previous.Name == name && previous.SpawnGroup == monster.SpawnGroup
+                    && (monster.SpawnGroup.HasValue || previous.Tier == monster.Tier))
+                {
+                    if (monster.Tier.HasValue) previous.Tier = monster.Tier;
+                    return;
+                }
                 previous.Members.Remove(monster.Id);
                 groupById.Remove(monster.Id);
                 if (previous.Members.Count == 0) displayGroups.Remove(previous);
@@ -215,14 +227,15 @@ namespace OverlayHUD
             if (name == null) return;
             // Persist membership rather than rechunking a dictionary on each render:
             // late metadata and reordered/repeated rosters must not shuffle full groups.
-            DisplayGroup group = displayGroups.Find(candidate => candidate.Name == name
-                && candidate.Tier == monster.Tier && candidate.Members.Count < GroupSize(name));
+            DisplayGroup group = displayGroups.Find(candidate => candidate.Name == name && candidate.SpawnGroup == monster.SpawnGroup
+                && (monster.SpawnGroup.HasValue || (candidate.Tier == monster.Tier && candidate.Members.Count < GroupSize(name))));
             if (group == null)
             {
-                group = new DisplayGroup { Name = name, Tier = monster.Tier };
+                group = new DisplayGroup { Name = name, Tier = monster.Tier, SpawnGroup = monster.SpawnGroup };
                 displayGroups.Add(group);
             }
             group.Members.Add(monster.Id);
+            if (monster.Tier.HasValue) group.Tier = monster.Tier;
             groupById.Add(monster.Id, group);
         }
 
@@ -241,9 +254,9 @@ namespace OverlayHUD
                     Monster member = Monsters[id];
                     display.Seen |= member.Seen;
                     display.Alive |= member.Alive;
-                    if (member.Seen && member.Alive)
+                    if (member.Alive)
                     {
-                        display.Detection = Math.Max(display.Detection, member.Detection);
+                        if (member.Seen) display.Detection = Math.Max(display.Detection, member.Detection);
                         display.PlayerClose |= member.PlayerClose;
                         display.PlayerVeryClose |= member.PlayerVeryClose;
                     }
@@ -276,8 +289,8 @@ namespace OverlayHUD
                     Id = member.Id, Name = member.Name, Tier = member.Tier, Unknown = member.Unknown,
                     Seen = member.Seen, Alive = member.Alive, Health = member.Health, MaxHealth = member.MaxHealth,
                     Detection = member.Seen && member.Alive ? member.Detection : 0,
-                    PlayerClose = member.Seen && member.Alive && member.PlayerClose,
-                    PlayerVeryClose = member.Seen && member.Alive && member.PlayerVeryClose,
+                    PlayerClose = member.Alive && member.PlayerClose,
+                    PlayerVeryClose = member.Alive && member.PlayerVeryClose,
                     RespawnAt = !member.Alive && member.RespawnAt > now ? member.RespawnAt : 0,
                     RespawnDuration = !member.Alive && member.RespawnAt > now ? member.RespawnDuration : 0,
                     CooldownReducedAt = member.Seen && !member.Alive && member.RespawnAt > now ? member.CooldownReducedAt : -10,
@@ -345,31 +358,40 @@ namespace OverlayHUD
     internal sealed class NativeAlertLifetime
     {
         internal const double MaxFreshAge = 15, ShowDuration = 6;
-        internal NativeHudState.DestroyedItemAlert Current { get; private set; }
-        internal double ShownAt { get; private set; }
+        internal sealed class Entry
+        {
+            internal NativeHudState.DestroyedItemAlert Event;
+            internal double ShownAt;
+        }
+        internal readonly List<Entry> Active = new List<Entry>();
+        private List<NativeHudState.DestroyedItemAlert> observedLevel;
         private long consumedSequence;
 
-        internal void Update(NativeHudState.DestroyedItemAlert latest, bool enabled, double now)
+        internal void Update(List<NativeHudState.DestroyedItemAlert> events, bool enabled, double now)
         {
-            if (latest == null)
+            if (observedLevel != events || !enabled)
             {
-                Current = null;
-                return;
+                Active.Clear();
+                observedLevel = events;
             }
+            if (events.Count == 0) return;
+            long newest = events[events.Count - 1].Sequence;
             if (!enabled)
             {
-                consumedSequence = Math.Max(consumedSequence, latest.Sequence);
-                Current = null;
+                consumedSequence = newest;
                 return;
             }
-            if (latest.Sequence > consumedSequence)
+            int expired = 0;
+            while (expired < Active.Count && now - Active[expired].ShownAt >= ShowDuration) expired++;
+            if (expired > 0) Active.RemoveRange(0, expired);
+            if (newest <= consumedSequence) return;
+            foreach (var item in events)
             {
-                consumedSequence = latest.Sequence;
-                double age = now - latest.At;
-                Current = age >= 0 && age <= MaxFreshAge ? latest : null;
-                ShownAt = now;
+                double age = now - item.At;
+                if (item.Sequence > consumedSequence && age >= 0 && age <= MaxFreshAge)
+                    Active.Add(new Entry { Event = item, ShownAt = now });
             }
-            if (Current != null && now - ShownAt >= ShowDuration) Current = null;
+            consumedSequence = newest;
         }
     }
 }

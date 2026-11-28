@@ -28,6 +28,8 @@ Look under the third tile. The blue eye bar fills as the monster notices you, th
 
 ### Native game UI effects
 
+To preview the in-game visual style, set `Style = Game` in `[Native - Appearance]` in `OverlayHUD.cfg`. Map value and losses use the level timer's typography with Taxman emoji. `WrapValueLabels` stacks map value above losses when enabled and puts the amounts side by side when disabled. Monster portraits use the inventory slot background. Health and detection bars span each portrait in six segments. When an item takes damage, the loss counter flashes and counts up to the new total. When a monster spots you, its detection bar shows three Taxman emoji in order: a monster, a watching eye, and the player. Destroyed-item alerts show the player and item in red and the word “destroyed” in white. Both styles use the `UseGameUIEffects` setting in **Native - Effects**.
+
 **UseGameUIEffects on** · Game bloom and colour fringing
 
 ![Game UI effects on](https://raw.githubusercontent.com/Dunweir/OverlayHUD-repo/master/docs/images/ui-effects-on.png)
@@ -41,7 +43,7 @@ Look under the third tile. The blue eye bar fills as the monster notices you, th
 - **Monster information** — health bars, required grab strength, grouped counts, respawn timers and circular respawn indicators.
 - **Run overview** — current level, elapsed time, remaining valuable value and losses.
 - **Player upgrades** — icons for owned upgrades, with individual visibility controls.
-- **Visual feedback** — proximity waves, floating damage numbers, animations and optional destroyed-item notifications showing the last holder.
+- **Visual feedback** — proximity waves, floating damage numbers, animations and optional destroyed-item notifications showing the last holder. Each break appears on its own line for six seconds.
 - **Flexible layout** — horizontal or grid layouts, alignment, offsets, scale, icon sizes, rows and columns.
 - **Russian and English** — localized interface and official game names in tooltips.
 - **Session timestamps** — local text logs of level starts, maps and encountered monsters.
@@ -59,14 +61,14 @@ Native HUD appearance settings can be changed live through **BepInEx Configurati
 - New monster artwork is enabled by default. Set `LegacyIcons = true` in **Appearance** to restore the original icons (`false` by default).
 - Choose `Language = en` or `ru` in **Native - General**; Russian is the default.
 - Show or hide individual HUD elements without stopping game-state tracking.
-- For hover tooltips, enable `ShowTooltips` and disable `UseGameUIEffects` in **Native - Effects**. Tooltips work when the game cursor is unlocked; the HUD does not unlock or capture it.
+- In Classic style, for hover tooltips, enable `ShowTooltips` and disable `UseGameUIEffects` in **Native - Effects**. Tooltips work when the game cursor is unlocked; the HUD does not unlock or capture it.
 - Timestamps are saved to `BepInEx/plugins/OverlayHUD/timestamps/` when `SaveTimestamps = true` (off by default).
 
 ### Multiplayer and limitations
 
 - Accurate client-side respawn timers and health synchronization require compatible, current OverlayHUD versions on the host and clients. Health synchronization is experimental.
 - Damage numbers show a monster's health loss from all sources, not an individual player's damage score.
-- Game UI effects are experimental and may reduce text sharpness. Disable `UseGameUIEffects` for independent, sharper rendering.
+- Game UI effects are experimental and may reduce text sharpness. In either style, disable `UseGameUIEffects` for independent, sharper rendering.
 - Monsters without a dedicated icon use a placeholder. Unsupported font characters appear as `?`.
 - This is an alternative edition of the same plugin, not an add-on for another OverlayHUD edition. Use only one copy per profile.
 
@@ -93,7 +95,7 @@ For bug reports, include `BepInEx/LogOutput.log`, your config and a short descri
 - **Информация о монстрах** — полоски здоровья, требуемая сила захвата, количество в группе, таймеры и круговые индикаторы респавна.
 - **Состояние забега** — текущий уровень, время прохождения, оставшаяся стоимость ценностей и потери.
 - **Улучшения игрока** — иконки полученных улучшений с отдельными переключателями видимости.
-- **Визуальные подсказки** — волны близости, всплывающие числа урона, анимации и включаемые уведомления об уничтоженных предметах с именем последнего державшего их игрока.
+- **Визуальные подсказки** — волны близости, всплывающие числа урона, анимации и включаемые уведомления об уничтоженных предметах с именем последнего державшего их игрока. Каждая поломка появляется отдельной строкой на шесть секунд.
 - **Гибкое расположение** — горизонтальный HUD или сетка, выравнивание, смещения, масштаб, размеры иконок, ряды и колонки.
 - **Русский и английский языки** — локализованный интерфейс и официальные игровые названия в подсказках.
 - **Таймкоды сессии** — локальные текстовые записи начала уровней, карт и встреченных монстров.
@@ -111,14 +113,14 @@ For bug reports, include `BepInEx/LogOutput.log`, your config and a short descri
 - Новые иконки монстров включены по умолчанию. Установите `LegacyIcons = true` в **Appearance**, чтобы вернуть прежние (`false` по умолчанию).
 - Язык выбирается параметром `Language = ru` или `en` в **Native - General**; по умолчанию — русский.
 - Отдельные элементы HUD можно скрывать, не останавливая отслеживание состояния игры.
-- Для подсказок при наведении включите `ShowTooltips` и отключите `UseGameUIEffects` в **Native - Effects**. Подсказки работают при разблокированном игровом курсоре; сам HUD не разблокирует и не перехватывает его.
+- Для подсказок при наведении выберите стиль `Classic`, включите `ShowTooltips` и отключите `UseGameUIEffects` в **Native - Effects**. Подсказки работают при разблокированном игровом курсоре; сам HUD не разблокирует и не перехватывает его.
 - Таймкоды сохраняются в `BepInEx/plugins/OverlayHUD/timestamps/`; запись включается параметром `SaveTimestamps = true` и по умолчанию выключена.
 
 ### Мультиплеер и ограничения
 
 - Для точных таймеров респавна у клиента и синхронизации ХП нужны совместимые актуальные версии OverlayHUD у хоста и клиентов. Синхронизация ХП экспериментальная.
 - Числа урона показывают потерю здоровья монстра от всех источников, а не личный урон игрока.
-- Эффекты игрового интерфейса экспериментальные и могут снижать чёткость текста. Отключите `UseGameUIEffects` для независимого, более чёткого вывода.
+- Эффекты игрового интерфейса экспериментальные и могут снижать чёткость текста. В обоих стилях можно отключить `UseGameUIEffects` для независимого, более чёткого вывода.
 - Монстры без собственной иконки отображаются с заглушкой. Неподдерживаемые шрифтом символы заменяются на `?`.
 - Это альтернативная версия того же плагина, а не дополнение к другой сборке OverlayHUD. В профиле должна быть только одна копия.
 

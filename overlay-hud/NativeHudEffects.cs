@@ -4,11 +4,50 @@ using UnityEngine.UI;
 
 namespace OverlayHUD
 {
-    // Remaining is a fraction: 1 covers the card, 0 clears it. Use black at .78
-    // alpha and a parent rounded stencil mask; this primitive clips to a square.
+    // Animate a visual child independently of layout, timer updates and damage/loss effects.
+    public sealed class NativeTextEntrance : MonoBehaviour
+    {
+        private NativeHud hud;
+        private RectTransform motion;
+
+        internal void Initialize(NativeHud owner, RectTransform visual)
+        {
+            hud = owner;
+            motion = visual;
+            Play();
+        }
+
+        private void OnEnable() => Play();
+
+        internal void Play()
+        {
+            if (hud == null || !isActiveAndEnabled) return;
+            StopAllCoroutines();
+            StartCoroutine(Enter());
+        }
+
+        private System.Collections.IEnumerator Enter()
+        {
+            float start = Time.unscaledTime;
+            while (hud.AnimateTextEntrance(motion, Time.unscaledTime - start)) yield return null;
+            ResetMotion();
+        }
+
+        private void OnDisable() => ResetMotion();
+
+        private void ResetMotion()
+        {
+            if (motion == null) return;
+            motion.anchoredPosition = Vector2.zero;
+            motion.localScale = Vector3.one;
+        }
+    }
+
+    // Remaining is a fraction: 1 covers the entire rect, 0 clears it.
     public sealed class NativeCooldownSector : MaskableGraphic
     {
         private float remaining;
+        internal bool ShowHand;
         internal float Remaining
         {
             get => remaining;
@@ -25,13 +64,14 @@ namespace OverlayHUD
         {
             mesh.Clear();
             var rect = rectTransform.rect;
-            if (remaining <= 0 || rect.width <= 0 || rect.height <= 0) return;
+            if (remaining <= 0 || rect.width <= 0 || rect.height <= 0 || color.a <= 0) return;
 
             float start = (1 - remaining) * 360;
             // Corner angles depend on aspect ratio, not just multiples of 45.
             float corner = Mathf.Atan2(rect.width, rect.height) * Mathf.Rad2Deg;
             mesh.AddVert(rect.center, color, Vector2.zero);
-            AddRay(mesh, rect, start);
+            Vector2 edge = RayEnd(rect, start);
+            mesh.AddVert(edge, color, Vector2.zero);
             float angle = start;
             while (angle < 360)
             {
@@ -40,10 +80,35 @@ namespace OverlayHUD
                 next = IncludeCorner(angle, next, 180 - corner);
                 next = IncludeCorner(angle, next, 180 + corner);
                 next = IncludeCorner(angle, next, 360 - corner);
-                AddRay(mesh, rect, next);
+                mesh.AddVert(RayEnd(rect, next), color, Vector2.zero);
                 int last = mesh.currentVertCount - 1;
                 mesh.AddTriangle(0, last - 1, last);
                 angle = next;
+            }
+            if (ShowHand)
+            {
+                Vector2 dir = (edge - rect.center).normalized;
+                Vector2 normal = new Vector2(-dir.y, dir.x);
+                var camera = canvas.renderMode == RenderMode.ScreenSpaceOverlay ? null : canvas.worldCamera;
+                Vector2 a = RectTransformUtility.WorldToScreenPoint(camera, rectTransform.TransformPoint(rect.center));
+                Vector2 b = RectTransformUtility.WorldToScreenPoint(camera, rectTransform.TransformPoint(rect.center + normal));
+                float pixel = 1 / Mathf.Max(.2f, Vector2.Distance(a, b));
+                float core = Mathf.Max(1.35f - pixel / 2, .25f * pixel);
+                int first = mesh.currentVertCount;
+                for (int i = 0; i < 4; i++)
+                {
+                    // A one-render-pixel alpha ramp on either side also covers the low-res UI camera.
+                    bool outside = i == 0 || i == 3;
+                    float offset = (outside ? core + pixel : core) * (i < 2 ? -1 : 1);
+                    Vector2 from = rect.center + normal * offset;
+                    var tint = new Color(.72f, .72f, .72f, outside ? 0 : color.a);
+                    mesh.AddVert(from, tint, Vector2.zero);
+                    mesh.AddVert(RayEnd(rect, from, dir), tint, Vector2.zero);
+                    if (i == 0) continue;
+                    int n = first + 2 * i;
+                    mesh.AddTriangle(n - 2, n, n + 1);
+                    mesh.AddTriangle(n - 2, n + 1, n - 1);
+                }
             }
         }
 
@@ -52,16 +117,59 @@ namespace OverlayHUD
             return corner > angle && corner < next ? corner : next;
         }
 
-        private void AddRay(VertexHelper mesh, Rect rect, float degrees)
+        private static Vector2 RayEnd(Rect rect, float degrees)
         {
             float radians = degrees * Mathf.Deg2Rad;
             var ray = new Vector2(Mathf.Sin(radians), Mathf.Cos(radians)).normalized;
-            // Intersect the ray with the square instead of using an inscribed
-            // circle. Its diagonal is an upper bound even at an axial ray.
+            return RayEnd(rect, rect.center, ray);
+        }
+
+        private static Vector2 RayEnd(Rect rect, Vector2 from, Vector2 ray)
+        {
             float distance = rect.size.magnitude;
-            if (Mathf.Abs(ray.x) > .000001f) distance = Mathf.Min(distance, rect.width * .5f / Mathf.Abs(ray.x));
-            if (Mathf.Abs(ray.y) > .000001f) distance = Mathf.Min(distance, rect.height * .5f / Mathf.Abs(ray.y));
-            mesh.AddVert(rect.center + ray * distance, color, Vector2.zero);
+            if (Mathf.Abs(ray.x) > .000001f) distance = Mathf.Min(distance, ((ray.x > 0 ? rect.xMax : rect.xMin) - from.x) / ray.x);
+            if (Mathf.Abs(ray.y) > .000001f) distance = Mathf.Min(distance, ((ray.y > 0 ? rect.yMax : rect.yMin) - from.y) / ray.y);
+            return from + ray * distance;
+        }
+    }
+
+    public sealed class NativeBatteryFrame : MaskableGraphic
+    {
+        private float ratio;
+
+        internal void SetFill(float value, Color tint)
+        {
+            color = tint;
+            if (ratio == value) return;
+            ratio = Mathf.Clamp01(value);
+            SetVerticesDirty();
+        }
+
+        protected override void OnPopulateMesh(VertexHelper mesh)
+        {
+            mesh.Clear();
+            Rect r = rectTransform.rect;
+            const int cells = 6;
+            const float gap = 2;
+            float width = (r.width - gap * (cells - 1)) / cells;
+            for (int i = 0; i < cells; i++)
+            {
+                float x = r.xMin + i * (width + gap);
+                AddRect(mesh, x, r.yMin, x + width, r.yMax, new Color32(17, 17, 17, 210));
+                float fill = Mathf.Clamp01(ratio * cells - i);
+                if (fill > 0) AddRect(mesh, x, r.yMin, x + width * fill, r.yMax, color);
+            }
+        }
+
+        private static void AddRect(VertexHelper mesh, float left, float bottom, float right, float top, Color32 tint)
+        {
+            int n = mesh.currentVertCount;
+            mesh.AddVert(new Vector3(left, bottom), tint, Vector2.zero);
+            mesh.AddVert(new Vector3(left, top), tint, Vector2.zero);
+            mesh.AddVert(new Vector3(right, top), tint, Vector2.zero);
+            mesh.AddVert(new Vector3(right, bottom), tint, Vector2.zero);
+            mesh.AddTriangle(n, n + 1, n + 2);
+            mesh.AddTriangle(n, n + 2, n + 3);
         }
     }
 

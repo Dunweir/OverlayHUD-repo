@@ -12,7 +12,15 @@ static void Destroyed(NativeHudState target, string player, string item, double 
 LanguageTests.Run();
 
 var defaults = new NativeHudOptions();
-Check(defaults.Scale == 1 && defaults.OffsetX == 0 && defaults.OffsetY == 30
+foreach (bool effects in new[] { false, true })
+{
+    var options = new NativeHudOptions { UseGameUIEffects = effects };
+    options.GameStyle = true;
+    Check(options.UseGameUIEffects == effects, "Game style changed the saved effects setting");
+    options.GameStyle = false;
+    Check(options.UseGameUIEffects == effects, "Classic style changed the saved effects setting");
+}
+Check(defaults.Scale == 1 && defaults.OffsetX == 0 && defaults.OffsetY == 50
     && defaults.MonsterSize == 70 && defaults.UpgradeSize == 38 && defaults.Columns == 4
     && defaults.HorizontalColumns == 11 && defaults.UpgradeRows == 2
     && defaults.Language == NativeHudLanguage.DefaultLanguage && defaults.Alignment == "Center" && defaults.HiddenUpgrades.Count == 0,
@@ -255,108 +263,114 @@ Console.WriteLine("Native HUD timestamp checks passed.");
 var alerts = new NativeHudState();
 alerts.Apply("level", "{\"level\":1}", 0);
 Destroyed(alerts, "  Ив\u0000ан\t  Smith\n", "  Ваза\r\n золотая\u200b ", 10);
-var firstAlert = alerts.LastDestroyedItem;
+var firstAlert = alerts.DestroyedItems.Last();
 Check(firstAlert.Player == "Иван Smith" && firstAlert.Item == "Ваза золотая" && firstAlert.At == 10,
     "Alert names were not sanitized or native seconds were lost");
 var alertClock = new NativeAlertLifetime();
-alertClock.Update(firstAlert, true, 10);
-Check(alertClock.Current == firstAlert && alertClock.ShownAt == 10, "Fresh alert did not start");
+alertClock.Update(alerts.DestroyedItems, true, 10);
+Check(alertClock.Active.Last().Event == firstAlert && alertClock.Active.Last().ShownAt == 10, "Fresh alert did not start");
 Destroyed(alerts, "Bob", "Cup", 10);
-var secondAlert = alerts.LastDestroyedItem;
+var secondAlert = alerts.DestroyedItems.Last();
 Check(secondAlert.Sequence > firstAlert.Sequence && secondAlert.At == firstAlert.At,
     "Same-timestamp alert did not get a new sequence");
-alertClock.Update(secondAlert, true, 11);
-Check(alertClock.Current == secondAlert && alertClock.ShownAt == 11, "Newest same-time alert did not replace current");
-alertClock.Update(secondAlert, true, 16.999);
-Check(alertClock.Current == secondAlert && alertClock.ShownAt == 11, "Repeated ticks restarted or prematurely expired alert");
-alertClock.Update(secondAlert, true, 17);
-Check(alertClock.Current == null, "Alert outlived six seconds");
-alertClock.Update(secondAlert, true, 18);
-Check(alertClock.Current == null, "Consumed alert replayed");
+alertClock.Update(alerts.DestroyedItems, true, 11);
+Check(alertClock.Active.Select(entry => entry.Event).SequenceEqual(new[] { firstAlert, secondAlert })
+    && alertClock.Active[0].ShownAt == 10 && alertClock.Active[1].ShownAt == 11, "Second alert displaced or restarted the first");
+alertClock.Update(alerts.DestroyedItems, true, 16.999);
+Check(alertClock.Active.Single().Event == secondAlert && alertClock.Active.Single().ShownAt == 11, "Repeated ticks restarted or prematurely expired alert");
+alertClock.Update(alerts.DestroyedItems, true, 17);
+Check(alertClock.Active.Count == 0, "Alert outlived six seconds");
+alertClock.Update(alerts.DestroyedItems, true, 18);
+Check(alertClock.Active.Count == 0, "Consumed alert replayed");
 foreach (string badName in new[] { "null", "42", "true", "{}", "[]", "\"\"", "\" \\t\\r\\n\\u0000\\u200b\"" })
 {
     alerts.Apply("item-destroyed", "{\"player\":" + badName + ",\"item\":\"Cup\"}", 19);
     alerts.Apply("item-destroyed", "{\"player\":\"Bob\",\"item\":" + badName + "}", 19);
-    Check(alerts.LastDestroyedItem == secondAlert, "Invalid name replaced the latest alert: " + badName);
+    Check(alerts.DestroyedItems.Last() == secondAlert, "Invalid name replaced the latest alert: " + badName);
 }
 alerts.Apply("item-destroyed", "{}", 19);
-Check(alerts.LastDestroyedItem == secondAlert, "Missing names replaced the latest alert");
+Check(alerts.DestroyedItems.Last() == secondAlert, "Missing names replaced the latest alert");
 foreach (double invalidTime in new[] { double.NaN, double.PositiveInfinity, double.NegativeInfinity })
     Destroyed(alerts, "Bob", "Cup", invalidTime);
-Check(alerts.LastDestroyedItem == secondAlert, "Non-finite timestamp replaced the latest alert");
+Check(alerts.DestroyedItems.Last() == secondAlert, "Non-finite timestamp replaced the latest alert");
 Destroyed(alerts, new string('Я', 70), new string('A', 90), 20);
-Check(alerts.LastDestroyedItem.Player == new string('Я', 60) && alerts.LastDestroyedItem.Item == new string('A', 80),
+Check(alerts.DestroyedItems.Last().Player == new string('Я', 60) && alerts.DestroyedItems.Last().Item == new string('A', 80),
     "Player/item caps are not 60/80 characters");
-Check(alerts.LastDestroyedItem.Sequence == secondAlert.Sequence + 1, "Invalid payloads advanced sequence");
+Check(alerts.DestroyedItems.Last().Sequence == secondAlert.Sequence + 1, "Invalid payloads advanced sequence");
 Destroyed(alerts, new string('A', 59) + "😀", new string('B', 79) + "😀", 20);
-Check(alerts.LastDestroyedItem.Player.Length == 59 && alerts.LastDestroyedItem.Item.Length == 79,
+Check(alerts.DestroyedItems.Last().Player.Length == 59 && alerts.DestroyedItems.Last().Item.Length == 79,
     "Name caps split a surrogate pair");
 
 var freshClock = new NativeAlertLifetime();
-freshClock.Update(alerts.LastDestroyedItem, true, 35);
-Check(freshClock.Current != null, "Exactly fifteen-second-old event was rejected");
-freshClock.Update(alerts.LastDestroyedItem, true, 40.999);
-Check(freshClock.Current != null, "Freshness limit incorrectly shortened the six-second presentation");
-freshClock.Update(alerts.LastDestroyedItem, true, 41);
-Check(freshClock.Current == null, "Delayed fresh event outlived its presentation");
+freshClock.Update(alerts.DestroyedItems, true, 35);
+Check(freshClock.Active.Count > 0, "Exactly fifteen-second-old event was rejected");
+freshClock.Update(alerts.DestroyedItems, true, 40.999);
+Check(freshClock.Active.Count > 0, "Freshness limit incorrectly shortened the six-second presentation");
+freshClock.Update(alerts.DestroyedItems, true, 41);
+Check(freshClock.Active.Count == 0, "Delayed fresh event outlived its presentation");
 var staleClock = new NativeAlertLifetime();
-staleClock.Update(alerts.LastDestroyedItem, true, 35.001);
-Check(staleClock.Current == null, "Stale event was shown");
-staleClock.Update(alerts.LastDestroyedItem, true, 35);
-Check(staleClock.Current == null, "Stale event was not consumed");
+staleClock.Update(alerts.DestroyedItems, true, 35.001);
+Check(staleClock.Active.Count == 0, "Stale event was shown");
+staleClock.Update(alerts.DestroyedItems, true, 35);
+Check(staleClock.Active.Count == 0, "Stale event was not consumed");
 
 Destroyed(alerts, "Bob", "Plate", 50);
-alertClock.Update(alerts.LastDestroyedItem, true, 50);
-alertClock.Update(alerts.LastDestroyedItem, false, 51);
-Check(alertClock.Current == null, "Disabling did not immediately hide the active alert");
-alertClock.Update(alerts.LastDestroyedItem, true, 51);
-Check(alertClock.Current == null, "Re-enabling replayed the active alert");
+alertClock.Update(alerts.DestroyedItems, true, 50);
+alertClock.Update(alerts.DestroyedItems, false, 51);
+Check(alertClock.Active.Count == 0, "Disabling did not immediately hide the active alert");
+alertClock.Update(alerts.DestroyedItems, true, 51);
+Check(alertClock.Active.Count == 0, "Re-enabling replayed the active alert");
 Destroyed(alerts, "Bob", "Bottle", 52);
-alertClock.Update(alerts.LastDestroyedItem, false, 52);
-alertClock.Update(alerts.LastDestroyedItem, true, 53);
-Check(alertClock.Current == null, "Re-enabling replayed an alert received while disabled");
+alertClock.Update(alerts.DestroyedItems, false, 52);
+alertClock.Update(alerts.DestroyedItems, true, 53);
+Check(alertClock.Active.Count == 0, "Re-enabling replayed an alert received while disabled");
 Destroyed(alerts, "Bob", "Statue", 54);
-alertClock.Update(alerts.LastDestroyedItem, true, 54);
+alertClock.Update(alerts.DestroyedItems, true, 54);
 Destroyed(alerts, "Bob", "Vase", 55);
-alertClock.Update(alerts.LastDestroyedItem, false, 55);
-alertClock.Update(alerts.LastDestroyedItem, true, 55);
-Check(alertClock.Current == null, "Disabling failed to consume both the active and pending replacement");
+alertClock.Update(alerts.DestroyedItems, false, 55);
+alertClock.Update(alerts.DestroyedItems, true, 55);
+Check(alertClock.Active.Count == 0, "Disabling failed to consume both the active and pending replacement");
 
 alerts.Apply("tab-hidden", "{\"hidden\":true}", 60);
 Destroyed(alerts, "Bob", "Hidden item", 60);
-alertClock.Update(alerts.LastDestroyedItem, true, 60);
-Check(alertClock.Current != null && alertClock.ShownAt == 60, "Hidden HUD did not consume a fresh event");
-alertClock.Update(alerts.LastDestroyedItem, true, 66);
+alertClock.Update(alerts.DestroyedItems, true, 60);
+Check(alertClock.Active.Count > 0 && alertClock.Active.Last().ShownAt == 60, "Hidden HUD did not consume a fresh event");
+alertClock.Update(alerts.DestroyedItems, true, 66);
 alerts.Apply("tab-hidden", "{\"hidden\":false}", 67);
-alertClock.Update(alerts.LastDestroyedItem, true, 67);
-Check(alertClock.Current == null, "Hidden HUD paused an alert or replayed it on reveal");
+alertClock.Update(alerts.DestroyedItems, true, 67);
+Check(alertClock.Active.Count == 0, "Hidden HUD paused an alert or replayed it on reveal");
 alerts.Visible = false;
 Destroyed(alerts, "Bob", "Inactive item", 70);
-alertClock.Update(alerts.LastDestroyedItem, true, 70);
-alertClock.Update(alerts.LastDestroyedItem, true, 76);
+alertClock.Update(alerts.DestroyedItems, true, 70);
+alertClock.Update(alerts.DestroyedItems, true, 76);
 alerts.Visible = true;
-alertClock.Update(alerts.LastDestroyedItem, true, 77);
-Check(alertClock.Current == null, "Inactive HUD replayed an expired alert");
+alertClock.Update(alerts.DestroyedItems, true, 77);
+Check(alertClock.Active.Count == 0, "Inactive HUD replayed an expired alert");
 Destroyed(alerts, "Bob", "Old level item", 80);
-alertClock.Update(alerts.LastDestroyedItem, true, 80);
-long oldSequence = alerts.LastDestroyedItem.Sequence;
+alertClock.Update(alerts.DestroyedItems, true, 80);
+long oldSequence = alerts.DestroyedItems.Last().Sequence;
 alerts.Apply("level", "{\"level\":1}", 80);
-Check(alerts.LastDestroyedItem == null, "Same-number level transition retained the alert");
-alertClock.Update(alerts.LastDestroyedItem, true, 80);
-Check(alertClock.Current == null, "Level transition retained the active presentation");
+Check(alerts.DestroyedItems.Count == 0, "Same-number level transition retained the alert");
+alertClock.Update(alerts.DestroyedItems, true, 80);
+Check(alertClock.Active.Count == 0, "Level transition retained the active presentation");
 Destroyed(alerts, "Bob", "New level item", 80);
-Check(alerts.LastDestroyedItem.Sequence > oldSequence, "Level transition reset the monotonic sequence");
-alertClock.Update(alerts.LastDestroyedItem, true, 80);
-Check(alertClock.Current == alerts.LastDestroyedItem, "New level's same-timestamp event was lost");
+Check(alerts.DestroyedItems.Last().Sequence > oldSequence, "Level transition reset the monotonic sequence");
+alertClock.Update(alerts.DestroyedItems, true, 80);
+Check(alertClock.Active.Last().Event == alerts.DestroyedItems.Last(), "New level's same-timestamp event was lost");
 alerts.Apply("level", "{\"level\":2}", 81);
 Destroyed(alerts, "Bob", "Next item", 81);
-alertClock.Update(alerts.LastDestroyedItem, true, 81);
-Check(alertClock.Current == alerts.LastDestroyedItem && alertClock.ShownAt == 81,
+alertClock.Update(alerts.DestroyedItems, true, 81);
+Check(alertClock.Active.Last().Event == alerts.DestroyedItems.Last() && alertClock.Active.Last().ShownAt == 81,
     "Level and new event between ticks retained the previous presentation");
 Destroyed(alerts, "Bob", "Pending old item", 82);
 alerts.Apply("level", "{\"level\":3}", 82);
-alertClock.Update(alerts.LastDestroyedItem, true, 82);
-Check(alertClock.Current == null && alerts.LastDestroyedItem == null, "Level transition retained a pending alert");
+alertClock.Update(alerts.DestroyedItems, true, 82);
+Check(alertClock.Active.Count == 0 && alerts.DestroyedItems.Count == 0, "Level transition retained a pending alert");
+Destroyed(alerts, "Bob", "Cup", 83);
+Destroyed(alerts, "Bob", "Plate", 83);
+alertClock.Update(alerts.DestroyedItems, true, 83);
+Check(alertClock.Active.Select(entry => entry.Event.Item).SequenceEqual(new[] { "Cup", "Plate" }),
+    "Lost or reordered multiple breaks before the next HUD tick");
 Console.WriteLine("Native HUD destroyed-item alert checks passed.");
 AlertLayoutTests.Run();
 
@@ -582,6 +596,25 @@ foreach (string name in new[] { "Trudge", "Animal", "Upscream", "Bowtie", "Menta
     Check(!sample.Monsters[1].Seen && sample.Monsters[1].Health == null
         && !sample.GetDisplayMonsters(0)[0].Seen, "Singleton was not copied");
 }
+var bangPacks = new NativeHudState();
+// Both game setups use the same Difficulty2 Banger prefab. A pair of normal
+// trios and a single six-pack must retain their spawn boundaries even if interleaved.
+for (int i = 0; i < 12; i++)
+{
+    int pack = i % 2 == 0 ? 42 : i < 6 ? 43 : 44;
+    bangPacks.Apply("roster", "{\"monsters\":[{\"id\":" + i + ",\"name\":\"Banger\",\"tier\":2,\"spawnGroup\":" + pack + "}]}", 0);
+    bangPacks.Apply("monster-status", "{\"statuses\":[{\"id\":" + i + ",\"alive\":true}]}", 1);
+}
+Check(bangPacks.GetDisplayMonsters(1).Select(m => m.Count).SequenceEqual(new[] { 6, 3, 3 }),
+    "Banger six-pack split or independent trios merged");
+bangPacks.Apply("monster-seen", "{\"id\":4,\"name\":\"Banger\"}", 2);
+Check(bangPacks.GetDisplayMonsters(2).Single(m => m.Seen).Count == 6, "Banger reveal lost pack membership");
+var arrivingPack = new NativeHudState();
+arrivingPack.Apply("monster-seen", "{\"id\":1,\"name\":\"Banger\",\"spawnGroup\":5}", 0);
+arrivingPack.Apply("roster", "{\"monsters\":[{\"id\":2,\"name\":\"Banger\",\"tier\":2,\"spawnGroup\":5}]}", 1);
+Check(arrivingPack.GetDisplayMonsters(1).Single().Tier == 2 && arrivingPack.GetDisplayMonsters(1).Single().Count == 2,
+    "Unknown initial tier briefly split a Banger pack");
+
 var tiers = new NativeHudState();
 Roster(tiers, "Gnomes", new[] { 30, 31 }, 3);
 Roster(tiers, "Gnomes", new[] { 20, 21 }, 2);
@@ -654,8 +687,8 @@ proximity.Apply("monster-status", "{\"statuses\":[{\"id\":1,\"alive\":true,\"pla
 Check(proximity.Monsters[1].PlayerClose && proximity.Monsters[1].PlayerVeryClose && !proximity.Monsters[1].Seen,
     "Incoming proximity was lost or revealed an unseen singleton");
 var proximityTile = proximity.GetDisplayMonsters(0).Single();
-Check(!proximityTile.Seen && !proximityTile.PlayerClose && !proximityTile.PlayerVeryClose,
-    "Unseen singleton exposed proximity visuals");
+Check(!proximityTile.Seen && proximityTile.PlayerClose && proximityTile.PlayerVeryClose,
+    "Unseen singleton lost proximity or was revealed by it");
 proximity.Apply("monster-seen", "{\"id\":1,\"name\":\"Trudge\"}", 1);
 proximity.Apply("roster", "{\"monsters\":[{\"id\":1,\"tier\":3}]}", 1);
 proximity.Apply("monster-status", "{\"statuses\":[{\"id\":1,\"alive\":true,\"health\":50}]}", 1);
@@ -687,11 +720,11 @@ Check(!proximity.GetDisplayMonsters(5).Single().PlayerClose && !proximity.GetDis
 var visualGroup = new NativeHudState();
 Roster(visualGroup, "Gnomes", new[] { 1, 2, 3 });
 visualGroup.Apply("monster-status", "{\"statuses\":[{\"id\":2,\"alive\":true,\"playerClose\":true,\"playerVeryClose\":true}]}", 0);
-Check(!visualGroup.GetDisplayMonsters(0).Single().Seen && !visualGroup.GetDisplayMonsters(0).Single().PlayerClose
-    && !visualGroup.GetDisplayMonsters(0).Single().PlayerVeryClose, "Unseen group exposed proximity");
+var unseenGroup = visualGroup.GetDisplayMonsters(0).Single();
+Check(!unseenGroup.Seen && unseenGroup.PlayerClose && unseenGroup.PlayerVeryClose, "Unseen group lost a member's proximity");
 visualGroup.Apply("monster-seen", "{\"id\":1}", 1);
-Check(!visualGroup.GetDisplayMonsters(1).Single().PlayerClose && !visualGroup.GetDisplayMonsters(1).Single().PlayerVeryClose,
-    "Seen group leaked an unseen member's proximity");
+Check(visualGroup.GetDisplayMonsters(1).Single().PlayerClose && visualGroup.GetDisplayMonsters(1).Single().PlayerVeryClose,
+    "Revealing another group member suppressed proximity");
 visualGroup.Apply("monster-seen", "{\"id\":2}", 2);
 var visualTile = visualGroup.GetDisplayMonsters(2).Single();
 Check(visualTile.PlayerClose && visualTile.PlayerVeryClose, "Non-leading seen member did not contribute proximity");

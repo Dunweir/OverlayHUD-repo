@@ -39,7 +39,7 @@ BepInEx creates `BepInEx/config/OverlayHUD.cfg` after first launch.
 | `General` (Full only) | `Renderer = Electron`; alternative `Native`, restart required |
 | `Detection` | `ScanIntervalSeconds = 3`, `StatusIntervalSeconds = 10` (minimum 10), `RevealMonstersOnEncounter = true`, `RevealUnknownMonsters = false`, `PreferPlayerVisionDetection = true` |
 | `Native - General` | `Enabled = true`, `Language = ru`, `SaveTimestamps = false` |
-| `Native - Layout` | `Alignment = Center`, `Scale = 1`, `OffsetX = 0`, `OffsetY = 30`, `HorizontalLayout = true`, `HorizontalColumns = 11`, `Columns = 4`, `MonsterSize = 70`, `UpgradeSize = 38`, `UpgradeRows = 2`, `WrapValueLabels = true` |
+| `Native - Layout` | `Alignment = Center`, `Scale = 1`, `OffsetX = 0`, `OffsetY = 50`, `HorizontalLayout = true`, `HorizontalColumns = 11`, `Columns = 4`, `MonsterSize = 70`, `UpgradeSize = 38`, `UpgradeRows = 2`, `WrapValueLabels = true` |
 | `Native - Information` | `ShowLevel`, `ShowTimer`, `ShowMapValue`, `ShowLostValue`, `ShowUpgrades` (all true) |
 | `Native - Monsters` | `ShowMonsters`, `ShowHealth`, `ShowRespawnTimer`, `ShowRespawnIndicator`, `ShowStrength`, `ShowMonsterCounts` (true); `OnlyAliveMonsters`, `FilterUndetectedMonsters` (false) |
 | `Native - Effects` | `Animations`, `ShowProximityWaves`, `ShowDamageNumbers`, `UseGameUIEffects` (true); `ShowDestroyedItemAlerts`, `ShowTooltips` (false) |

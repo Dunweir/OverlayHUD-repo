@@ -714,6 +714,13 @@ namespace OverlayHUD
                     Logger.LogInfo("Patched PhysGrabObject.GrabPlayerAddRPC for last-grabber tracking.");
                 }
 
+                var bangDirectorAwake = AccessTools.Method("EnemyBangDirector:Awake");
+                var enemyParentAwake = AccessTools.Method("EnemyParent:Awake");
+                if (bangDirectorAwake != null && enemyParentAwake != null)
+                {
+                    harmony.Patch(bangDirectorAwake, prefix: new HarmonyMethod(typeof(Plugin), nameof(BangPackStarted)));
+                    harmony.Patch(enemyParentAwake, postfix: new HarmonyMethod(typeof(Plugin), nameof(RecordBangPack)));
+                }
                 PatchVisionProgress(harmony);
                 if (enemyVisionTrigger != null)
                 {
@@ -824,6 +831,34 @@ namespace OverlayHUD
                 // With no local avatar yet, defer a local table read. Never use the event owner's value.
                 if (string.IsNullOrEmpty(localId) || localId == _steamID) instance.pendingUpgradeKeys.Add(stateKey);
             }
+        }
+
+        // Each vanilla Bang setup instantiates a director followed by three or six identical
+        // EnemyParents. The game destroys duplicate directors, so observe Awake before that.
+        private sealed class BangPack
+        {
+            internal int Id, Scene, Members;
+        }
+        private static int bangPackSequence;
+        private static BangPack currentBangPack;
+        private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<Component, BangPack> bangPacks =
+            new System.Runtime.CompilerServices.ConditionalWeakTable<Component, BangPack>();
+
+        private static void BangPackStarted(Component __instance)
+        {
+            currentBangPack = new BangPack { Id = ++bangPackSequence, Scene = __instance.gameObject.scene.handle };
+        }
+
+        private static void RecordBangPack(Component __instance)
+        {
+            if (currentBangPack == null) return;
+            if (__instance.gameObject.scene.handle != currentBangPack.Scene || ResolveMonsterName(__instance) != "Banger")
+            {
+                currentBangPack = null;
+                return;
+            }
+            bangPacks.Add(__instance, currentBangPack);
+            if (++currentBangPack.Members == 6) currentBangPack = null;
         }
 
         private static void EnemyParentSpawnedPostfix(object __instance)
@@ -2718,6 +2753,9 @@ namespace OverlayHUD
 
         private static void AppendMonsterMetadata(StringBuilder json, EnemyCandidate candidate)
         {
+            var parent = GetEnemyParent(candidate);
+            if (parent != null && bangPacks.TryGetValue(parent, out var pack))
+                json.Append(",\"spawnGroup\":").Append(pack.Id.ToString(CultureInfo.InvariantCulture));
             if (IsUnknownMonster(candidate)) json.Append(",\"unknown\":true");
             json.Append(",\"strength\":");
             // Peeper cannot be grabbed and has no usable grab-force metadata.
